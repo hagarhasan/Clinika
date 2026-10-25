@@ -1,0 +1,8 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+clinika.db
+.vercel
+node_modules/
+dist/
