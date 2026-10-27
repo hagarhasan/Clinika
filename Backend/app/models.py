@@ -2,9 +2,11 @@ from datetime import date, datetime, time, timezone
 from enum import Enum
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -15,6 +17,7 @@ from sqlalchemy import (
     UniqueConstraint,
     CheckConstraint,
 )
+from sqlalchemy import false as sa_false, true as sa_true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -38,6 +41,18 @@ class AppointmentStatus(str, Enum):
     no_show = "no_show"
 
 
+class DoctorStatus(str, Enum):
+    pending = "pending"
+    active = "active"
+    inactive = "inactive"
+    rejected = "rejected"
+
+
+class ConsultationType(str, Enum):
+    in_person = "in_person"
+    online = "online"
+
+
 ACTIVE_STATUSES = (AppointmentStatus.pending.value, AppointmentStatus.confirmed.value)
 
 
@@ -53,6 +68,9 @@ class User(Base):
     phone: Mapped[str | None] = mapped_column(String(30))
     role: Mapped[str] = mapped_column(String(20), index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(500))
+    # بيزيد لما الباسورد يتغير/يتعمل reset فكل التوكنات القديمة تبطل
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     def refresh_full_name(self) -> None:
@@ -76,6 +94,11 @@ class Clinic(Base):
     city: Mapped[str | None] = mapped_column(String(100), index=True)
     phone: Mapped[str | None] = mapped_column(String(30))
     email: Mapped[str | None] = mapped_column(String(255))
+    district: Mapped[str | None] = mapped_column(String(100), index=True)  # المنطقة: Maadi, Zamalek...
+    latitude: Mapped[float | None] = mapped_column(Float)
+    longitude: Mapped[float | None] = mapped_column(Float)
+    photo_url: Mapped[str | None] = mapped_column(String(500))
+    parking_info: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -112,6 +135,10 @@ class Patient(Base):
     def phone(self) -> str | None:
         return self.user.phone
 
+    @property
+    def avatar_url(self) -> str | None:
+        return self.user.avatar_url
+
 
 class Doctor(Base):
     __tablename__ = "doctors"
@@ -125,11 +152,33 @@ class Doctor(Base):
     consultation_fee: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     license_number: Mapped[str | None] = mapped_column(String(60))
     slot_duration_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    # is_active بيفضل المصدر اللي باقي الكود بيفلتر بيه؛ status هو الحالة الكاملة
+    # (pending/active/inactive/rejected) وبيتزامنوا عن طريق services.doctors.set_doctor_status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str] = mapped_column(
+        String(20), default=DoctorStatus.active.value, server_default=DoctorStatus.active.value, index=True
+    )
+    rejection_reason: Mapped[str | None] = mapped_column(Text)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    gender: Mapped[str | None] = mapped_column(String(10))
+    title: Mapped[str | None] = mapped_column(String(150))  # مثلا: Primary Care Physician
+    room: Mapped[str | None] = mapped_column(String(60))
+    languages: Mapped[list | None] = mapped_column(JSON)
+    focus_areas: Mapped[list | None] = mapped_column(JSON)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa_false())
+    accepting_new_patients: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa_true())
+    offers_online: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa_false())
 
     user: Mapped[User] = relationship(lazy="joined")
     specialty: Mapped[Specialty | None] = relationship(lazy="joined")
     clinic: Mapped[Clinic | None] = relationship(lazy="joined")
+    credentials: Mapped[list["DoctorCredential"]] = relationship(
+        lazy="selectin", cascade="all, delete-orphan", order_by="DoctorCredential.id"
+    )
+
+    @property
+    def photo_url(self) -> str | None:
+        return self.user.avatar_url
 
     @property
     def first_name(self) -> str:
@@ -160,6 +209,19 @@ class Doctor(Base):
         return self.clinic.name if self.clinic else None
 
 
+class DoctorCredential(Base):
+    """التعليم والشهادات (kind = education | certification)"""
+
+    __tablename__ = "doctor_credentials"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    doctor_id: Mapped[int] = mapped_column(ForeignKey("doctors.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(20), default="education")
+    title: Mapped[str] = mapped_column(String(200))
+    institution: Mapped[str | None] = mapped_column(String(200))
+    year: Mapped[int | None] = mapped_column(Integer)
+
+
 class DoctorSchedule(Base):
     """جدول العمل الأسبوعي. day_of_week: 0=الاثنين ... 6=الأحد (زي Python weekday)"""
 
@@ -172,6 +234,14 @@ class DoctorSchedule(Base):
     start_time: Mapped[time] = mapped_column(Time)
     end_time: Mapped[time] = mapped_column(Time)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # العيادة اللي الدكتور فيها في الفترة دي. NULL = عيادته الأساسية (Doctor.clinic_id)
+    clinic_id: Mapped[int | None] = mapped_column(ForeignKey("clinics.id", ondelete="SET NULL"), index=True)
+
+    clinic: Mapped["Clinic | None"] = relationship(lazy="joined")
+
+    @property
+    def clinic_name(self) -> str | None:
+        return self.clinic.name if self.clinic else None
 
 
 class DoctorTimeOff(Base):
@@ -210,11 +280,20 @@ class Appointment(Base):
     cancellation_reason: Mapped[str | None] = mapped_column(Text)
     cancelled_by: Mapped[str | None] = mapped_column(String(20))
     reminder_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    consultation_type: Mapped[str] = mapped_column(
+        String(20), default=ConsultationType.in_person.value, server_default=ConsultationType.in_person.value
+    )
+    reference_number: Mapped[str | None] = mapped_column(String(30), unique=True, index=True)  # APT-2026-0042
+    fee_at_booking: Mapped[float | None] = mapped_column(Numeric(10, 2))  # سعر الكشف وقت الحجز
+    meeting_link: Mapped[str | None] = mapped_column(String(500))
+    # العيادة اللي اتحجز فيها الموعد (بتتحدد من جدول الدكتور وقت الحجز)
+    clinic_id: Mapped[int | None] = mapped_column(ForeignKey("clinics.id", ondelete="SET NULL"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     patient: Mapped[Patient] = relationship(lazy="joined")
     doctor: Mapped[Doctor] = relationship(lazy="joined")
+    clinic: Mapped[Clinic | None] = relationship(lazy="joined")
 
 
 class MedicalRecord(Base):
@@ -307,3 +386,42 @@ class AuditLog(Base):
     entity_type: Mapped[str] = mapped_column(String(60))
     entity_id: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PasswordResetToken(Base):
+    """توكنات نسيت كلمة السر: بنخزن الـ hash بس، صالحة مرة واحدة ولمدة محدودة"""
+
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ContactMessage(Base):
+    __tablename__ = "contact_messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    subject: Mapped[str | None] = mapped_column(String(200))
+    message: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="new", server_default="new", index=True)  # new|read|resolved
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class ActivityLog(Base):
+    """Recent Activity في لوحة الأدمن (غير audit_logs اللي للبيانات الطبية)"""
+
+    __tablename__ = "activity_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    actor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    action: Mapped[str] = mapped_column(String(60))
+    entity_type: Mapped[str] = mapped_column(String(60))
+    entity_id: Mapped[int | None] = mapped_column(Integer)
+    description: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)

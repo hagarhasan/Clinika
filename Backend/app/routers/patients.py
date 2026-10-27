@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import get_current_patient, get_current_user, require_roles
-from ..models import Appointment, AppointmentStatus, Patient, Role, User
+from ..models import ACTIVE_STATUSES, Appointment, AppointmentStatus, Patient, Role, User
 from ..schemas import PatientOut, PatientUpdate
 from ..services.access import doctor_has_patient, get_doctor_profile
+from ..services.serializers import appointment_out
+from ..services.slots import now_local, to_local_dt
 
 router = APIRouter(prefix="/patients", tags=["Patients"])
 
@@ -22,7 +24,7 @@ def update_my_profile(
     patient: Patient = Depends(get_current_patient),
     db: Session = Depends(get_db),
 ):
-    data = payload.model_dump(exclude_unset=True)
+    data = payload.model_dump(exclude_unset=True, exclude={"full_name"})
     for field in ("first_name", "last_name", "phone"):
         if field in data:
             setattr(patient.user, field, data.pop(field))
@@ -31,6 +33,40 @@ def update_my_profile(
         setattr(patient, field, value)
     db.commit()
     return patient
+
+
+@router.get("/me/stats")
+def my_stats(patient: Patient = Depends(get_current_patient), db: Session = Depends(get_db)):
+    """عدّادات داشبورد المريض + أقرب موعد قادم."""
+    now = now_local()
+    rows = db.execute(
+        select(Appointment.status, func.count(Appointment.id))
+        .where(Appointment.patient_id == patient.id)
+        .group_by(Appointment.status)
+    ).all()
+    by_status = {s.value: 0 for s in AppointmentStatus}
+    by_status.update({r[0]: r[1] for r in rows})
+
+    upcoming = [
+        a
+        for a in db.scalars(
+            select(Appointment)
+            .where(
+                Appointment.patient_id == patient.id,
+                Appointment.status.in_(ACTIVE_STATUSES),
+                Appointment.appointment_date >= now.date(),
+            )
+            .order_by(Appointment.appointment_date, Appointment.start_time)
+        ).unique().all()
+        if to_local_dt(a.appointment_date, a.start_time) >= now
+    ]
+    return {
+        "upcoming": len(upcoming),
+        "completed": by_status[AppointmentStatus.completed.value],
+        "cancelled": by_status[AppointmentStatus.cancelled.value],
+        "total": sum(by_status.values()),
+        "next_appointment": appointment_out(db, upcoming[0]) if upcoming else None,
+    }
 
 
 @router.get("", response_model=list[PatientOut])

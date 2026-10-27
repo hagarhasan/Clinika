@@ -1,18 +1,30 @@
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..database import get_db
 from ..deps import get_current_patient, get_current_user
-from ..models import ACTIVE_STATUSES, Appointment, AppointmentStatus, Doctor, Patient, Role, User
-from ..schemas import AppointmentCreate, AppointmentOut, CancelIn, RescheduleIn, StatusUpdateIn
+from ..models import (
+    ACTIVE_STATUSES,
+    Appointment,
+    AppointmentStatus,
+    ConsultationType,
+    Doctor,
+    Patient,
+    Role,
+    User,
+)
+from ..schemas import AppointmentCreate, AppointmentOut, CancelIn, MeetingLinkIn, RescheduleIn, StatusUpdateIn
 from ..services.access import get_doctor_profile, get_patient_profile
-from ..services.notifications import notify
-from ..services.slots import now_local, to_local_dt, validate_slot
+from ..services.booking import create_booking
+from ..services.email import send_appointment_email
+from ..services.notifications import log_activity, notify
+from ..services.serializers import appointment_out, appointments_out
+from ..services.slots import find_slot, now_local, to_local_dt
 
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
@@ -55,6 +67,7 @@ def _patient_conflict(db: Session, patient_id: int, day: date, start, exclude_id
 @router.post("", response_model=AppointmentOut, status_code=status.HTTP_201_CREATED)
 def book_appointment(
     payload: AppointmentCreate,
+    user: User = Depends(get_current_user),
     patient: Patient = Depends(get_current_patient),
     db: Session = Depends(get_db),
 ):
@@ -62,49 +75,32 @@ def book_appointment(
     if doctor is None or not doctor.is_active:
         raise HTTPException(status_code=404, detail="Doctor not found")
 
-    end = validate_slot(db, doctor, payload.appointment_date, payload.start_time)
-    start = payload.start_time.replace(second=0, microsecond=0)
-
-    if _patient_conflict(db, patient.id, payload.appointment_date, start):
-        raise HTTPException(status_code=409, detail="You already have an appointment at this time")
-
-    appt = Appointment(
-        patient_id=patient.id,
-        doctor_id=doctor.id,
+    appt = create_booking(
+        db,
+        patient=patient,
+        doctor=doctor,
         appointment_date=payload.appointment_date,
-        start_time=start,
-        end_time=end,
+        start_time=payload.start_time,
         reason=payload.reason,
-        status=(
-            AppointmentStatus.confirmed.value
-            if settings.AUTO_CONFIRM_APPOINTMENTS
-            else AppointmentStatus.pending.value
-        ),
-    )
-    db.add(appt)
-    try:
-        db.flush()  # الـ unique index بيمنع الحجز المزدوج لو اتنين حجزوا في نفس اللحظة
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="This time slot was just booked by someone else")
-
-    notify(
-        db,
-        patient.user_id,
-        "Appointment booked",
-        f"Your appointment with Dr. {doctor.full_name} on {_label(appt)} was received.",
-        "appointment",
-    )
-    notify(
-        db,
-        doctor.user_id,
-        "New appointment",
-        f"{patient.full_name} booked an appointment on {_label(appt)}.",
-        "appointment",
+        consultation_type=payload.consultation_type,
+        actor=user,
+        clinic_id=payload.clinic_id,
     )
     db.commit()
     db.refresh(appt)
-    return appt
+
+    kind = "Online" if appt.consultation_type == ConsultationType.online.value else "In-person"
+    lines = [
+        f"Reference: {appt.reference_number}",
+        f"Doctor: Dr. {doctor.full_name}",
+        f"When: {_label(appt)} ({kind})",
+        *([f"Clinic: {appt.clinic.name}" + (f" - {appt.clinic.address}" if appt.clinic.address else "")] if appt.clinic else []),
+        f"Fee: {appt.fee_at_booking} EGP - pay at the clinic",
+    ]
+    if appt.meeting_link:
+        lines.append(f"Meeting link: {appt.meeting_link}")
+    send_appointment_email(patient.user.email, patient.first_name, "Your Clinika appointment", lines)
+    return appointment_out(db, appt)
 
 
 # ---------- list / details ----------
@@ -116,6 +112,8 @@ def list_appointments(
     doctor_id: int | None = None,
     patient_id: int | None = None,
     upcoming: bool | None = Query(None, description="true = القادمة فقط، false = السابقة فقط"),
+    consultation_type: str | None = Query(None, pattern="^(in_person|online)$"),
+    q: str | None = Query(None, description="بحث باسم المريض أو الدكتور أو رقم الحجز"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     user: User = Depends(get_current_user),
@@ -141,6 +139,19 @@ def list_appointments(
         if status_filter not in {s.value for s in AppointmentStatus}:
             raise HTTPException(status_code=400, detail="Invalid status filter")
         stmt = stmt.where(Appointment.status == status_filter)
+    if consultation_type:
+        stmt = stmt.where(Appointment.consultation_type == consultation_type)
+    if q:
+        term = f"%{q.strip().lstrip('#')}%"
+        patient_ids = select(Patient.id).join(User, Patient.user_id == User.id).where(User.full_name.ilike(term))
+        doctor_ids = select(Doctor.id).join(User, Doctor.user_id == User.id).where(User.full_name.ilike(term))
+        stmt = stmt.where(
+            or_(
+                Appointment.reference_number.ilike(term),
+                Appointment.patient_id.in_(patient_ids),
+                Appointment.doctor_id.in_(doctor_ids),
+            )
+        )
     if date_from:
         stmt = stmt.where(Appointment.appointment_date >= date_from)
     if date_to:
@@ -158,7 +169,7 @@ def list_appointments(
     else:
         stmt = stmt.order_by(Appointment.appointment_date.desc(), Appointment.start_time.desc())
 
-    return db.scalars(stmt.limit(limit).offset(offset)).unique().all()
+    return appointments_out(db, db.scalars(stmt.limit(limit).offset(offset)).unique().all())
 
 
 @router.get("/today", response_model=list[AppointmentOut])
@@ -173,14 +184,37 @@ def todays_appointments(user: User = Depends(get_current_user), db: Session = De
         stmt = stmt.where(Appointment.patient_id == get_patient_profile(db, user).id)
     elif user.role == Role.doctor.value:
         stmt = stmt.where(Appointment.doctor_id == get_doctor_profile(db, user).id)
-    return db.scalars(stmt.order_by(Appointment.start_time)).unique().all()
+    return appointments_out(db, db.scalars(stmt.order_by(Appointment.start_time)).unique().all())
 
 
 @router.get("/{appointment_id}", response_model=AppointmentOut)
 def get_appointment(appointment_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     appt = _get_appointment(db, appointment_id)
     _ensure_access(user, appt)
-    return appt
+    return appointment_out(db, appt)
+
+
+# ---------- meeting link (online visits) ----------
+@router.patch("/{appointment_id}/meeting-link", response_model=AppointmentOut)
+def set_meeting_link(
+    appointment_id: int,
+    payload: MeetingLinkIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """الدكتور (أو الأدمن) يغيّر لينك المكالمة. الفيديو نفسه بره النظام، إحنا بنحفظ اللينك بس."""
+    if user.role == Role.patient.value:
+        raise HTTPException(status_code=403, detail="Only doctors and admins can change the meeting link")
+    appt = _get_appointment(db, appointment_id)
+    _ensure_access(user, appt)
+    if appt.consultation_type != ConsultationType.online.value:
+        raise HTTPException(status_code=400, detail="This is not an online appointment")
+    appt.meeting_link = payload.meeting_link
+    if payload.meeting_link:
+        notify(db, appt.patient.user_id, "Meeting link updated",
+               f"The meeting link for your appointment on {_label(appt)} was updated.", "appointment")
+    db.commit()
+    return appointment_out(db, appt)
 
 
 # ---------- cancel ----------
@@ -217,8 +251,10 @@ def cancel_appointment(
     else:
         notify(db, appt.patient.user_id, "Appointment cancelled",
                f"Your appointment with Dr. {appt.doctor.full_name} on {_label(appt)} was cancelled.", "appointment")
+    log_activity(db, user.id, "appointment_cancelled", "appointment", appt.id,
+                 f"{appt.reference_number or '#' + str(appt.id)} cancelled by {user.role}")
     db.commit()
-    return appt
+    return appointment_out(db, appt)
 
 
 # ---------- reschedule ----------
@@ -251,7 +287,10 @@ def reschedule_appointment(
                 detail=f"Appointments can only be rescheduled at least {settings.CANCEL_MIN_HOURS_BEFORE} hours before the start time",
             )
 
-    end = validate_slot(db, appt.doctor, payload.appointment_date, new_start)
+    # الافتراضي: نفس العيادة اللي المريض حجز فيها، إلا لو اختار عيادة تانية صراحةً
+    target_clinic = payload.clinic_id or appt.clinic_id
+    slot = find_slot(db, appt.doctor, payload.appointment_date, new_start, target_clinic)
+    end = slot["end_time"]
     if _patient_conflict(db, appt.patient_id, payload.appointment_date, new_start, exclude_id=appt.id):
         raise HTTPException(status_code=409, detail="You already have an appointment at this time")
 
@@ -259,6 +298,7 @@ def reschedule_appointment(
     appt.appointment_date = payload.appointment_date
     appt.start_time = new_start
     appt.end_time = end
+    appt.clinic_id = slot["clinic_id"]
     appt.reminder_sent = False
     appt.status = (
         AppointmentStatus.confirmed.value if settings.AUTO_CONFIRM_APPOINTMENTS else AppointmentStatus.pending.value
@@ -273,8 +313,10 @@ def reschedule_appointment(
            f"{appt.patient.full_name} moved the appointment from {old_label} to {_label(appt)}.", "appointment")
     notify(db, appt.patient.user_id, "Appointment rescheduled",
            f"Your appointment with Dr. {appt.doctor.full_name} is now on {_label(appt)}.", "appointment")
+    log_activity(db, user.id, "appointment_rescheduled", "appointment", appt.id,
+                 f"{appt.reference_number or '#' + str(appt.id)} moved to {_label(appt)}")
     db.commit()
-    return appt
+    return appointment_out(db, appt)
 
 
 # ---------- status (doctor/admin) ----------
@@ -311,5 +353,7 @@ def update_status(
     }
     title, message = messages[payload.status]
     notify(db, appt.patient.user_id, title, message, "appointment")
+    log_activity(db, user.id, f"appointment_{payload.status}", "appointment", appt.id,
+                 f"{appt.reference_number or '#' + str(appt.id)} marked {payload.status}")
     db.commit()
-    return appt
+    return appointment_out(db, appt)

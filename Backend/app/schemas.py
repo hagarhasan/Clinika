@@ -3,31 +3,83 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
+from .services.names import split_full_name
+
 
 class ORM(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# ---------------- Names (Full Name أو first/last) ----------------
+class NameMixin(BaseModel):
+    """الفرونت ممكن يبعت full_name واحد أو first_name + last_name؛ الاتنين مقبولين."""
+
+    full_name: str | None = Field(default=None, max_length=150)
+    first_name: str | None = Field(default=None, min_length=1, max_length=70)
+    last_name: str | None = Field(default=None, min_length=1, max_length=70)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _split_full_name(cls, data):
+        if isinstance(data, dict) and data.get("full_name") and not data.get("first_name") and not data.get("last_name"):
+            first, last = split_full_name(str(data["full_name"]))
+            data = {**data, "first_name": first, "last_name": last}
+        return data
+
+
+class RequiredNameMixin(NameMixin):
+    @model_validator(mode="after")
+    def _names_required(self):
+        if not self.first_name or not self.last_name:
+            raise ValueError("first_name and last_name (or full_name) are required")
+        return self
+
+
 # ---------------- Auth / Users ----------------
-class RegisterIn(BaseModel):
+class RegisterIn(RequiredNameMixin):
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)
-    first_name: str = Field(min_length=1, max_length=70)
-    last_name: str = Field(min_length=1, max_length=70)
     phone: str | None = Field(default=None, max_length=30)
     date_of_birth: date | None = None
     gender: Literal["male", "female"] | None = None
 
 
+class DoctorRegisterIn(RequiredNameMixin):
+    """طلب انضمام دكتور (بيتراجع من الأدمن قبل ما الحساب يشتغل)."""
+
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=72)
+    phone: str | None = Field(default=None, max_length=30)
+    gender: Literal["male", "female"] | None = None
+    specialty_id: int
+    clinic_id: int | None = None
+    license_number: str = Field(min_length=3, max_length=60)
+    years_of_experience: int = Field(default=0, ge=0, le=70)
+    consultation_fee: float = Field(default=0, ge=0)
+    bio: str | None = Field(default=None, max_length=2000)
+
+
+class DoctorRequestOut(BaseModel):
+    message: str
+    status: str
+    doctor_id: int
+
+
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+    remember_me: bool = False
 
 
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: "UserOut"
+
+
+class AccessTokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
 
 
 class UserOut(ORM):
@@ -39,13 +91,15 @@ class UserOut(ORM):
     phone: str | None
     role: str
     is_active: bool
+    avatar_url: str | None = None
     created_at: datetime
 
 
-class UserUpdate(BaseModel):
-    first_name: str | None = Field(default=None, min_length=1, max_length=70)
-    last_name: str | None = Field(default=None, min_length=1, max_length=70)
+class UserUpdate(NameMixin):
     phone: str | None = Field(default=None, max_length=30)
+    avatar_url: str | None = Field(default=None, max_length=500)
+    email: EmailStr | None = None
+    current_password: str | None = Field(default=None, description="مطلوب لو بتغيّر الإيميل")
 
 
 class ChangePasswordIn(BaseModel):
@@ -53,12 +107,29 @@ class ChangePasswordIn(BaseModel):
     new_password: str = Field(min_length=8, max_length=72)
 
 
-class AdminUserCreate(BaseModel):
+class ForgotPasswordIn(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordIn(BaseModel):
+    token: str = Field(min_length=20, max_length=200)
+    new_password: str = Field(min_length=8, max_length=72)
+
+
+class AdminUserCreate(RequiredNameMixin):
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)
-    first_name: str = Field(min_length=1, max_length=70)
-    last_name: str = Field(min_length=1, max_length=70)
     phone: str | None = None
+
+
+class AdminPatientCreate(RequiredNameMixin):
+    """الأدمن بيضيف مريض. لو مفيش password بنبعتله إيميل يختار هو كلمة السر."""
+
+    email: EmailStr
+    password: str | None = Field(default=None, min_length=8, max_length=72)
+    phone: str | None = Field(default=None, max_length=30)
+    date_of_birth: date | None = None
+    gender: Literal["male", "female"] | None = None
 
 
 class AdminUserStatusIn(BaseModel):
@@ -84,18 +155,28 @@ class ClinicIn(BaseModel):
     name: str = Field(min_length=2, max_length=150)
     address: str | None = None
     city: str | None = None
+    district: str | None = Field(default=None, max_length=100)
     phone: str | None = None
     email: EmailStr | None = None
     description: str | None = None
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    photo_url: str | None = Field(default=None, max_length=500)
+    parking_info: str | None = None
 
 
 class ClinicUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=150)
     address: str | None = None
     city: str | None = None
+    district: str | None = Field(default=None, max_length=100)
     phone: str | None = None
     email: EmailStr | None = None
     description: str | None = None
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    photo_url: str | None = Field(default=None, max_length=500)
+    parking_info: str | None = None
     is_active: bool | None = None
 
 
@@ -104,16 +185,19 @@ class ClinicOut(ORM):
     name: str
     address: str | None
     city: str | None
+    district: str | None = None
     phone: str | None
     email: str | None
     description: str | None
+    latitude: float | None = None
+    longitude: float | None = None
+    photo_url: str | None = None
+    parking_info: str | None = None
     is_active: bool
 
 
 # ---------------- Patients ----------------
-class PatientUpdate(BaseModel):
-    first_name: str | None = Field(default=None, min_length=1, max_length=70)
-    last_name: str | None = Field(default=None, min_length=1, max_length=70)
+class PatientUpdate(NameMixin):
     phone: str | None = None
     date_of_birth: date | None = None
     gender: Literal["male", "female"] | None = None
@@ -129,6 +213,7 @@ class PatientBrief(ORM):
     id: int
     full_name: str
     phone: str | None
+    avatar_url: str | None = None
 
 
 class PatientOut(ORM):
@@ -138,6 +223,7 @@ class PatientOut(ORM):
     last_name: str
     full_name: str
     phone: str | None
+    avatar_url: str | None = None
     date_of_birth: date | None
     gender: str | None
     blood_type: str | None
@@ -149,11 +235,30 @@ class PatientOut(ORM):
 
 
 # ---------------- Doctors ----------------
-class DoctorCreate(BaseModel):
+class CredentialIn(BaseModel):
+    kind: Literal["education", "certification"] = "education"
+    title: str = Field(min_length=2, max_length=200)
+    institution: str | None = Field(default=None, max_length=200)
+    year: int | None = Field(default=None, ge=1950, le=2100)
+
+
+class CredentialOut(ORM, CredentialIn):
+    id: int
+
+
+class DoctorProfileFields(BaseModel):
+    gender: Literal["male", "female"] | None = None
+    title: str | None = Field(default=None, max_length=150)
+    room: str | None = Field(default=None, max_length=60)
+    languages: list[str] | None = None
+    focus_areas: list[str] | None = None
+    accepting_new_patients: bool | None = None
+    offers_online: bool | None = None
+
+
+class DoctorCreate(RequiredNameMixin):
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)
-    first_name: str = Field(min_length=1, max_length=70)
-    last_name: str = Field(min_length=1, max_length=70)
     phone: str | None = None
     specialty_id: int
     clinic_id: int | None = None
@@ -162,9 +267,17 @@ class DoctorCreate(BaseModel):
     consultation_fee: float = Field(default=0, ge=0)
     license_number: str | None = None
     slot_duration_minutes: int = Field(default=30, ge=10, le=120)
+    gender: Literal["male", "female"] | None = None
+    title: str | None = Field(default=None, max_length=150)
+    room: str | None = Field(default=None, max_length=60)
+    languages: list[str] | None = None
+    focus_areas: list[str] | None = None
+    is_verified: bool = False
+    accepting_new_patients: bool = True
+    offers_online: bool = False
 
 
-class DoctorUpdate(BaseModel):
+class DoctorUpdate(DoctorProfileFields):
     specialty_id: int | None = None
     clinic_id: int | None = None
     bio: str | None = None
@@ -173,6 +286,23 @@ class DoctorUpdate(BaseModel):
     license_number: str | None = None
     slot_duration_minutes: int | None = Field(default=None, ge=10, le=120)
     is_active: bool | None = None
+    is_verified: bool | None = None
+    photo_url: str | None = Field(default=None, max_length=500)
+
+
+class DoctorReviewIn(BaseModel):
+    action: Literal["approve", "reject"]
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class DoctorVerifyIn(BaseModel):
+    is_verified: bool
+
+
+class NextSlot(BaseModel):
+    appointment_date: date
+    start_time: time
+    clinic_id: int | None = None
 
 
 class DoctorBrief(ORM):
@@ -180,6 +310,13 @@ class DoctorBrief(ORM):
     full_name: str
     specialty_name: str | None
     clinic_name: str | None
+    photo_url: str | None = None
+    title: str | None = None
+    room: str | None = None
+    consultation_fee: float = 0
+    clinic: ClinicOut | None = None
+    rating_avg: float | None = None
+    reviews_count: int = 0
 
 
 class DoctorOut(ORM):
@@ -190,16 +327,35 @@ class DoctorOut(ORM):
     full_name: str
     email: str
     phone: str | None
+    photo_url: str | None = None
+    gender: str | None = None
+    title: str | None = None
+    room: str | None = None
     specialty: SpecialtyOut | None
     clinic: ClinicOut | None
+    clinics: list[ClinicOut] = []  # كل العيادات اللي الدكتور بيشتغل فيها (من جدوله)
     bio: str | None
     years_of_experience: int
     consultation_fee: float
     license_number: str | None
     slot_duration_minutes: int
     is_active: bool
+    status: str = "active"
+    rejection_reason: str | None = None
+    is_verified: bool = False
+    accepting_new_patients: bool = True
+    offers_online: bool = False
+    languages: list[str] = []
+    focus_areas: list[str] = []
+    credentials: list[CredentialOut] = []
     rating_avg: float | None = None
     reviews_count: int = 0
+    next_available: NextSlot | None = None
+
+    @field_validator("languages", "focus_areas", mode="before")
+    @classmethod
+    def _none_to_list(cls, v):
+        return v or []
 
 
 class ScheduleItem(BaseModel):
@@ -207,6 +363,7 @@ class ScheduleItem(BaseModel):
     start_time: time
     end_time: time
     is_active: bool = True
+    clinic_id: int | None = Field(default=None, description="العيادة في الفترة دي (فاضي = عيادته الأساسية)")
 
     @model_validator(mode="after")
     def check_times(self):
@@ -221,6 +378,8 @@ class ScheduleOut(ORM):
     start_time: time
     end_time: time
     is_active: bool
+    clinic_id: int | None = None
+    clinic_name: str | None = None
 
 
 class TimeOffIn(BaseModel):
@@ -246,6 +405,7 @@ class SlotOut(BaseModel):
     start_time: time
     end_time: time
     is_available: bool
+    clinic_id: int | None = None
 
 
 # ---------------- Appointments ----------------
@@ -254,11 +414,32 @@ class AppointmentCreate(BaseModel):
     appointment_date: date
     start_time: time
     reason: str | None = Field(default=None, max_length=1000)
+    consultation_type: Literal["in_person", "online"] = "in_person"
+    clinic_id: int | None = Field(default=None, description="العيادة المختارة (اختياري؛ بيتأكد إن الدكتور فيها في الوقت ده)")
+
+
+class AdminAppointmentCreate(AppointmentCreate):
+    """الأدمن بيحجز نيابة عن مريض."""
+
+    patient_id: int
+    status: Literal["pending", "confirmed"] = "confirmed"
+
+
+class MeetingLinkIn(BaseModel):
+    meeting_link: str | None = Field(default=None, max_length=500)
+
+    @field_validator("meeting_link")
+    @classmethod
+    def _https_only(cls, v):
+        if v and not v.startswith("https://"):
+            raise ValueError("meeting_link must start with https://")
+        return v
 
 
 class RescheduleIn(BaseModel):
     appointment_date: date
     start_time: time
+    clinic_id: int | None = None
 
 
 class CancelIn(BaseModel):
@@ -280,6 +461,13 @@ class AppointmentOut(ORM):
     reason: str | None
     cancellation_reason: str | None
     cancelled_by: str | None
+    clinic_id: int | None = None
+    clinic: ClinicOut | None = None
+    consultation_type: str = "in_person"
+    reference_number: str | None = None
+    fee_at_booking: float | None = None
+    meeting_link: str | None = None
+    has_review: bool = False
     created_at: datetime
 
 
@@ -380,4 +568,37 @@ class AuditLogOut(ORM):
     action: str
     entity_type: str
     entity_id: int | None
+    created_at: datetime
+
+
+# ---------------- Contact / Activity / Public ----------------
+class ContactIn(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    email: EmailStr
+    subject: str | None = Field(default=None, max_length=200)
+    message: str = Field(min_length=5, max_length=3000)
+
+
+class ContactOut(ORM):
+    id: int
+    name: str
+    email: str
+    subject: str | None
+    message: str
+    status: str
+    created_at: datetime
+
+
+class ContactStatusIn(BaseModel):
+    status: Literal["new", "read", "resolved"]
+
+
+class ActivityOut(ORM):
+    id: int
+    actor_user_id: int | None
+    actor_name: str | None = None
+    action: str
+    entity_type: str
+    entity_id: int | None
+    description: str
     created_at: datetime

@@ -1,3 +1,5 @@
+import warnings
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -15,14 +17,22 @@ from .routers import (
     notifications,
     patients,
     prescriptions,
+    public,
     reviews,
     specialties,
+    uploads,
 )
 
 if settings.AUTO_CREATE_TABLES:
     from . import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+
+if settings.SECRET_KEY == "dev-secret-change-me" or settings.ADMIN_PASSWORD == "Admin@12345":
+    warnings.warn(
+        "SECRET_KEY / ADMIN_PASSWORD are still the default values. Set real ones in the environment variables.",
+        stacklevel=1,
+    )
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -36,6 +46,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Total-Count"],  # عشان الفرونت يقرا العدد الكلي للـ pagination
 )
 
 for r in (
@@ -50,6 +61,8 @@ for r in (
     notifications.router,
     reviews.router,
     admin.router,
+    public.router,
+    uploads.router,
     internal.router,
 ):
     app.include_router(r)

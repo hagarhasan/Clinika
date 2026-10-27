@@ -7,7 +7,7 @@ from sqlalchemy import select
 from . import models  # noqa: F401
 from .config import settings
 from .database import Base, SessionLocal, engine
-from .models import Clinic, Doctor, DoctorSchedule, Patient, Role, Specialty, User
+from .models import Clinic, Doctor, DoctorCredential, DoctorSchedule, Patient, Role, Specialty, User
 from .security import hash_password
 
 SPECIALTIES = [
@@ -60,8 +60,9 @@ def run() -> None:
         clinic = db.scalar(select(Clinic).where(Clinic.name == "Clinika Main Clinic"))
         if not clinic:
             clinic = Clinic(
-                name="Clinika Main Clinic", address="Main Street", city="Qena", phone="0965000000",
-                email="info@clinika.com", description="Demo clinic",
+                name="Clinika Main Clinic", address="Main Street", city="Qena", district="Qena City",
+                phone="0965000000", email="info@clinika.com", description="Demo clinic",
+                parking_info="Street parking available in front of the clinic.",
             )
             db.add(clinic)
             db.flush()
@@ -73,9 +74,12 @@ def run() -> None:
                     user_id=user.id, specialty_id=specs[spec_name].id, clinic_id=clinic.id,
                     bio=f"{spec_name} specialist with {years} years of experience.",
                     years_of_experience=years, consultation_fee=fee, slot_duration_minutes=30,
+                    title=f"{spec_name} Specialist", languages=["Arabic", "English"], is_verified=True,
+                    offers_online=True, accepting_new_patients=True, status="active",
                 )
                 db.add(doctor)
                 db.flush()
+                db.add(DoctorCredential(doctor_id=doctor.id, kind="education", title="MBBS", institution="Cairo University"))
                 # السبت(5) الأحد(6) الاثنين(0) الثلاثاء(1) الأربعاء(2)
                 for day in (5, 6, 0, 1, 2):
                     db.add(DoctorSchedule(doctor_id=doctor.id, day_of_week=day, start_time=time(10, 0), end_time=time(14, 0)))

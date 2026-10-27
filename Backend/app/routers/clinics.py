@@ -6,6 +6,7 @@ from ..database import get_db
 from ..deps import require_roles
 from ..models import Clinic, Doctor, Role
 from ..schemas import ClinicIn, ClinicOut, ClinicUpdate
+from ..services.storage import validate_image_url
 
 router = APIRouter(prefix="/clinics", tags=["Clinics"])
 admin_only = require_roles(Role.admin)
@@ -14,6 +15,7 @@ admin_only = require_roles(Role.admin)
 @router.get("", response_model=list[ClinicOut])
 def list_clinics(
     city: str | None = None,
+    district: str | None = None,
     q: str | None = None,
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -22,6 +24,8 @@ def list_clinics(
     stmt = select(Clinic).where(Clinic.is_active.is_(True))
     if city:
         stmt = stmt.where(Clinic.city.ilike(f"%{city}%"))
+    if district:
+        stmt = stmt.where(Clinic.district.ilike(f"%{district}%"))
     if q:
         stmt = stmt.where(Clinic.name.ilike(f"%{q}%"))
     return db.scalars(stmt.order_by(Clinic.name).limit(limit).offset(offset)).all()
@@ -37,7 +41,9 @@ def get_clinic(clinic_id: int, db: Session = Depends(get_db)):
 
 @router.post("", response_model=ClinicOut, status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_only)])
 def create_clinic(payload: ClinicIn, db: Session = Depends(get_db)):
-    obj = Clinic(**payload.model_dump())
+    data = payload.model_dump()
+    data["photo_url"] = validate_image_url(data.get("photo_url"))
+    obj = Clinic(**data)
     db.add(obj)
     db.commit()
     return obj
@@ -48,7 +54,10 @@ def update_clinic(clinic_id: int, payload: ClinicUpdate, db: Session = Depends(g
     obj = db.get(Clinic, clinic_id)
     if obj is None:
         raise HTTPException(status_code=404, detail="Clinic not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    if "photo_url" in data:
+        data["photo_url"] = validate_image_url(data["photo_url"])
+    for field, value in data.items():
         setattr(obj, field, value)
     db.commit()
     return obj

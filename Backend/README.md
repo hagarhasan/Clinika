@@ -108,3 +108,61 @@ alembic current                                    # الإصدار الحالي
 - لو الجداول موجودة أصلًا على Neon من `init_db`: اعملي migration الأولى ثم `alembic stamp head`
   بدل `upgrade` (عشان ما يحاولش ينشئها تاني)، أو امسحي الجداول التجريبية وابدئي من الأول.
 - `app.init_db` اتساب للتجربة السريعة بس.
+
+---
+
+## تحديث: الـ endpoints الجديدة (متوافقة مع شاشات الـ UI)
+
+**Auth**
+`POST /auth/register/doctor` (طلب انضمام دكتور → حالة pending) · `POST /auth/forgot-password` ·
+`GET /auth/reset-password/validate?token=` · `POST /auth/reset-password` ·
+`POST /auth/login` بيقبل `remember_me: true` (توكن 30 يوم) ·
+`PUT /auth/me` بيقبل `full_name` واحد (أو first/last) و`avatar_url`، وتغيير `email` بيحتاج `current_password` ·
+`POST /auth/change-password` بيرجّع **توكن جديد** (200) ويقفل باقي الجلسات.
+`register` و`PUT /patients/me` و`POST /doctors` بيقبلوا `full_name` بدل first/last.
+
+**Public**: `GET /public/stats` · `GET /public/locations` · `POST /contact`
+
+**Doctors**
+`GET /doctors` فلاتر جديدة: `specialty_ids` · `cities` · `districts` · `gender` · `min_fee` · `verified` ·
+`accepting_new_patients` · `online` · `availability=today|tomorrow|this_week` · `date=YYYY-MM-DD` ·
+`sort=recommended|next_available` — والـ header `X-Total-Count` فيه العدد الكلي، وكل دكتور فيه `next_available`.
+`GET/PUT /doctors/{id}/credentials` (التعليم والشهادات).
+`/doctors/me/stats` بقى فيه: `completed_this_week` · `attendance_rate` · `visit_types_30d` · `today_capacity`.
+`/doctors/{id}/availability` بقى فيه `is_working_day` (لو true و`available_slots=0` اليوم "Full").
+
+**Appointments**
+`POST /appointments` بيقبل `consultation_type: in_person|online`، والرد فيه `reference_number` ·
+`fee_at_booking` · `meeting_link` · بيانات الدكتور (صورة، تقييم، سعر، عيادة بالعنوان والخريطة).
+`PATCH /appointments/{id}/meeting-link` · `GET /appointments?q=&consultation_type=`.
+
+**Patients**: `GET /patients/me/stats`
+
+**Admin**
+`GET /admin/doctors?status=pending|active|inactive|rejected` · `GET /admin/doctors/counts` ·
+`GET /admin/doctors/{id}` · `PATCH /admin/doctors/{id}/review` (approve/reject) · `PATCH /admin/doctors/{id}/verify` ·
+`GET /admin/doctors/export` (CSV) · `POST /admin/patients` · `POST /admin/appointments` ·
+`GET /admin/activity` · `GET /admin/contact-messages` · `PATCH /admin/contact-messages/{id}`
+
+**العيادات المتعددة للدكتور**
+الدكتور بيحدد العيادة لكل فترة في جدوله: `PUT /doctors/{id}/schedules` وكل عنصر فيه `clinic_id` (فاضي = عيادته الأساسية).
+المريض لما يفلتر بعيادة/مدينة/منطقة (`/doctors?clinic_id=` أو `cities` أو `districts`) مش بيشوف غير الدكاترة اللي فعلًا
+في العيادة دي، و`next_available` بيتحسب في العيادات المختارة بس. كل دكتور فيه `clinics` (كل عياداته).
+`GET /doctors/{id}/slots?date=&clinic_id=` و`/availability?clinic_id=` بيرجّعوا مواعيد العيادة دي بس.
+`POST /appointments` بيقبل `clinic_id` اختياري: لو الدكتور في عيادة تانية في الوقت ده الحجز بيترفض (400)،
+والحجز بيتسجل عليه العيادة (`clinic_id` و`clinic` في الرد). الدكتور مينفعش يبقى في عيادتين في نفس الوقت.
+
+**Uploads**: `POST /uploads/avatar` · `POST /uploads/image` (أدمن)
+
+## Environment Variables الجديدة
+`FRONTEND_URL` · `RESEND_API_KEY` · `EMAIL_FROM` · `CONTACT_RECEIVER_EMAIL` ·
+`CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` ·
+`MIN_BOOKING_NOTICE_MINUTES` · `PASSWORD_RESET_EXPIRE_MINUTES` · `REMEMBER_ME_EXPIRE_DAYS`
+(الإيميل والصور اختياريين: من غيرهم الباك اند بيشتغل عادي، بس الإيميل بيتجاهل والرفع بيرجّع 503).
+
+## تطبيق الـ migration الجديدة على Neon
+```bash
+alembic current                      # لازم يطلّع 74a942950602 (أو يبقى فاضي)
+# لو فاضي (الجداول اتعملت بـ create_all): alembic stamp 74a942950602
+alembic upgrade head                 # بيطبّق migration-تين دفاعيتين (a1f3c9d2b7e4 ثم b2d4e6f8a0c1) ويضيف الناقص بس
+```

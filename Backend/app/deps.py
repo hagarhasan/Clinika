@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .database import get_db
-from .models import Doctor, Patient, Role, User
+from .models import Doctor, DoctorStatus, Patient, Role, User
 from .security import decode_access_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
@@ -21,6 +21,9 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise credentials_error
     user = db.get(User, int(payload["sub"]))
     if user is None:
+        raise credentials_error
+    # التوكنات القديمة (قبل ميزة token_version) مالهاش "tv" فبتتعامل كأنها 0
+    if int(payload.get("tv", 0)) != (user.token_version or 0):
         raise credentials_error
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is deactivated")
@@ -49,4 +52,6 @@ def get_current_doctor(user: User = Depends(require_roles(Role.doctor)), db: Ses
     doctor = db.scalar(select(Doctor).where(Doctor.user_id == user.id))
     if doctor is None:
         raise HTTPException(status_code=404, detail="Doctor profile not found")
+    if doctor.status in (DoctorStatus.pending.value, DoctorStatus.rejected.value):
+        raise HTTPException(status_code=403, detail="Your doctor account is not approved yet")
     return doctor
