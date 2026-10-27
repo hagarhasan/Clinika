@@ -29,6 +29,7 @@ import About from './Pages/About/About';
 import Doctors from './Pages/Doctors/Doctors';
 import DoctorProfile from './Pages/Doctors/DoctorProfile';
 import BookAppointment from './Pages/Doctors/BookAppointment';
+import NotFound from './Pages/NotFound/NotFound';
 
 const router = createHashRouter([
   {
@@ -45,6 +46,7 @@ const router = createHashRouter([
   { path: "register", element: <Register /> },
   { path: "forget-password", element: <ForgetPassword /> },
   { path: "reset-password/:token", element: <ResetPassword /> },
+  { path: "reset-password", element: <ResetPassword /> },
   { path: "privacy", element: <Privacy /> },
   { path: "terms", element: <Terms /> },
   { path: "accessibility", element: <Accessibility /> },
@@ -73,6 +75,7 @@ const router = createHashRouter([
       { path: "my-profile", element: <AdminProfile /> },
     ]
   },
+  { path: "*", element: <NotFound /> }
 ])
 
 export default function App() {
