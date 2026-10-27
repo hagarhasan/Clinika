@@ -1,0 +1,305 @@
+:root {
+  /* Brand */
+  --cl-primary: #1b68f6;
+  --cl-primary-hover: #0f52ba;
+  --cl-secondary: #e0edfd;
+  --cl-secondary-wash: #ebf3ff;
+
+  /* Text */
+  --cl-text: #0f172a;
+  /* tertiary: headlines */
+  --cl-text-body: #334155;
+  /* body / links */
+  --cl-text-muted: #64748b;
+  /* captions / meta */
+  --cl-text-label: #475569;
+  /* section super-titles */
+
+  /* Surfaces */
+  --cl-surface: #ffffff;
+  --cl-bg-secondary: #f8fafc;
+  --cl-border: #e2e8f0;
+  --cl-alert-bg: #d7e4f4;
+
+  /* Status */
+  --cl-danger: #ba1a1a;
+
+  /* Shapes & depth */
+  --cl-radius-btn: 0.75rem;
+  --cl-shadow-1: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
+  --cl-glow: 0 4px 14px rgba(27, 104, 246, 0.28);
+}
+
+body {
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--cl-text);
+}
+
+/* ---------- Logo (shared) ---------- */
+.cl-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+  font-size: 1.125rem;
+  line-height: 26px;
+  letter-spacing: -0.01em;
+  color: var(--cl-text);
+  text-decoration: none;
+}
+
+.cl-logo:hover {
+  color: var(--cl-text);
+}
+
+.cl-logo-mark {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 0.3rem;
+  background: var(--cl-primary);
+  color: #fff;
+  font-size: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------- Focus (keyboard) ---------- */
+.cl-navbar a:focus-visible,
+.cl-navbar button:focus-visible,
+.cl-footer a:focus-visible,
+.cl-emergency a:focus-visible {
+  outline: 2px solid var(--cl-primary);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+/* ==========================================================
+   NAVBAR
+   ========================================================== */
+.cl-navbar {
+  background: var(--cl-surface);
+  border-bottom: 1px solid var(--cl-border);
+  box-shadow: var(--cl-shadow-1);
+  padding: 0;
+}
+
+.cl-navbar .container-fluid {
+  position: relative;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.cl-navbar .nav-link {
+  position: relative;
+  color: var(--cl-text);
+  font-size: 0.875rem;
+  /* label-action 14px */
+  font-weight: 500;
+  padding: 0.5rem 0.9rem;
+  transition: color 0.15s ease;
+}
+
+.cl-navbar .nav-link:hover {
+  color: var(--cl-primary);
+}
+
+/* Active link: blue + semibold */
+.cl-navbar .nav-link.active {
+  color: var(--cl-primary);
+  font-weight: 600;
+}
+
+.cl-login-link {
+  color: var(--cl-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 0.5rem 0.25rem;
+  transition: color 0.15s ease;
+}
+
+.cl-login-link:hover {
+  color: var(--cl-primary);
+}
+
+/* Primary button */
+.cl-btn-book {
+  background: var(--cl-primary);
+  border: 0;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 20px;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--cl-radius-btn);
+  box-shadow: var(--cl-glow);
+  transition: background 0.15s ease;
+}
+
+.cl-btn-book:hover,
+.cl-btn-book:focus-visible,
+.cl-btn-book:active {
+  background: var(--cl-primary-hover);
+  color: #fff;
+}
+
+.cl-avatar-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  background: var(--cl-primary);
+  color: #fff;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.cl-avatar-btn:hover {
+  background: var(--cl-primary-hover);
+  color: #fff;
+}
+
+/* Desktop: links centered, full navbar height, active bar on bottom edge */
+@media (min-width: 992px) {
+  .cl-nav-links {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: -1rem;
+    bottom: -1rem;
+  }
+
+  .cl-nav-links .nav-item {
+    display: flex;
+  }
+
+  .cl-nav-links .nav-link {
+    display: flex;
+    align-items: center;
+  }
+
+  .cl-nav-links .nav-link.active::after {
+    content: "";
+    position: absolute;
+    left: 0.9rem;
+    right: 0.9rem;
+    bottom: 0;
+    height: 2px;
+    background: var(--cl-primary);
+    border-radius: 2px 2px 0 0;
+  }
+}
+
+/* Mobile */
+@media (max-width: 991.98px) {
+  .cl-navbar .navbar-collapse {
+    padding-top: 1rem;
+    margin-top: 0.75rem;
+    border-top: 1px solid var(--cl-border);
+  }
+
+  .cl-nav-actions {
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+  }
+}
+
+/* ==========================================================
+   FOOTER
+   ========================================================== */
+.cl-emergency {
+  background: var(--cl-alert-bg);
+  padding: 0.85rem 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--cl-text-body);
+}
+
+.cl-emergency i {
+  color: var(--cl-danger);
+  margin-right: 0.6rem;
+}
+
+.cl-emergency a {
+  color: var(--cl-text);
+  font-weight: 700;
+  text-decoration: none;
+  margin-left: 0.35rem;
+}
+
+.cl-emergency a:hover {
+  text-decoration: underline;
+}
+
+.cl-footer {
+  background: var(--cl-bg-secondary);
+  padding-top: 4rem;
+  /* space-2xl */
+}
+
+.cl-footer-desc {
+  color: var(--cl-text-body);
+  font-size: 0.875rem;
+  /* body-md */
+  line-height: 1.6;
+  max-width: 24rem;
+  margin: 1.5rem 0 0;
+}
+
+/* Section super-titles = label-badge */
+.cl-footer-title {
+  font-size: 0.6875rem;
+  /* 11px */
+  font-weight: 600;
+  line-height: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cl-text-label);
+  margin-bottom: 1.1rem;
+}
+
+.cl-footer-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.cl-footer-links li {
+  margin-bottom: 0.75rem;
+}
+
+.cl-footer-links a {
+  color: var(--cl-text-body);
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: color 0.15s ease;
+}
+
+.cl-footer-links a:hover {
+  color: var(--cl-primary);
+}
+
+.cl-footer-bottom {
+  margin-top: 3rem;
+  padding: 1.75rem 0 2rem;
+  border-top: 1px solid var(--cl-border);
+  font-size: 0.8125rem;
+  /* body-sm */
+  color: var(--cl-text-muted);
+}
+
+.cl-footer-bottom a {
+  color: var(--cl-text-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.cl-footer-bottom a:hover {
+  color: var(--cl-primary);
+}
