@@ -4,12 +4,12 @@ import { Outlet } from 'react-router-dom'
 
 export default function Layout() {
     return (
-        <>
+        <div className="cl-app-layout">
             <Navbar />
-            <div className='container'>
+            <main className="cl-main-content">
                 <Outlet />
-            </div>
+            </main>
             <Footer />
-        </>
+        </div>
     )
 }
