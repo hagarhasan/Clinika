@@ -8,6 +8,7 @@
     opacity: 0;
     transform: translateY(-8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -509,4 +510,532 @@
 
 .cl-footer-legal-link:hover {
   color: var(--cl-primary, #0050cb);
+}
+
+/* ---------- Page shell ---------- */
+.cl-page {
+  background: var(--cl-background, #f7f9fb);
+  /* الهيدر fixed، فلازم نعوّض ارتفاعه (احذف السطر ده لو الـ layout بيعمل offset بالفعل) */
+  padding: calc(var(--cl-navbar-height, 5rem) + 3rem) 0 5rem;
+  min-height: 60vh;
+}
+
+.cl-page-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* ---------- Breadcrumb ---------- */
+.cl-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8125rem;
+  color: var(--cl-text-muted, #53606d);
+  margin-bottom: 2rem;
+}
+
+.cl-breadcrumb a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--cl-text-muted, #53606d);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.cl-breadcrumb a:hover {
+  color: var(--cl-primary, #0050cb);
+}
+
+.cl-breadcrumb .fa-chevron-right {
+  font-size: 0.55rem;
+  color: #94a3b8;
+}
+
+.cl-breadcrumb [aria-current="page"] {
+  color: var(--cl-text, #191c1e);
+  font-weight: 600;
+}
+
+/* ---------- Header ---------- */
+.cl-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--cl-secondary-container, #d7e4f4);
+  color: var(--cl-primary, #0050cb);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.45rem 0.9rem;
+  border-radius: 9999px;
+}
+
+.cl-page-title {
+  font-size: 2.5rem;
+  line-height: 3rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--cl-text, #191c1e);
+  margin: 1rem 0 0.75rem;
+}
+
+.cl-accent {
+  color: var(--cl-primary-container, #1b68f6);
+}
+
+.cl-page-intro {
+  font-size: 1rem;
+  line-height: 1.625;
+  color: var(--cl-text-variant, #424655);
+  max-width: 42rem;
+  margin: 0;
+}
+
+.cl-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.cl-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #ffffff;
+  border: 1px solid var(--cl-border, #e2e8f0);
+  border-radius: 9999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--cl-text-muted, #53606d);
+}
+
+.cl-meta-pill i {
+  color: var(--cl-primary, #0050cb);
+}
+
+/* ---------- Table of contents ---------- */
+.cl-toc {
+  position: sticky;
+  top: calc(var(--cl-navbar-height, 5rem) + 1.5rem);
+  background: #ffffff;
+  border: 1px solid var(--cl-border, #e2e8f0);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  box-shadow: var(--cl-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02));
+}
+
+.cl-toc-title {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cl-text-muted, #53606d);
+  margin: 0 0 0.75rem 0.75rem;
+}
+
+.cl-toc a,
+.cl-toc button {
+  display: block;
+  width: 100%;
+  text-align: start;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--cl-text-variant, #424655);
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.cl-toc a:hover,
+.cl-toc button:hover {
+  background: var(--cl-surface-low, #f2f4f6);
+  color: var(--cl-primary, #0050cb);
+}
+
+.cl-toc a.active,
+.cl-toc button.active {
+  background: var(--cl-secondary-container, #d7e4f4);
+  color: var(--cl-primary, #0050cb);
+  font-weight: 600;
+}
+
+/* ---------- Content card ---------- */
+.cl-legal-card {
+  background: #ffffff;
+  border: 1px solid var(--cl-border, #e2e8f0);
+  border-radius: 1rem;
+  box-shadow: var(--cl-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02));
+  padding: 2.5rem;
+}
+
+.cl-legal-section {
+  scroll-margin-top: calc(var(--cl-navbar-height, 5rem) + 1.5rem);
+  padding-bottom: 2rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--cl-border, #e2e8f0);
+}
+
+.cl-legal-section:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.cl-legal-section h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 1.375rem;
+  line-height: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--cl-text, #191c1e);
+  margin: 0 0 0.75rem;
+}
+
+.cl-sec-num {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.cl-legal-section p,
+.cl-legal-section li {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--cl-text-variant, #424655);
+}
+
+.cl-legal-section p {
+  margin: 0 0 0.9rem;
+}
+
+.cl-legal-section ul {
+  padding-left: 1.25rem;
+  margin: 0 0 0.9rem;
+}
+
+.cl-legal-section li {
+  margin-bottom: 0.4rem;
+}
+
+.cl-legal-section li::marker {
+  color: var(--cl-primary-container, #1b68f6);
+}
+
+.cl-legal-section strong {
+  color: var(--cl-text, #191c1e);
+  font-weight: 600;
+}
+
+.cl-legal-section a {
+  color: var(--cl-primary, #0050cb);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.cl-legal-section a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Callout ---------- */
+.cl-callout {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  background: rgba(0, 80, 203, 0.05);
+  border: 1px solid rgba(0, 80, 203, 0.12);
+  border-radius: 1rem;
+  padding: 1.1rem 1.25rem;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--cl-text-variant, #424655);
+}
+
+.cl-callout strong {
+  color: var(--cl-text, #191c1e);
+}
+
+.cl-callout>i {
+  color: var(--cl-primary, #0050cb);
+  margin-top: 0.2rem;
+}
+
+/* ---------- Icon box / feature cards ---------- */
+.cl-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 0.75rem;
+  background: var(--cl-secondary-container, #d7e4f4);
+  color: var(--cl-primary, #0050cb);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+.cl-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+  margin: 2rem 0 2.5rem;
+}
+
+.cl-feature-card {
+  background: #ffffff;
+  border: 1px solid var(--cl-border, #e2e8f0);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  box-shadow: var(--cl-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02));
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.cl-feature-card:hover {
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+  box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.06), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
+}
+
+.cl-feature-card h3 {
+  font-size: 1.125rem;
+  line-height: 1.6rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 1rem 0 0.35rem;
+  color: var(--cl-text, #191c1e);
+}
+
+.cl-feature-card p {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--cl-text-muted, #53606d);
+  margin: 0;
+}
+
+/* ---------- Ghost button (الزرار الأساسي هو .cl-book-btn من app.css) ---------- */
+.cl-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: #ffffff;
+  border: 1px solid var(--cl-border, #e2e8f0);
+  color: var(--cl-text, #191c1e);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  padding: 0.65rem 1.25rem;
+  border-radius: 0.75rem;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.cl-btn-ghost:hover {
+  background: var(--cl-surface-low, #f2f4f6);
+  color: var(--cl-primary, #0050cb);
+}
+
+/* ---------- Contact strip ---------- */
+.cl-contact-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: #ffffff;
+  border: 1px solid var(--cl-border, #e2e8f0);
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+  margin-top: 2rem;
+}
+
+.cl-contact-text {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.cl-contact-strip h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.15rem;
+  color: var(--cl-text, #191c1e);
+}
+
+.cl-contact-strip p {
+  font-size: 0.8125rem;
+  color: var(--cl-text-muted, #53606d);
+  margin: 0;
+}
+
+/* ==========================================================
+   404
+   ========================================================== */
+.cl-404-wrap {
+  max-width: 44rem;
+  margin: 0 auto;
+  text-align: center;
+  padding-top: 2rem;
+}
+
+.cl-404-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.04em;
+  font-size: clamp(6rem, 18vw, 9rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--cl-primary-container, #1b68f6);
+  margin: 1.25rem 0 0.5rem;
+}
+
+.cl-404-zero {
+  width: 0.78em;
+  height: 0.78em;
+  border-radius: 50%;
+  background: var(--cl-secondary-container, #d7e4f4);
+  color: var(--cl-primary-container, #1b68f6);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 0.06em var(--cl-primary-container, #1b68f6);
+}
+
+.cl-404-zero i {
+  font-size: 0.34em;
+}
+
+.cl-404-wrap .cl-page-intro {
+  margin: 0 auto;
+}
+
+.cl-404-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.cl-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 3rem;
+  text-align: left;
+}
+
+.cl-quick-card {
+  display: block;
+  background: #ffffff;
+  border: 1px solid var(--cl-border, #e2e8f0);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  box-shadow: var(--cl-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02));
+  text-decoration: none;
+  color: var(--cl-text, #191c1e);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.cl-quick-card:hover {
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+  color: var(--cl-text, #191c1e);
+}
+
+.cl-quick-card h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1rem 0 0.25rem;
+}
+
+.cl-quick-card p {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--cl-text-muted, #53606d);
+  margin: 0 0 0.75rem;
+}
+
+.cl-quick-link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cl-primary, #0050cb);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.cl-triage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: #ffffff;
+  border: 1px solid var(--cl-border, #e2e8f0);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  margin-top: 1.5rem;
+  text-align: left;
+  font-size: 0.8125rem;
+  color: var(--cl-text-variant, #424655);
+}
+
+.cl-triage i.fa-briefcase-medical {
+  color: var(--cl-error, #ba1a1a);
+  margin-right: 0.75rem;
+}
+
+.cl-triage strong {
+  color: var(--cl-text, #191c1e);
+}
+
+.cl-triage a {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cl-primary, #0050cb);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.cl-triage a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 991.98px) {
+  .cl-page {
+    padding: calc(var(--cl-navbar-height, 5rem) + 2rem) 0 3.5rem;
+  }
+
+  .cl-page-title {
+    font-size: 1.75rem;
+    line-height: 2.25rem;
+    letter-spacing: -0.02em;
+  }
+
+  .cl-legal-card {
+    padding: 1.5rem;
+  }
+
+  .cl-quick-grid {
+    grid-template-columns: 1fr;
+  }
 }

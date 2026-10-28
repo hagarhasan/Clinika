@@ -16,7 +16,6 @@ export default function Navbar() {
     return (
         <header className="cl-header">
             <div className="cl-header-container">
-                {/* Brand Logo matching Stitch */}
                 <Link className="cl-brand" to="/" onClick={() => setMobileOpen(false)}>
                     <img src={logoImg} alt="Clinika" className="cl-brand-logo" />
                 </Link>
