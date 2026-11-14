@@ -33,11 +33,11 @@ npm test                    # اختبارات المنطق (من غير دات�
 
 | | القديم | الجديد |
 |---|---|---|
-| Swagger `/docs` | موجود | مش موجود (الـ endpoints هي هي) |
+| Swagger `/docs` | موجود | موجود (`/docs`)، والـ spec بيتولّد بـ `npm run docs:build` بعد أي تعديل في الـ endpoints |
 | SQLite محليًا | مدعوم | لأ، PostgreSQL بس |
 | `AUTO_CREATE_TABLES` / Alembic | موجود | `npm run db:migrate` (آمن وبيتشغل أكتر من مرة) |
 | نص رسائل 422 | رسائل pydantic | نفس الشكل (`detail[].loc/msg/type`) لكن النص ممكن يختلف شوية |
-| رسالة `GET /` | فيها `docs` | `{ name, status }` |
+
 
 ## الهيكل
 
@@ -50,3 +50,17 @@ src/repo.js           الـ queries المشتركة وتحويل الداتا 
 src/schemas.js        التحقق من الـ request bodies (zod بدل pydantic)
 db/schema.sql         شكل الجداول (بيستخدمه db:migrate)
 ```
+
+## قوالب Resend (اختياري)
+
+لو عايزة تصمّمي شكل الإيميلات من داشبورد Resend (Templates) بدل الـ HTML اللي في الكود:
+اعملي القالب، اعمليله **Publish**، وحطي الـ ID في المتغير المناسب. لو المتغير فاضي أو القالب فشل،
+الإيميل بيتبعت بالـ HTML المدمج.
+
+| المتغير | الإيميل | متغيرات القالب (بالظبط بالحروف الكبيرة) |
+|---|---|---|
+| `RESEND_TEMPLATE_RESET` | نسيت كلمة السر | `NAME` `RESET_LINK` `EXPIRES_MINUTES` |
+| `RESEND_TEMPLATE_INVITE` | دعوة مريض أضافه الأدمن | `NAME` `RESET_LINK` `EXPIRES_MINUTES` |
+| `RESEND_TEMPLATE_DOCTOR_APPROVED` | قبول طلب دكتور | `NAME` `LOGIN_LINK` |
+| `RESEND_TEMPLATE_DOCTOR_REJECTED` | رفض طلب دكتور | `NAME` `REASON` |
+| `RESEND_TEMPLATE_APPOINTMENT` | تأكيد الحجز | `NAME` `TITLE` `REFERENCE` `DOCTOR` `WHEN` `CLINIC` `FEE` `MEETING_LINK` |
