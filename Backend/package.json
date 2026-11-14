@@ -11,6 +11,7 @@
     "db:migrate": "node src/scripts/migrate.js",
     "seed": "node src/scripts/seed.js",
     "smoke": "node src/scripts/smoke.js",
+    "docs:build": "node src/scripts/genOpenApi.js",
     "test": "node --test"
   },
   "dependencies": {

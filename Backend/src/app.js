@@ -10,20 +10,20 @@ if (settings.SECRET_KEY === 'dev-secret-change-me' || settings.ADMIN_PASSWORD ==
 
 const app = express();
 app.disable('x-powered-by');
-app.set('etag', false);
+app.set('etag', false); // FastAPI مكانش بيبعت ETag
 app.set('trust proxy', true);
 
 app.use(
   cors({
     origin: settings.corsOriginsList,
     credentials: true,
-    exposedHeaders: ['X-Total-Count'],
+    exposedHeaders: ['X-Total-Count'], // عشان الفرونت يقرا العدد الكلي للـ pagination
   })
 );
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));
 
-app.get('/', (_req, res) => res.json({ name: settings.APP_NAME, status: 'running' }));
+app.get('/', (_req, res) => res.json({ name: settings.APP_NAME, status: 'running', docs: '/docs' }));
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.use('/auth', require('./routes/auth'));
@@ -39,10 +39,12 @@ app.use('/reviews', require('./routes/reviews'));
 app.use('/admin', require('./routes/admin'));
 app.use('/uploads', require('./routes/uploads'));
 app.use('/internal', require('./routes/internal'));
-app.use('/', require('./routes/public'));
+app.use('/', require('./routes/docs')); // /docs و /openapi.json
+app.use('/', require('./routes/public')); // /public/stats /public/locations /contact
 
 app.use((_req, res) => res.status(404).json({ detail: 'Not Found' }));
 
+// eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, next) => {
   if (res.headersSent) return next(err);
   if (err instanceof HttpError) {
