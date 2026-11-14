@@ -3,8 +3,6 @@ import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 
 export default function AdminOverview() {
-  const location = useLocation();
-  const isActive = (path) => location.pathname.includes(path);
 
   // States لتخزين البيانات القادمة من الباك إند
   const [stats, setStats] = useState({
