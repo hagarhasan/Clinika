@@ -1,6 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+
+const DEFAULT_DOCTORS = [
+  { id: 1, name: 'Dr. Maya Bennett', npi: '94819204', specialty: 'Family Medicine', email: 'maya.bennett@clinika.com', experience: '12 years', status: 'Active' },
+  { id: 2, name: 'Dr. Daniel Park', npi: '78491023', specialty: 'Cardiology', email: 'daniel.park@clinika.com', experience: '15 years', status: 'Active' },
+  { id: 3, name: 'Dr. Sarah Al-Mansoor', npi: '38291048', specialty: 'Cardiology & Care', email: 'sarah.mansoor@clinika.com', experience: '7 years', status: 'Pending Approval' },
+  { id: 4, name: 'Dr. Elena Rossi', npi: '58491032', specialty: 'Dermatology', email: 'elena.rossi@clinika.com', experience: '9 years', status: 'Inactive' }
+];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -23,49 +30,48 @@ export default function AdminDashboard() {
     experience: '',
     status: 'Active'
   });
-
-  const fetchDoctors = () => {
+  const loadDoctors = useCallback(async () => {
     setLoading(true);
-    fetch('https://clinika-backend.vercel.app/admin/doctors')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && Array.isArray(data)) {
-          setDoctors(data);
-        }
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error fetching doctors:", err);
-        setLoading(false);
-      });
-  };
-
-  useEffect(() => {
-    fetchDoctors();
+    try {
+      const res = await fetch('https://clinika-backend.vercel.app/admin/doctors');
+      const data = await res.json();
+      if (data && Array.isArray(data)) {
+        setDoctors(data);
+      }
+    } catch (err) {
+      console.error('Error fetching doctors:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const defaultDoctors = [
-    { id: 1, name: 'Dr. Maya Bennett', npi: '94819204', specialty: 'Family Medicine', email: 'maya.bennett@clinika.com', experience: '12 years', status: 'Active' },
-    { id: 2, name: 'Dr. Daniel Park', npi: '78491023', specialty: 'Cardiology', email: 'daniel.park@clinika.com', experience: '15 years', status: 'Active' },
-    { id: 3, name: 'Dr. Sarah Al-Mansoor', npi: '38291048', specialty: 'Cardiology & Care', email: 'sarah.mansoor@clinika.com', experience: '7 years', status: 'Pending Approval' },
-    { id: 4, name: 'Dr. Elena Rossi', npi: '58491032', specialty: 'Dermatology', email: 'elena.rossi@clinika.com', experience: '9 years', status: 'Inactive' }
-  ];
+  useEffect(() => {
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) {
+        loadDoctors();
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [loadDoctors]);
 
-  const activeList = doctors.length > 0 ? doctors : defaultDoctors;
+  const activeList = doctors.length > 0 ? doctors : DEFAULT_DOCTORS;
 
   const filteredDoctors = activeList.filter((doc) => {
-    const matchesSearch = 
+    const matchesSearch =
       doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doc.specialty.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doc.npi.includes(searchQuery);
-    
+
     const matchesFilter = filterStatus === 'All' || doc.status === filterStatus;
     return matchesSearch && matchesFilter;
   });
 
   const handleAddDoctorSubmit = (e) => {
     e.preventDefault();
-    
+
     fetch('https://clinika-backend.vercel.app/admin/doctors', {
       method: 'POST',
       headers: {
@@ -74,35 +80,39 @@ export default function AdminDashboard() {
       body: JSON.stringify(newDoctor),
     })
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to add doctor on backend");
+        if (!res.ok) throw new Error('Failed to add doctor on backend');
         return res.json().catch(() => ({}));
       })
       .then(() => {
-        alert("تم إضافة الدكتور بنجاح على السيرفر!");
+        alert('تم إضافة الدكتور بنجاح على السيرفر!');
         setIsAddModalOpen(false);
         setNewDoctor({ name: '', npi: '', specialty: '', email: '', experience: '', status: 'Active' });
-        fetchDoctors();
+        loadDoctors();
       })
       .catch((err) => {
-        console.error("Error adding doctor:", err);
+        console.error('Error adding doctor:', err);
         const fallbackObj = { id: activeList.length + 1, ...newDoctor };
         setDoctors([fallbackObj, ...activeList]);
         setIsAddModalOpen(false);
         setNewDoctor({ name: '', npi: '', specialty: '', email: '', experience: '', status: 'Active' });
-        alert("تم إضافة الدكتور محلياً (Local Fallback) بنجاح!");
+        alert('تم إضافة الدكتور محلياً (Local Fallback) بنجاح!');
       });
   };
 
   const handleExportRoster = () => {
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + ["Name,NPI,Specialty,Email,Experience,Status",
-         ...filteredDoctors.map(d => `"${d.name}","${d.npi}","${d.specialty}","${d.email}","${d.experience}","${d.status}"`)
-        ].join("\n");
-    
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [
+        'Name,NPI,Specialty,Email,Experience,Status',
+        ...filteredDoctors.map(
+          (d) => `"${d.name}","${d.npi}","${d.specialty}","${d.email}","${d.experience}","${d.status}"`
+        ),
+      ].join('\n');
+
     const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "clinika_doctors_roster.csv");
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', 'clinika_doctors_roster.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -114,7 +124,6 @@ export default function AdminDashboard() {
   };
 
   const isManageDoctorsPage = location.pathname.includes('manage-doctors');
-
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F8FAFC', fontFamily: 'Inter, sans-serif', color: '#0F172A' }}>
       <Helmet>
@@ -129,7 +138,7 @@ export default function AdminDashboard() {
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-          <button 
+          <button
             onClick={() => navigate('/admin-dashboard')}
             style={{
               display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '8px', border: 'none',
@@ -141,7 +150,7 @@ export default function AdminDashboard() {
             📊 Overview
           </button>
 
-          <button 
+          <button
             onClick={() => navigate('/admin-dashboard/manage-doctors')}
             style={{
               display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '8px', border: 'none',
@@ -153,7 +162,7 @@ export default function AdminDashboard() {
             👨‍⚕️ Manage Doctors
           </button>
 
-          <button 
+          <button
             onClick={() => navigate('/admin-dashboard/manage-users-and-appointments')}
             style={{
               display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '8px', border: 'none',
@@ -167,7 +176,7 @@ export default function AdminDashboard() {
         </nav>
 
         <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '16px' }}>
-          <button 
+          <button
             onClick={() => navigate('/login')}
             style={{ background: 'none', border: 'none', color: '#EF4444', fontWeight: '500', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}
           >
@@ -188,13 +197,13 @@ export default function AdminDashboard() {
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button 
+                <button
                   onClick={handleExportRoster}
                   style={{ backgroundColor: '#FFFFFF', color: '#0F172A', border: '1px solid #CBD5E1', padding: '10px 18px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}
                 >
                   Export Roster
                 </button>
-                <button 
+                <button
                   onClick={() => setIsAddModalOpen(true)}
                   style={{ backgroundColor: '#1B68F6', color: '#FFFFFF', border: 'none', padding: '10px 18px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}
                 >
@@ -211,24 +220,24 @@ export default function AdminDashboard() {
               </div>
               <div style={{ backgroundColor: '#FFFFFF', padding: '20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
                 <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>Active</span>
-                <h3 style={{ fontSize: '24px', margin: '8px 0 0', color: '#1B68F6' }}>{activeList.filter(d => d.status === 'Active').length}</h3>
+                <h3 style={{ fontSize: '24px', margin: '8px 0 0', color: '#1B68F6' }}>{activeList.filter((d) => d.status === 'Active').length}</h3>
               </div>
               <div style={{ backgroundColor: '#FFFFFF', padding: '20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
                 <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>Pending Approval</span>
-                <h3 style={{ fontSize: '24px', margin: '8px 0 0', color: '#D97706' }}>{activeList.filter(d => d.status === 'Pending Approval').length}</h3>
+                <h3 style={{ fontSize: '24px', margin: '8px 0 0', color: '#D97706' }}>{activeList.filter((d) => d.status === 'Pending Approval').length}</h3>
               </div>
               <div style={{ backgroundColor: '#FFFFFF', padding: '20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
                 <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>Inactive</span>
-                <h3 style={{ fontSize: '24px', margin: '8px 0 0', color: '#64748B' }}>{activeList.filter(d => d.status === 'Inactive').length}</h3>
+                <h3 style={{ fontSize: '24px', margin: '8px 0 0', color: '#64748B' }}>{activeList.filter((d) => d.status === 'Inactive').length}</h3>
               </div>
             </div>
             {/* Directory Table */}
             <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden', marginBottom: '32px' }}>
               <div style={{ padding: '20px 24px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: '600', fontSize: '16px' }}>Directory</span>
-                <input 
-                  type="text" 
-                  placeholder="Search by doctor name, specialty, NPI..." 
+                <input
+                  type="text"
+                  placeholder="Search by doctor name, specialty, NPI..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', width: '350px', fontSize: '14px', outline: 'none' }}
@@ -283,16 +292,16 @@ export default function AdminDashboard() {
                         <td style={{ padding: '16px 24px', fontSize: '14px', color: '#334155' }}>{doc.email}</td>
                         <td style={{ padding: '16px 24px', fontSize: '14px', color: '#334155' }}>{doc.experience}</td>
                         <td style={{ padding: '16px 24px' }}>
-                          <span style={{ 
-                            backgroundColor: doc.status === 'Active' ? '#E0F2FE' : '#FEF3C7', 
-                            color: doc.status === 'Active' ? '#0369A1' : '#D97706', 
-                            padding: '5px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500' 
+                          <span style={{
+                            backgroundColor: doc.status === 'Active' ? '#E0F2FE' : '#FEF3C7',
+                            color: doc.status === 'Active' ? '#0369A1' : '#D97706',
+                            padding: '5px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500'
                           }}>
                             {doc.status}
                           </span>
                         </td>
                         <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                          <button 
+                          <button
                             onClick={() => handleOpenEdit(doc)}
                             style={{ background: 'none', border: 'none', color: '#1B68F6', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}
                           >
@@ -307,7 +316,6 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
-
             {/* Bottom Analytics */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
               <div style={{ backgroundColor: '#FFFFFF', padding: '24px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
@@ -330,8 +338,8 @@ export default function AdminDashboard() {
                   <h4 style={{ margin: '0 0 8px', fontSize: '16px' }}>Fast Onboarding</h4>
                   <h3 style={{ margin: '0 0 12px', fontSize: '18px' }}>Hospital EHR Integration</h3>
                 </div>
-                <button 
-                  onClick={() => alert("Provider sync configuration launched successfully!")}
+                <button
+                  onClick={() => alert('Provider sync configuration launched successfully!')}
                   style={{ backgroundColor: '#FFFFFF', color: '#1B68F6', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}
                 >
                   Configure Provider Sync
@@ -352,23 +360,23 @@ export default function AdminDashboard() {
             <form onSubmit={handleAddDoctorSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
                 <label style={{ fontSize: '13px', fontWeight: '500', color: '#64748B' }}>Doctor Name</label>
-                <input type="text" required placeholder="Dr. John Doe" value={newDoctor.name} onChange={(e) => setNewDoctor({...newDoctor, name: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
+                <input type="text" required placeholder="Dr. John Doe" value={newDoctor.name} onChange={(e) => setNewDoctor({ ...newDoctor, name: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ fontSize: '13px', fontWeight: '500', color: '#64748B' }}>NPI Number</label>
-                <input type="text" required placeholder="12345678" value={newDoctor.npi} onChange={(e) => setNewDoctor({...newDoctor, npi: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
+                <input type="text" required placeholder="12345678" value={newDoctor.npi} onChange={(e) => setNewDoctor({ ...newDoctor, npi: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ fontSize: '13px', fontWeight: '500', color: '#64748B' }}>Specialty</label>
-                <input type="text" required placeholder="Cardiology" value={newDoctor.specialty} onChange={(e) => setNewDoctor({...newDoctor, specialty: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
+                <input type="text" required placeholder="Cardiology" value={newDoctor.specialty} onChange={(e) => setNewDoctor({ ...newDoctor, specialty: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ fontSize: '13px', fontWeight: '500', color: '#64748B' }}>Contact Email</label>
-                <input type="email" required placeholder="doctor@clinika.com" value={newDoctor.email} onChange={(e) => setNewDoctor({...newDoctor, email: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
+                <input type="email" required placeholder="doctor@clinika.com" value={newDoctor.email} onChange={(e) => setNewDoctor({ ...newDoctor, email: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ fontSize: '13px', fontWeight: '500', color: '#64748B' }}>Experience</label>
-                <input type="text" required placeholder="5 years" value={newDoctor.experience} onChange={(e) => setNewDoctor({...newDoctor, experience: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
+                <input type="text" required placeholder="5 years" value={newDoctor.experience} onChange={(e) => setNewDoctor({ ...newDoctor, experience: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
                 <button type="button" onClick={() => setIsAddModalOpen(false)} style={{ backgroundColor: '#F1F5F9', color: '#475569', border: 'none', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}>Cancel</button>
