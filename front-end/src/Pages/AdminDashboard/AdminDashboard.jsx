@@ -8,8 +8,10 @@ export default function AdminDashboard() {
         <title>Admin Dashboard | Clinika</title>
       </Helmet>
       <div>
+        <h2>AdminDashboard</h2>
         <Outlet />
       </div>
     </>
   );
 }
+
