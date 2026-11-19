@@ -60,4 +60,12 @@ export const deleteNotification = (id) => api.delete(`/notifications/${id}`);
 export const UNREAD_EVENT = 'cl-pd-unread-changed';
 export const refreshUnreadBadge = () => window.dispatchEvent(new Event(UNREAD_EVENT));
 
+// GET /medical-records -> diagnosis, symptoms, treatment_plan, notes, follow_up_date, doctor
+export const fetchMedicalRecords = () =>
+  api.get('/medical-records', { params: { limit: 50 } }).then((res) => res.data);
+
+// GET /prescriptions -> each one has items: medication_name, dosage, frequency, duration, instructions
+export const fetchPrescriptions = () =>
+  api.get('/prescriptions', { params: { limit: 50 } }).then((res) => res.data);
+
 export default api;

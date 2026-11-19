@@ -1,0 +1,67 @@
+/* Styles for the Medical Records page. Same "cl-pd-" prefix and project tokens. */
+
+.cl-pd-rec {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cl-pd-rec__head {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.cl-pd-rec__doctor {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.cl-pd-rec__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.cl-pd-rec__field dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cl-text-muted);
+}
+
+.cl-pd-rec__field dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.9375rem;
+  white-space: pre-line;
+}
+
+.cl-pd-rx {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cl-pd-rx__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: var(--cl-surface-low);
+}
+
+.cl-pd-rx__item .material-symbols-outlined {
+  color: var(--cl-primary-container);
+}
+
+.cl-pd-rx__name {
+  margin: 0;
+  font-weight: 600;
+}
