@@ -68,4 +68,21 @@ export const fetchMedicalRecords = () =>
 export const fetchPrescriptions = () =>
   api.get('/prescriptions', { params: { limit: 50 } }).then((res) => res.data);
 
+// GET /patients/me -> name, phone, avatar_url, date_of_birth, gender, blood_type, address, ...
+export const fetchProfile = () => api.get('/patients/me').then((res) => res.data);
+
+// PUT /patients/me — send every editable field; an empty value clears it.
+export const updateProfile = (data) => api.put('/patients/me', data).then((res) => res.data);
+
+// POST /uploads/avatar — multipart, field name "file", image only.
+export const uploadAvatar = (file) => {
+  const body = new FormData();
+  body.append('file', file);
+  return api.post('/uploads/avatar', body).then((res) => res.data);
+};
+
+// POST /auth/change-password -> { access_token }. The old token stops working right away.
+export const changePassword = (current_password, new_password) =>
+  api.post('/auth/change-password', { current_password, new_password }).then((res) => res.data);
+
 export default api;
