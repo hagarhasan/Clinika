@@ -1,0 +1,45 @@
+import axios from 'axios';
+
+// Patient-only API helper.
+// Kept inside the PatientDashboard folder on purpose, so no shared file has to change
+// until the team agrees on one shared API client. Swapping it later is a one-line change.
+const api = axios.create({ baseURL: 'https://clinika-backend.vercel.app' });
+
+// Attach the login token to every request (same 'token' key the API guide describes).
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+export const isUnauthorized = (error) => error?.response?.status === 401;
+
+// Turns any axios error into one short, friendly sentence for the patient.
+export function getErrorMessage(error) {
+  if (!error?.response) {
+    return 'Cannot reach the server. Check your connection and try again.';
+  }
+  if (isUnauthorized(error)) {
+    return 'Your session has expired. Please log in again.';
+  }
+  const detail = error.response.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail[0]?.msg) return detail[0].msg;
+  return 'Something went wrong. Please try again.';
+}
+
+// GET /appointments returns only the logged-in patient's appointments.
+// upcoming=true  -> today and later, soonest first
+// upcoming=false -> before today, newest first
+export const fetchAppointments = (upcoming) =>
+  api.get('/appointments', { params: { upcoming, limit: 50 } }).then((res) => res.data);
+
+// PATCH /appointments/{id}/cancel — the reason is optional.
+export const cancelAppointment = (id, reason) =>
+  api.patch(`/appointments/${id}/cancel`, reason ? { reason } : {}).then((res) => res.data);
+
+// GET /notifications/unread-count -> { unread: number }
+export const fetchUnreadCount = () =>
+  api.get('/notifications/unread-count').then((res) => res.data.unread);
+
+export default api;
