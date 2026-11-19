@@ -2,7 +2,7 @@
 try {
   require('dotenv').config();
 } catch (_) {
-  /* */
+  /* dotenv مش متثبت — بنعتمد على environment variables بس */
 }
 
 const env = process.env;
@@ -42,6 +42,12 @@ const settings = {
   RESEND_API_KEY: str('RESEND_API_KEY', ''),
   EMAIL_FROM: str('EMAIL_FROM', 'Clinika <onboarding@resend.dev>'),
   CONTACT_RECEIVER_EMAIL: str('CONTACT_RECEIVER_EMAIL', ''),
+  // IDs قوالب Resend (اختياري). لو فاضي الإيميل بيتبعت بالـ HTML المدمج في الكود.
+  RESEND_TEMPLATE_RESET: str('RESEND_TEMPLATE_RESET', ''),
+  RESEND_TEMPLATE_INVITE: str('RESEND_TEMPLATE_INVITE', ''),
+  RESEND_TEMPLATE_DOCTOR_APPROVED: str('RESEND_TEMPLATE_DOCTOR_APPROVED', ''),
+  RESEND_TEMPLATE_DOCTOR_REJECTED: str('RESEND_TEMPLATE_DOCTOR_REJECTED', ''),
+  RESEND_TEMPLATE_APPOINTMENT: str('RESEND_TEMPLATE_APPOINTMENT', ''),
 
   CLOUDINARY_CLOUD_NAME: str('CLOUDINARY_CLOUD_NAME', ''),
   CLOUDINARY_API_KEY: str('CLOUDINARY_API_KEY', ''),

@@ -17,6 +17,7 @@ const { nowLocal, naiveMs, timeToSec, normMinute, hhmm } = require('../utils/tim
 
 const router = express.Router();
 
+// ---------- helpers ----------
 async function getAppointment(id) {
   const a = await repo.loadAppointment(id);
   if (!a) throw new HttpError(404, 'Appointment not found');
@@ -33,7 +34,7 @@ const refOf = (a) => a.reference_number || `#${a.id}`;
 const startMs = (a) => naiveMs(a.appointment_date, timeToSec(a.start_time));
 const tooLate = (a) => nowLocal().ms > startMs(a) - settings.CANCEL_MIN_HOURS_BEFORE * 3600000;
 
-
+// ---------- create ----------
 router.post('/', currentPatient, ah(async (req, res) => {
   const p = parseBody(S.AppointmentCreate, req.body);
   const doctor = await repo.loadDoctor(p.doctor_id);
@@ -57,10 +58,19 @@ router.post('/', currentPatient, ah(async (req, res) => {
     `Fee: ${Number(row.fee_at_booking).toFixed(2)} EGP - pay at the clinic`,
   ];
   if (row.meeting_link) lines.push(`Meeting link: ${row.meeting_link}`);
-  await sendAppointmentEmail(req.patient.email, req.patient.first_name, 'Your Clinika appointment', lines);
+  await sendAppointmentEmail(req.patient.email, req.patient.first_name, 'Your Clinika appointment', lines, {
+    REFERENCE: row.reference_number,
+    DOCTOR: `Dr. ${doctor.full_name}`,
+    WHEN: `${label(row)} (${kind})`,
+    CLINIC: clinic ? clinic.name : '',
+    FEE: `${Number(row.fee_at_booking).toFixed(2)} EGP`,
+    MEETING_LINK: row.meeting_link || '',
+  });
   res.status(201).json(await repo.appointmentOut(row));
 }));
 
+// ---------- list / details ----------
+// المريض يشوف حجوزاته، الدكتور يشوف حجوزاته، الأدمن يشوف الكل
 router.get('/', auth, ah(async (req, res) => {
   const q = query(req);
   const statusFilter = q.str('status');
@@ -116,6 +126,7 @@ router.get('/', auth, ah(async (req, res) => {
   res.json(await repo.appointmentsOut(rows));
 }));
 
+// مواعيد اليوم (للدكتور: dashboard اليوم، للمريض: مواعيده اليوم)
 router.get('/today', auth, ah(async (req, res) => {
   const p = new Params();
   const where = [`a.appointment_date = ${p.add(nowLocal().date)}::date`, `a.status IN ('pending','confirmed')`];
@@ -131,6 +142,8 @@ router.get('/:appointment_id', auth, ah(async (req, res) => {
   res.json(await repo.appointmentOut(a));
 }));
 
+// ---------- meeting link (online visits) ----------
+// الدكتور (أو الأدمن) يغيّر لينك المكالمة. الفيديو نفسه بره النظام، إحنا بنحفظ اللينك بس
 router.patch('/:appointment_id/meeting-link', auth, ah(async (req, res) => {
   const id = pathInt(req, 'appointment_id');
   const p = parseBody(S.MeetingLinkIn, req.body);
@@ -147,6 +160,7 @@ router.patch('/:appointment_id/meeting-link', auth, ah(async (req, res) => {
   res.json(await repo.appointmentOut(await repo.loadAppointment(id)));
 }));
 
+// ---------- cancel ----------
 router.patch('/:appointment_id/cancel', auth, ah(async (req, res) => {
   const id = pathInt(req, 'appointment_id');
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? parseBody(S.CancelIn, req.body) : {};
@@ -170,6 +184,7 @@ router.patch('/:appointment_id/cancel', auth, ah(async (req, res) => {
   res.json(await repo.appointmentOut(await repo.loadAppointment(id)));
 }));
 
+// ---------- reschedule ----------
 router.patch('/:appointment_id/reschedule', auth, ah(async (req, res) => {
   const id = pathInt(req, 'appointment_id');
   const p = parseBody(S.RescheduleIn, req.body);
@@ -188,6 +203,7 @@ router.patch('/:appointment_id/reschedule', auth, ah(async (req, res) => {
   }
 
   const doctor = await repo.loadDoctor(a.doctor_id);
+  // الافتراضي: نفس العيادة اللي المريض حجز فيها، إلا لو اختار عيادة تانية صراحةً
   const targetClinic = p.clinic_id || a.clinic_id || null;
   const oldLabel = label(a);
 
@@ -219,6 +235,7 @@ router.patch('/:appointment_id/reschedule', auth, ah(async (req, res) => {
   res.json(await repo.appointmentOut(await repo.loadAppointment(id)));
 }));
 
+// ---------- status (doctor/admin) ----------
 const ALLOWED_TRANSITIONS = { pending: ['confirmed'], confirmed: ['completed', 'no_show'] };
 
 router.patch('/:appointment_id/status', auth, ah(async (req, res) => {
