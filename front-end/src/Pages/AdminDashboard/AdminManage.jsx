@@ -1,6 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+
+const DEFAULT_PATIENTS = [
+  { id: 1, full_name: 'Sarah Jenkins', email: 'sarah.j@example.com', phone: '+1 (555) 234-5678', created_at: 'Jan 14, 2024', status: 'Active' },
+  { id: 2, full_name: 'Marcus Vance', email: 'marcus.v@example.com', phone: '+1 (555) 345-6789', created_at: 'Feb 22, 2024', status: 'Active' },
+  { id: 3, full_name: 'Aisha Rahman', email: 'aisha.r@example.com', phone: '+1 (555) 456-7890', created_at: 'Mar 05, 2024', status: 'Active' },
+  { id: 4, full_name: 'David Chen', email: 'david.c@example.com', phone: '+1 (555) 567-8901', created_at: 'Nov 18, 2023', status: 'Inactive' }
+];
+
+const DEFAULT_APPOINTMENTS_LIST = [
+  { id: 1, patient: 'Sarah Jenkins', doctor: 'Dr. Maya Bennett', date: 'Nov 20, 2026', type: 'Cardiology Consultation', status: 'Confirmed' },
+  { id: 2, patient: 'Marcus Vance', doctor: 'Dr. Daniel Park', date: 'Nov 21, 2026', type: 'General Checkup', status: 'Pending' }
+];
 
 export default function AdminManage() {
   const navigate = useNavigate();
@@ -13,7 +25,7 @@ export default function AdminManage() {
   const [loading, setLoading] = useState(true);
   const [showEmptyDemo, setShowEmptyDemo] = useState(false);
 
-  // Pagination States 
+  // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 3;
 
@@ -41,47 +53,45 @@ export default function AdminManage() {
     status: 'confirmed'
   });
 
-  const fetchData = () => {
+  const loadAdminData = useCallback(async () => {
     setLoading(true);
-    fetch('https://clinika-backend.vercel.app/admin/users?role=patient')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && Array.isArray(data)) setUsers(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Error fetching users:', err);
-        setLoading(false);
-      });
+    try {
+      const usersRes = await fetch('https://clinika-backend.vercel.app/admin/users?role=patient');
+      const usersData = await usersRes.json();
+      if (usersData && Array.isArray(usersData)) {
+        setUsers(usersData);
+      }
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    } finally {
+      setLoading(false);
+    }
 
-    fetch('https://clinika-backend.vercel.app/admin/reports/appointments')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && Array.isArray(data)) setAppointments(data);
-      })
-      .catch((err) => {
-        console.error('Error fetching appointments:', err);
-      });
-  };
-
-  useEffect(() => {
-    fetchData();
+    try {
+      const apptRes = await fetch('https://clinika-backend.vercel.app/admin/reports/appointments');
+      const apptData = await apptRes.json();
+      if (apptData && Array.isArray(apptData)) {
+        setAppointments(apptData);
+      }
+    } catch (err) {
+      console.error('Error fetching appointments:', err);
+    }
   }, []);
 
-  const defaultPatients = [
-    { id: 1, full_name: 'Sarah Jenkins', email: 'sarah.j@example.com', phone: '+1 (555) 234-5678', created_at: 'Jan 14, 2024', status: 'Active' },
-    { id: 2, full_name: 'Marcus Vance', email: 'marcus.v@example.com', phone: '+1 (555) 345-6789', created_at: 'Feb 22, 2024', status: 'Active' },
-    { id: 3, full_name: 'Aisha Rahman', email: 'aisha.r@example.com', phone: '+1 (555) 456-7890', created_at: 'Mar 05, 2024', status: 'Active' },
-    { id: 4, full_name: 'David Chen', email: 'david.c@example.com', phone: '+1 (555) 567-8901', created_at: 'Nov 18, 2023', status: 'Inactive' }
-  ];
+  useEffect(() => {
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) {
+        loadAdminData();
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [loadAdminData]);
 
-  const defaultAppointmentsList = [
-    { id: 1, patient: 'Sarah Jenkins', doctor: 'Dr. Maya Bennett', date: 'Nov 20, 2026', type: 'Cardiology Consultation', status: 'Confirmed' },
-    { id: 2, patient: 'Marcus Vance', doctor: 'Dr. Daniel Park', date: 'Nov 21, 2026', type: 'General Checkup', status: 'Pending' }
-  ];
-
-  const activePatients = users.length > 0 ? users : defaultPatients;
-  const activeAppointments = appointments.length > 0 ? appointments : defaultAppointmentsList;
+  const activePatients = users.length > 0 ? users : DEFAULT_PATIENTS;
+  const activeAppointments = appointments.length > 0 ? appointments : DEFAULT_APPOINTMENTS_LIST;
 
   const handleAddPatientSubmit = (e) => {
     e.preventDefault();
@@ -97,7 +107,7 @@ export default function AdminManage() {
       .then(() => {
         alert('تم إضافة المريض بنجاح!');
         setIsPatientModalOpen(false);
-        fetchData();
+        loadAdminData();
       })
       .catch(() => {
         const fallback = {
@@ -128,7 +138,7 @@ export default function AdminManage() {
       .then(() => {
         alert('تم حجز الموعد بنجاح!');
         setIsAppointmentModalOpen(false);
-        fetchData();
+        loadAdminData();
       })
       .catch(() => {
         setIsAppointmentModalOpen(false);
@@ -148,10 +158,10 @@ export default function AdminManage() {
         return res.json().catch(() => ({}));
       })
       .then(() => {
-        fetchData();
+        loadAdminData();
       })
       .catch(() => {
-        const baseList = users.length > 0 ? users : defaultPatients;
+        const baseList = users.length > 0 ? users : DEFAULT_PATIENTS;
         setUsers(baseList.map((u) => (u.id === userId ? { ...u, status: newActiveState ? 'Active' : 'Inactive' } : u)));
       });
   };
@@ -310,7 +320,6 @@ export default function AdminManage() {
             </button>
           </div>
         </div>
-
         {/* Metrics Banner */}
         <div style={{ display: 'flex', gap: '24px', marginBottom: '24px', fontSize: '13px', color: '#475569', backgroundColor: '#FFFFFF', padding: '16px 20px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
           <div>👤 <strong>{activePatients.length}</strong> Registered Patients</div>
@@ -361,6 +370,7 @@ export default function AdminManage() {
               </span>
             </div>
           </div>
+
           {/* Patients Table */}
           {activeTab === 'patients' ? (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -446,7 +456,7 @@ export default function AdminManage() {
               Showing {filteredPatients.length > 0 ? indexOfFirstRow + 1 : 0}–{Math.min(indexOfLastRow, filteredPatients.length)} of {filteredPatients.length} patients
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button 
+              <button
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
                 style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #CBD5E1', backgroundColor: '#FFFFFF', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', opacity: currentPage === 1 ? 0.5 : 1 }}
@@ -472,7 +482,7 @@ export default function AdminManage() {
                 </button>
               ))}
 
-              <button 
+              <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
                 style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #CBD5E1', backgroundColor: '#FFFFFF', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', opacity: currentPage === totalPages ? 0.5 : 1 }}
@@ -483,7 +493,6 @@ export default function AdminManage() {
           </div>
         </div>
       </main>
-
       {/* Patient Modal */}
       {isPatientModalOpen && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
