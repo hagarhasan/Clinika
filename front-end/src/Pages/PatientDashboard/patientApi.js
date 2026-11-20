@@ -85,4 +85,14 @@ export const uploadAvatar = (file) => {
 export const changePassword = (current_password, new_password) =>
   api.post('/auth/change-password', { current_password, new_password }).then((res) => res.data);
 
+// GET /doctors/{id}/slots?date=YYYY-MM-DD -> [{ start_time, end_time, is_available, clinic_id }]
+export const fetchSlots = (doctorId, date, clinicId) =>
+  api
+    .get(`/doctors/${doctorId}/slots`, { params: { date, ...(clinicId ? { clinic_id: clinicId } : {}) } })
+    .then((res) => res.data);
+
+// PATCH /appointments/{id}/reschedule — the server refuses it less than 2 hours before the start.
+export const rescheduleAppointment = (id, appointment_date, start_time) =>
+  api.patch(`/appointments/${id}/reschedule`, { appointment_date, start_time }).then((res) => res.data);
+
 export default api;

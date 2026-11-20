@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import RescheduleForm from './RescheduleForm';
 import { StatusBadge } from './StateViews';
 import { formatDate, formatTime, getInitials } from './dateFormat';
 import { cancelAppointment, getErrorMessage } from '../../Pages/PatientDashboard/patientApi';
 
 const CANCELLABLE = ['pending', 'confirmed'];
 
-// onCancelled() runs after the server confirms the cancellation, so the page can reload its list.
+// onCancelled(message) runs after the server confirms a cancellation OR a reschedule,
+// so the page can show the message and reload its list.
 export default function AppointmentCard({ appointment, onCancelled }) {
   const { id, doctor, status, reason, clinic } = appointment;
   const [confirming, setConfirming] = useState(false);
+  const [rescheduling, setRescheduling] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -88,12 +91,28 @@ export default function AppointmentCard({ appointment, onCancelled }) {
             Join online
           </a>
         )}
-        {canCancel && !confirming && (
+        {canCancel && !confirming && !rescheduling && (
+          <button type="button" className="cl-pd-btn" onClick={() => setRescheduling(true)}>
+            Reschedule
+          </button>
+        )}
+        {canCancel && !confirming && !rescheduling && (
           <button type="button" className="cl-pd-btn cl-pd-btn--danger" onClick={() => setConfirming(true)}>
             Cancel appointment
           </button>
         )}
       </div>
+
+      {rescheduling && (
+        <RescheduleForm
+          appointment={appointment}
+          onClose={() => setRescheduling(false)}
+          onDone={(message) => {
+            setRescheduling(false);
+            onCancelled(message);
+          }}
+        />
+      )}
 
       {confirming && (
         <div className="cl-pd-confirm" role="group" aria-label="Confirm cancellation">
