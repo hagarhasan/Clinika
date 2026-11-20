@@ -1,0 +1,120 @@
+/* Styles for the My Profile page. Same "cl-pd-" prefix and project tokens. */
+
+.cl-pd-notice--error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.cl-pd-profile-head {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.cl-pd-avatar--lg {
+  width: 5rem;
+  height: 5rem;
+  font-size: 1.5rem;
+}
+
+.cl-pd-profile-head__name {
+  margin: 0 0 0.15rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.cl-pd-profile-head .cl-pd-btn {
+  margin-top: 0.5rem;
+}
+
+.cl-pd-section-card {
+  margin-bottom: 1.5rem;
+}
+
+.cl-pd-section-card h2 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.cl-pd-section-card .cl-pd-section__head h2 {
+  margin: 0;
+}
+
+.cl-pd-section-card .cl-pd-section__head {
+  margin-bottom: 1rem;
+}
+
+/* ---------- Read-only view ---------- */
+.cl-pd-info {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem 1.5rem;
+  margin: 0;
+}
+
+.cl-pd-info dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cl-text-muted);
+}
+
+.cl-pd-info dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.9375rem;
+  white-space: pre-line;
+}
+
+/* ---------- Forms ---------- */
+.cl-pd-form {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem 1.5rem;
+}
+
+.cl-pd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.cl-pd-field label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.cl-pd-field input,
+.cl-pd-field select,
+.cl-pd-field textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--cl-border);
+  border-radius: 12px;
+  background: var(--cl-surface-card);
+  font: inherit;
+}
+
+.cl-pd-field input:focus-visible,
+.cl-pd-field select:focus-visible,
+.cl-pd-field textarea:focus-visible {
+  outline: 2px solid var(--cl-primary-container);
+  outline-offset: 1px;
+}
+
+.cl-pd-field--wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 767px) {
+  .cl-pd-info,
+  .cl-pd-form {
+    grid-template-columns: 1fr;
+  }
+
+  .cl-pd-profile-head {
+    align-items: flex-start;
+  }
+}

@@ -1,0 +1,137 @@
+/* Extra styles for the Overview and Notifications pages. Same "cl-pd-" prefix and project tokens. */
+
+.cl-pd-page-head--row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.cl-pd-list--plain {
+  margin: 0 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.cl-pd-notice--error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ---------- Stat cards ---------- */
+.cl-pd-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin: 0 0 2rem;
+  padding: 0;
+  list-style: none;
+}
+
+.cl-pd-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.cl-pd-stat__icon {
+  font-size: 1.6rem;
+  color: var(--cl-primary-container);
+}
+
+.cl-pd-stat__value {
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* ---------- Sections ---------- */
+.cl-pd-section {
+  margin-bottom: 2rem;
+}
+
+.cl-pd-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.cl-pd-section__head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.cl-pd-link {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--cl-primary);
+}
+
+.cl-pd-link:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Notification rows ---------- */
+.cl-pd-notif {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.cl-pd-notif.is-unread {
+  border-left: 4px solid var(--cl-primary-container);
+  background: var(--cl-surface-low);
+}
+
+.cl-pd-notif__icon {
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--cl-secondary-container);
+  color: var(--cl-primary);
+  font-size: 1.3rem;
+}
+
+.cl-pd-notif__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.cl-pd-notif__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.cl-pd-notif__text {
+  margin: 0.2rem 0;
+  font-size: 0.9rem;
+  color: var(--cl-text-variant);
+}
+
+.cl-pd-notif__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+@media (max-width: 767px) {
+  .cl-pd-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cl-pd-notif {
+    flex-wrap: wrap;
+  }
+
+  .cl-pd-notif__actions {
+    width: 100%;
+  }
+}
