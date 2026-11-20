@@ -1,0 +1,953 @@
+
+/* =========================================
+   CLINIKA LOGIN - RESET
+========================================= */
+
+.clinika-login,
+.clinika-login * {
+  box-sizing: border-box;
+}
+/* Back to Home */
+
+.clinika-back-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  width: fit-content;
+
+  color: #64748b;
+  text-decoration: none;
+
+  font-size: 12px;
+  font-weight: 500;
+
+  margin-bottom: 20px;
+
+  transition: all 0.2s ease;
+}
+
+.clinika-back-home:hover {
+  color: #2563eb;
+  transform: translateX(-3px);
+}
+
+.clinika-back-home svg {
+  transition: transform 0.2s ease;
+}
+
+.clinika-back-home:hover svg {
+  transform: translateX(-3px);
+}
+.clinika-login {
+  min-height: 100vh;
+  width: 100%;
+  padding: 45px 6.5% 25px;
+
+  background: #f5f7fa;
+  color: #111827;
+
+  font-family: Arial, Helvetica, sans-serif;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+
+  column-gap: 65px;
+  row-gap: 30px;
+
+  align-items: center;
+}
+
+/* =========================================
+   LEFT SIDE
+========================================= */
+
+.clinika-login-left {
+  width: 100%;
+  max-width: 540px;
+  justify-self: center;
+}
+
+/* Badge */
+
+.clinika-access-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 8px 13px;
+
+  border-radius: 30px;
+
+  background: #e8f0fc;
+  color: #2563eb;
+
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+
+  margin-bottom: 25px;
+}
+
+.clinika-badge-dot {
+  width: 7px;
+  height: 7px;
+
+  background: #2563eb;
+  border-radius: 50%;
+}
+
+/* Main Heading */
+
+.clinika-main-heading {
+  font-size: clamp(32px, 3.2vw, 46px);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -1.3px;
+
+  color: #111827;
+
+  margin: 0 0 18px;
+}
+
+.clinika-main-heading span {
+  display: block;
+  color: #2864ed;
+}
+
+/* Description */
+
+.clinika-intro-text {
+  max-width: 440px;
+
+  font-size: 14px;
+  line-height: 1.85;
+
+  color: #64748b;
+
+  margin: 0 0 28px;
+}
+
+/* =========================================
+   DOCTOR CARD
+========================================= */
+
+.clinika-doctor-card {
+  width: 100%;
+
+  background: #ffffff;
+
+  border: 1px solid #e8edf3;
+  border-radius: 17px;
+
+  padding: 20px;
+
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04);
+
+  margin-bottom: 20px;
+}
+
+/* Doctor top */
+
+.clinika-doctor-top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+/* Avatar */
+
+.clinika-doctor-avatar {
+  width: 43px;
+  height: 43px;
+  flex-shrink: 0;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  color: #2563eb;
+  background: #eef3ff;
+
+  border-radius: 50%;
+}
+
+/* Doctor information */
+
+.clinika-doctor-details {
+  min-width: 0;
+}
+
+.clinika-doctor-details h3 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  margin: 0 0 5px;
+}
+
+.clinika-verified-icon {
+  color: #2563eb;
+  fill: #2563eb;
+  flex-shrink: 0;
+}
+
+.clinika-doctor-details p {
+  font-size: 10px;
+  line-height: 1.5;
+
+  color: #64748b;
+
+  margin: 0;
+}
+
+/* Rating */
+
+.clinika-rating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  margin-left: auto;
+
+  background: #fff8e8;
+  color: #d99b16;
+
+  padding: 6px 8px;
+
+  border-radius: 7px;
+
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* Quote */
+
+.clinika-doctor-quote {
+  color: #64748b;
+
+  font-size: 11px;
+  line-height: 1.8;
+
+  font-style: italic;
+
+  margin: 17px 0;
+}
+
+/* Doctor Stats */
+
+.clinika-doctor-stats {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+
+  flex-wrap: wrap;
+}
+
+.clinika-doctor-stats div {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  font-size: 10px;
+  color: #2563eb;
+}
+
+/* =========================================
+   SECURITY CARDS
+========================================= */
+
+.clinika-security-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.clinika-security-card {
+  background: #ffffff;
+
+  border: 1px solid #e8edf3;
+  border-radius: 13px;
+
+  padding: 12px;
+
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.clinika-security-icon {
+  width: 37px;
+  height: 37px;
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #edf3ff;
+  color: #2563eb;
+
+  border-radius: 10px;
+}
+
+.clinika-security-card h4 {
+  font-size: 11px;
+  font-weight: 600;
+
+  margin: 0 0 4px;
+}
+
+.clinika-security-card p {
+  font-size: 9px;
+  color: #64748b;
+
+  margin: 0;
+}
+
+/* =========================================
+   RIGHT SIDE
+========================================= */
+
+.clinika-login-right {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Login Card */
+
+.clinika-login-card {
+  width: 100%;
+  max-width: 475px;
+
+  background: #ffffff;
+
+  border-radius: 19px;
+
+  padding: 32px 34px;
+
+  box-shadow: 0 12px 35px rgba(15, 23, 42, 0.07);
+}
+
+/* Header */
+
+.clinika-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 15px;
+
+  margin-bottom: 27px;
+}
+
+.clinika-card-header h2 {
+  font-size: 25px;
+  font-weight: 500;
+  letter-spacing: -0.6px;
+
+  color: #111827;
+
+  margin: 0 0 9px;
+}
+
+.clinika-card-header p {
+  max-width: 330px;
+
+  font-size: 12px;
+  line-height: 1.7;
+
+  color: #64748b;
+
+  margin: 0;
+}
+
+/* Secure Badge */
+
+.clinika-secure-badge {
+  flex-shrink: 0;
+
+  background: #f0f2f5;
+  color: #475569;
+
+  border-radius: 30px;
+
+  padding: 9px 12px;
+
+  font-size: 9px;
+  font-weight: 500;
+}
+
+/* =========================================
+   ROLE SELECTOR
+========================================= */
+
+.clinika-role-section {
+  margin-bottom: 23px;
+}
+
+.clinika-section-label {
+  display: block;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  margin-bottom: 11px;
+}
+
+/* Switch */
+
+.clinika-role-switch {
+  width: 100%;
+
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+
+  padding: 4px;
+
+  background: #edf0f4;
+  border-radius: 11px;
+}
+
+.clinika-role-switch button {
+  min-height: 43px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+
+  border: none;
+  border-radius: 8px;
+
+  background: transparent;
+
+  color: #475569;
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.clinika-role-switch button:hover {
+  color: #2563eb;
+}
+
+.clinika-role-switch button.clinika-role-active {
+  background: #ffffff;
+  color: #2563eb;
+
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+}
+
+/* Role Hint */
+
+.clinika-role-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+
+  margin-top: 10px;
+
+  font-size: 10px;
+  line-height: 1.5;
+
+  color: #2563eb;
+}
+
+.clinika-role-hint svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* =========================================
+   FORM
+========================================= */
+
+.clinika-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 19px;
+}
+
+.clinika-field {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+/* Field Header */
+
+.clinika-field-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.clinika-field-header label {
+  color: #111827;
+
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.clinika-field-header > span {
+  font-size: 10px;
+  color: #2563eb;
+}
+
+.clinika-field-header a {
+  font-size: 10px;
+  color: #2563eb;
+
+  text-decoration: none;
+}
+
+.clinika-field-header a:hover {
+  text-decoration: underline;
+}
+
+/* Input Box */
+
+.clinika-input-box {
+  width: 100%;
+  height: 47px;
+
+  display: flex;
+  align-items: center;
+  gap: 11px;
+
+  padding: 0 13px;
+
+  background: #f5f7f9;
+
+  border: 1px solid transparent;
+  border-radius: 10px;
+
+  color: #64748b;
+
+  transition: all 0.2s;
+}
+
+.clinika-input-box:focus-within {
+  background: #ffffff;
+  border-color: #2864ed;
+
+  box-shadow: 0 0 0 3px rgba(40, 100, 237, 0.08);
+}
+
+.clinika-input-box > svg {
+  flex-shrink: 0;
+}
+
+/* Input */
+
+.clinika-input-box input {
+  width: 100%;
+  height: 100%;
+
+  outline: none;
+  border: none;
+
+  background: transparent;
+
+  font-family: inherit;
+  font-size: 12px;
+
+  color: #111827;
+}
+
+.clinika-input-box input::placeholder {
+  color: #94a3b8;
+}
+
+/* Password Button */
+
+.clinika-password-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  flex-shrink: 0;
+
+  border: none;
+  background: transparent;
+
+  color: #2563eb;
+
+  font-family: inherit;
+  font-size: 10px;
+
+  cursor: pointer;
+}
+
+/* =========================================
+   REMEMBER ME
+========================================= */
+
+.clinika-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  cursor: pointer;
+
+  color: #475569;
+  font-size: 11px;
+}
+
+.clinika-remember input {
+  width: 14px;
+  height: 14px;
+
+  margin: 0;
+
+  accent-color: #2864ed;
+
+  cursor: pointer;
+}
+
+/* =========================================
+   SUBMIT BUTTON
+========================================= */
+
+.clinika-submit-button {
+  width: 100%;
+  min-height: 49px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: #2864ed;
+  color: #ffffff;
+
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  box-shadow: 0 5px 13px rgba(37, 99, 235, 0.22);
+
+  transition: all 0.2s;
+}
+
+.clinika-submit-button:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+
+  box-shadow: 0 7px 17px rgba(37, 99, 235, 0.27);
+}
+
+.clinika-submit-button:active {
+  transform: translateY(0);
+}
+
+/* =========================================
+   DEMO
+========================================= */
+
+.clinika-demo-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+
+  margin-top: 20px;
+
+  font-size: 10px;
+  color: #64748b;
+}
+
+.clinika-demo-section button {
+  border: none;
+  background: transparent;
+
+  padding: 0;
+
+  color: #2563eb;
+  font-family: inherit;
+  font-size: 10px;
+
+  text-decoration: underline;
+
+  cursor: pointer;
+}
+
+.clinika-demo-dot {
+  color: #94a3b8;
+}
+
+/* =========================================
+   REGISTER
+========================================= */
+
+.clinika-register {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+
+  margin-top: 20px;
+
+  font-size: 11px;
+  color: #475569;
+}
+
+.clinika-register a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  color: #2563eb;
+
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.clinika-register a:hover {
+  text-decoration: underline;
+}
+
+/* =========================================
+   PRIVACY NOTICE
+========================================= */
+
+.clinika-privacy-notice {
+  grid-column: 1 / -1;
+
+  width: 100%;
+  max-width: 1050px;
+
+  justify-self: center;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 14px 20px;
+
+  background: #f0f3f7;
+
+  border-radius: 12px;
+}
+
+.clinika-privacy-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #2563eb;
+
+  flex-shrink: 0;
+}
+
+.clinika-privacy-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  flex: 1;
+
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.clinika-privacy-text strong {
+  font-weight: 600;
+  color: #111827;
+}
+
+.clinika-privacy-text span {
+  color: #64748b;
+}
+
+.clinika-privacy-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  white-space: nowrap;
+
+  font-size: 9px;
+}
+
+.clinika-privacy-links a {
+  color: #64748b;
+  text-decoration: none;
+}
+
+.clinika-privacy-links a:hover {
+  color: #2563eb;
+}
+
+/* =========================================
+   FOOTER
+========================================= */
+
+.clinika-login-footer {
+  grid-column: 1 / -1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.clinika-login-footer a {
+  color: #64748b;
+  text-decoration: none;
+}
+
+.clinika-login-footer a:hover {
+  color: #2563eb;
+}
+
+/* =========================================
+   TABLET
+========================================= */
+
+@media (max-width: 1000px) {
+  .clinika-login {
+    column-gap: 35px;
+    padding-left: 4%;
+    padding-right: 4%;
+  }
+
+  .clinika-login-card {
+    padding: 27px;
+  }
+
+  .clinika-main-heading {
+    font-size: 36px;
+  }
+}
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 750px) {
+  .clinika-login {
+    min-height: 100vh;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+
+    padding: 25px 18px;
+    gap: 28px;
+  }
+
+  .clinika-login-left,
+  .clinika-login-right {
+    width: 100%;
+    max-width: 500px;
+  }
+
+  .clinika-main-heading {
+    font-size: 34px;
+  }
+
+  .clinika-intro-text {
+    font-size: 13px;
+  }
+
+  .clinika-login-card {
+    max-width: 500px;
+    padding: 25px 22px;
+  }
+
+  .clinika-privacy-notice {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .clinika-privacy-text {
+    min-width: 0;
+  }
+
+  .clinika-privacy-links {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .clinika-login-footer {
+    flex-wrap: wrap;
+  }
+}
+
+/* =========================================
+   SMALL MOBILE
+========================================= */
+
+@media (max-width: 450px) {
+  .clinika-login {
+    padding: 20px 14px;
+  }
+
+  .clinika-main-heading {
+    font-size: 29px;
+  }
+
+  .clinika-access-badge {
+    margin-bottom: 18px;
+  }
+
+  .clinika-doctor-card {
+    padding: 15px;
+  }
+
+  .clinika-doctor-top {
+    flex-wrap: wrap;
+  }
+
+  .clinika-rating {
+    margin-left: 0;
+  }
+
+  .clinika-security-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .clinika-card-header {
+    flex-direction: column;
+  }
+
+  .clinika-secure-badge {
+    align-self: flex-start;
+  }
+
+  .clinika-login-card {
+    padding: 22px 17px;
+  }
+
+  .clinika-demo-section {
+    gap: 6px;
+  }
+
+  .clinika-privacy-notice {
+    padding: 13px;
+  }
+}

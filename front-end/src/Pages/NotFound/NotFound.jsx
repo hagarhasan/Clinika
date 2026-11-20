@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
+import './NotFound.css';
 
 const quickLinks = [
   { icon: "fa-user-doctor", title: "Find a Doctor", text: "Search verified specialists by specialty or location.", to: "/doctors", cta: "Search doctors" },

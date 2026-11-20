@@ -1,0 +1,297 @@
+
+/* =====================================
+   CLINIKA FOOTER
+===================================== */
+
+.clinika-footer {
+  width: 100%;
+  background: #f1f3f6;
+  color: #212d3c;
+  border: none;
+  border-bottom: 3px solid #7567ff;
+  border-radius: 0;
+  overflow: hidden;
+  font-family: inherit;
+}
+
+/* =====================================
+   EMERGENCY BAR
+===================================== */
+
+.clinika-footer-emergency {
+  min-height: 42px;
+  padding: 8px 15px;
+  background: #d7e4f4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #212d3c;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.clinika-footer-emergency svg {
+  color: #e11d48;
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+}
+
+.clinika-footer-emergency strong {
+  font-weight: 800;
+  margin-left: 3px;
+}
+
+/* =====================================
+   MAIN FOOTER
+===================================== */
+
+.clinika-footer-main {
+  display: grid;
+  grid-template-columns: 2fr 0.85fr 0.85fr 0.85fr;
+  gap: 45px;
+  padding: 48px 38px 45px;
+}
+
+/* =====================================
+   BRAND SECTION
+===================================== */
+
+.clinika-footer-brand {
+  max-width: 340px;
+}
+
+.clinika-footer-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #2164f5;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  line-height: 1;
+  text-decoration: none;
+  margin-bottom: 18px;
+  transition: color 0.3s ease;
+}
+
+.clinika-footer-logo:hover {
+  color: #0050cb;
+}
+
+.footer-logo-text {
+  font-size: 32px;
+  font-weight: 800;
+  color: inherit;
+  letter-spacing: -1.5px;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+
+.clinika-footer-brand p {
+  margin: 0;
+  color: #363d45;
+  font-size: 14px;
+  line-height: 1.8;
+  max-width: 320px;
+}
+
+/* =====================================
+   FOOTER COLUMNS
+===================================== */
+
+.clinika-footer-column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.clinika-footer-column h3 {
+  margin: 2px 0 2px;
+  color: #191c1e;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+.clinika-footer-column a {
+  color: #3b424a;
+  font-size: 13px;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.clinika-footer-column a:hover {
+  color: #0050cb;
+}
+
+/* =====================================
+   BOTTOM FOOTER
+===================================== */
+
+.clinika-footer-bottom {
+  min-height: 70px;
+  padding: 15px 38px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-top: 1px solid #e1e6ed;
+}
+
+.clinika-footer-bottom p {
+  margin: 0;
+  color: #53606d;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.clinika-footer-bottom-links {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+}
+
+.clinika-footer-bottom-links a {
+  color: #53606d;
+  font-size: 12px;
+  text-decoration: none;
+  transition: color 0.2s ease;
+  white-space: nowrap;
+}
+
+.clinika-footer-bottom-links a:hover {
+  color: #0050cb;
+}
+
+/* =====================================
+   TABLET RESPONSIVE
+===================================== */
+
+@media (max-width: 900px) {
+
+  .clinika-footer-main {
+    grid-template-columns: 1.5fr 1fr 1fr;
+    gap: 35px;
+    padding: 38px 25px;
+  }
+
+  .clinika-footer-brand {
+    grid-column: 1 / -1;
+    max-width: 450px;
+  }
+
+  .clinika-footer-bottom {
+    padding: 15px 25px 20px;
+  }
+}
+
+/* =====================================
+   MOBILE RESPONSIVE
+===================================== */
+
+@media (max-width: 600px) {
+
+  .clinika-footer-emergency {
+    min-height: 45px;
+    padding: 9px 12px;
+    font-size: 10px;
+    text-align: center;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .clinika-footer-emergency svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .clinika-footer-main {
+    grid-template-columns: 1fr 1fr;
+    gap: 30px 20px;
+    padding: 30px 20px;
+  }
+
+  .clinika-footer-brand {
+    grid-column: 1 / -1;
+    max-width: 100%;
+  }
+
+  .clinika-footer-logo {
+    margin-bottom: 14px;
+  }
+
+  .footer-logo-text {
+    font-size: 28px;
+  }
+
+  .clinika-footer-brand p {
+    font-size: 12px;
+  }
+
+  .clinika-footer-column {
+    gap: 11px;
+  }
+
+  .clinika-footer-column h3 {
+    font-size: 11px;
+  }
+
+  .clinika-footer-column a {
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .clinika-footer-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 17px 20px 22px;
+    gap: 15px;
+  }
+
+  .clinika-footer-bottom p {
+    font-size: 10px;
+    line-height: 1.8;
+  }
+
+  .clinika-footer-bottom-links {
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .clinika-footer-bottom-links a {
+    font-size: 11px;
+  }
+}
+
+/* =====================================
+   EXTRA SMALL MOBILE
+===================================== */
+
+@media (max-width: 360px) {
+
+  .clinika-footer-main {
+    grid-template-columns: 1fr;
+    gap: 25px;
+    padding: 28px 18px;
+  }
+
+  .clinika-footer-brand {
+    grid-column: auto;
+  }
+
+  .clinika-footer-column {
+    gap: 10px;
+  }
+
+  .clinika-footer-bottom {
+    padding: 15px 18px 20px;
+  }
+
+  .clinika-footer-bottom-links {
+    gap: 15px;
+  }
+}
