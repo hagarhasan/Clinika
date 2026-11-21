@@ -1,6 +1,5 @@
 import { Helmet } from 'react-helmet-async';
 import { 
-  ShieldAlert, 
   User, 
   Headset, 
   Mail, 
