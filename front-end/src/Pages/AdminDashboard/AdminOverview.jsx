@@ -22,14 +22,14 @@ export default function AdminOverview() {
     localStorage.getItem('token') || localStorage.getItem('access_token');
 
   const loadOverviewData = useCallback(
-    async (isActiveRef) => {
+    async () => {
       const token = getToken();
 
       if (!token) {
-        if (isActiveRef.current) {
+        
           setLoading(false);
           navigate('/login', { replace: true });
-        }
+    
         return;
       }
 
@@ -50,16 +50,16 @@ export default function AdminOverview() {
           activityRes.status === 401 ||
           activityRes.status === 403
         ) {
-          if (isActiveRef.current) {
+          
             setErrorMsg('You are not authorized to view admin data.');
             setLoading(false);
-          }
+          
           return;
         }
 
         if (statsRes.ok) {
           const statsData = await statsRes.json();
-          if (isActiveRef.current && statsData) {
+          if (statsData) {
             setStats({
               totalDoctors:
                 statsData.totalDoctors ?? statsData.total_doctors ?? 0,
@@ -82,30 +82,37 @@ export default function AdminOverview() {
               activityData?.data ||
               [];
 
-          if (isActiveRef.current) {
+          
             setActivities(Array.isArray(list) ? list : []);
-          }
+          
         }
       } catch (err) {
         console.error('Error fetching overview data:', err);
-        if (isActiveRef.current) {
+       
           setErrorMsg('Failed to load dashboard data from server.');
-        }
+        
       } finally {
-        if (isActiveRef.current) {
+        
           setLoading(false);
-        }
+        
       }
     },
     [navigate]
   );
 
   useEffect(() => {
-    const isActiveRef = { current: true };
-    loadOverviewData(isActiveRef);
+    let isActive = true;
+
+    const fetchData = async () => {
+      await loadOverviewData();
+    };
+
+    if (isActive) {
+      fetchData();
+    }
 
     return () => {
-      isActiveRef.current = false;
+      isActive = false;
     };
   }, [loadOverviewData]);
   return (

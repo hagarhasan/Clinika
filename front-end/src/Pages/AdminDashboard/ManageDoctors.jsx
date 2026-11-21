@@ -41,20 +41,20 @@ export default function ManageDoctors() {
   }, []);
 
   const loadDoctors = useCallback(
-    async (isActiveRef) => {
+    async () => {
       const token = getToken();
       if (!token) {
-        if (isActiveRef?.current !== false) {
+        
           setLoading(false);
           navigate('/login', { replace: true });
-        }
+        
         return;
       }
 
-      if (isActiveRef?.current !== false) {
+      
         setLoading(true);
         setErrorMsg('');
-      }
+      
 
       try {
         const res = await fetch(`${API_BASE_URL}/admin/doctors`, {
@@ -62,10 +62,10 @@ export default function ManageDoctors() {
         });
 
         if (res.status === 401 || res.status === 403) {
-          if (isActiveRef?.current !== false) {
+          
             setErrorMsg('You are not authorized to view or manage doctors.');
             setDoctors([]);
-          }
+          
           return;
         }
 
@@ -78,31 +78,38 @@ export default function ManageDoctors() {
           ? data
           : data?.doctors || data?.items || data?.data || [];
 
-        if (isActiveRef?.current !== false) {
+        
           setDoctors(Array.isArray(list) ? list : []);
-        }
+        
       } catch (err) {
         console.error('Error fetching doctors:', err);
-        if (isActiveRef?.current !== false) {
+        
           setErrorMsg('Failed to load doctors from server.');
-        }
+        
       } finally {
-        if (isActiveRef?.current !== false) {
+        
           setLoading(false);
-        }
+        
       }
     },
     [getAuthHeaders, navigate]
   );
 
   useEffect(() => {
-    const isActiveRef = { current: true };
-    loadDoctors(isActiveRef);
+    let isActive = true;
+
+    const fetchDoctors = async () => {
+      await loadDoctors();
+    };
+
+    if (isActive) {
+      fetchDoctors();
+    }
+
     return () => {
-      isActiveRef.current = false;
+      isActive = false;
     };
   }, [loadDoctors]);
-
   const filteredDoctors = doctors.filter((doc) => {
     const q = searchQuery.trim().toLowerCase();
     const docName = (doc.name || '').toLowerCase();
