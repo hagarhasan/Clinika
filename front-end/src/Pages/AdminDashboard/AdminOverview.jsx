@@ -39,9 +39,10 @@ export default function AdminOverview() {
       };
 
       try {
-        const [statsRes, activityRes] = await Promise.all([
+       const [statsRes, activityRes, patientsRes] = await Promise.all([
           fetch(`${API_BASE_URL}/admin/stats`, { headers }),
           fetch(`${API_BASE_URL}/admin/activity?limit=10&offset=0`, { headers }),
+          fetch(`${API_BASE_URL}/admin/users?role=patient`, { headers }),
         ]);
 
         if (
@@ -56,22 +57,37 @@ export default function AdminOverview() {
           
           return;
         }
-
-        if (statsRes.ok) {
-          const statsData = await statsRes.json();
-          if (statsData) {
-            setStats({
-              totalDoctors:
-                statsData.totalDoctors ?? statsData.total_doctors ?? 0,
-              totalPatients:
-                statsData.totalPatients ?? statsData.total_patients ?? 0,
-              totalAppointments:
-                statsData.totalAppointments ?? statsData.total_appointments ?? 0,
-              pendingRequests:
-                statsData.pendingRequests ?? statsData.pending_requests ?? 0,
-            });
-          }
+let patientsCountFromUsers = null;
+      if (patientsRes && patientsRes.ok) {
+        const patientsData = await patientsRes.json();
+        const pList = Array.isArray(patientsData)
+          ? patientsData
+          : patientsData?.items || patientsData?.users || patientsData?.patients || patientsData?.data || [];
+        if (Array.isArray(pList)) {
+          patientsCountFromUsers = pList.length;
         }
+      }
+
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        if (statsData) {
+          const statsPatients = statsData.totalPatients ?? statsData.total_patients ?? 0;
+          setStats({
+            totalDoctors: statsData.totalDoctors ?? statsData.total_doctors ?? 0,
+            totalPatients:
+              patientsCountFromUsers !== null && Number(statsPatients) === 0
+                ? patientsCountFromUsers
+                : statsPatients,
+            totalAppointments: statsData.totalAppointments ?? statsData.total_appointments ?? 0,
+            pendingRequests: statsData.pendingRequests ?? statsData.pending_requests ?? 0,
+          });
+        }
+      } else if (patientsCountFromUsers !== null) {
+        setStats((prev) => ({
+          ...prev,
+          totalPatients: patientsCountFromUsers,
+        }));
+      }
 
         if (activityRes.ok) {
           const activityData = await activityRes.json();
