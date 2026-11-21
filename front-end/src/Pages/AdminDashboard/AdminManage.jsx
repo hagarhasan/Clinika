@@ -54,20 +54,17 @@ export default function AdminManage() {
   }, []);
 
   const loadAdminData = useCallback(
-    async (isActiveRef) => {
+    async () => {
       const token = getToken();
       if (!token) {
-        if (isActiveRef?.current !== false) {
           setLoading(false);
           navigate('/login', { replace: true });
-        }
         return;
       }
 
-      if (isActiveRef?.current !== false) {
+
         setLoading(true);
         setErrorMsg('');
-      }
 
       const headers = getAuthHeaders();
 
@@ -78,11 +75,11 @@ export default function AdminManage() {
         ]);
 
         if (usersRes.status === 401 || usersRes.status === 403 || apptRes.status === 401 || apptRes.status === 403) {
-          if (isActiveRef?.current !== false) {
+          
             setErrorMsg('You are not authorized to view users or appointments.');
             setUsers([]);
             setAppointments([]);
-          }
+          
           return;
         }
 
@@ -91,9 +88,9 @@ export default function AdminManage() {
           const uList = Array.isArray(usersData)
             ? usersData
             : usersData?.users || usersData?.items || usersData?.data || [];
-          if (isActiveRef?.current !== false) {
+          
             setUsers(Array.isArray(uList) ? uList : []);
-          }
+          
         }
 
         if (apptRes.ok) {
@@ -101,31 +98,33 @@ export default function AdminManage() {
           const aList = Array.isArray(apptData)
             ? apptData
             : apptData?.appointments || apptData?.items || apptData?.data || [];
-          if (isActiveRef?.current !== false) {
+      
             setAppointments(Array.isArray(aList) ? aList : []);
-          }
+          
         }
       } catch (err) {
         console.error('Error loading admin users/appointments:', err);
-        if (isActiveRef?.current !== false) {
+        
           setErrorMsg('Failed to load users and appointments from server.');
-        }
+        
       } finally {
-        if (isActiveRef?.current !== false) {
+      
           setLoading(false);
-        }
       }
     },
     [getAuthHeaders, navigate]
   );
 
-  useEffect(() => {
-    const isActiveRef = { current: true };
-    loadAdminData(isActiveRef);
-    return () => {
-      isActiveRef.current = false;
-    };
-  }, [loadAdminData]);
+ useEffect(() => {
+  
+  const fetchData = async () => {
+  
+    await loadAdminData();
+  };
+
+  fetchData();
+
+}, [loadAdminData]);
 
   const handleAddPatientSubmit = async (e) => {
     e.preventDefault();

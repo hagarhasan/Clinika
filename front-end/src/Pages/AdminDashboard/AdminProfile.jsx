@@ -75,19 +75,19 @@ export default function AdminProfile() {
   }, []);
 
   const fetchAdminLogs = useCallback(
-    async (isActiveRef) => {
+    async () => {
       const token = getToken();
       if (!token) {
-        if (isActiveRef?.current !== false) {
+      
           setLoadingLogs(false);
           navigate("/login", { replace: true });
-        }
+        
         return;
       }
 
-      if (isActiveRef?.current !== false) {
+      
         setLoadingLogs(true);
-      }
+      
 
       const headers = { Authorization: `Bearer ${token}` };
 
@@ -100,7 +100,7 @@ export default function AdminProfile() {
           ? res.data
           : res.data?.data || res.data?.logs || res.data?.items || [];
 
-        if (isActiveRef?.current !== false) {
+       
           setLogs(
             Array.isArray(list)
               ? list.map((row, idx) => ({
@@ -117,13 +117,13 @@ export default function AdminProfile() {
                 }))
               : []
           );
-        }
+        
       } catch (err) {
         if (err?.response?.status === 401 || err?.response?.status === 403) {
-          if (isActiveRef?.current !== false) {
+          
             setLogs([]);
             notify("error", "You are not authorized to view admin audit logs.");
-          }
+          
           return;
         }
 
@@ -136,7 +136,7 @@ export default function AdminProfile() {
             ? fallbackRes.data
             : fallbackRes.data?.data || fallbackRes.data?.items || [];
 
-          if (isActiveRef?.current !== false) {
+          
             setLogs(
               Array.isArray(actList)
                 ? actList.map((row, idx) => ({
@@ -148,26 +148,34 @@ export default function AdminProfile() {
                   }))
                 : []
             );
-          }
+          
         } catch {
-          if (isActiveRef?.current !== false) {
+          
             setLogs([]);
-          }
+          
         }
       } finally {
-        if (isActiveRef?.current !== false) {
+        
           setLoadingLogs(false);
-        }
+        
       }
     },
     [navigate, notify]
   );
 
   useEffect(() => {
-    const isActiveRef = { current: true };
-    fetchAdminLogs(isActiveRef);
+    let isActive = true;
+
+    const loadLogs = async () => {
+      await fetchAdminLogs();
+    };
+
+    if (isActive) {
+      loadLogs();
+    }
+
     return () => {
-      isActiveRef.current = false;
+      isActive = false;
     };
   }, [fetchAdminLogs]);
   const handleField = (key, value) => {
