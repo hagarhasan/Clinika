@@ -52,7 +52,7 @@ export default function DoctorProfile() {
 
         const data = await response.json();
         setDoctor(data);
-      } catch (err) {
+      } catch {
         setError("Unable to load doctor profile.");
       } finally {
         setLoading(false);
