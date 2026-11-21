@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Heart,
   CalendarCheck,
-  Users,
   Smile,
   Clock,
   CheckCircle2
