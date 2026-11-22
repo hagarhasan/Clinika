@@ -18,7 +18,7 @@ import DoctorDashboard from './Pages/DoctorDashboard/DoctorDashboard';
 import DoctorOverview from './Pages/DoctorDashboard/DoctorOverview';
 import DoctorAppointments from './Pages/DoctorDashboard/DoctorAppointments';
 import DoctorAvailability from './Pages/DoctorDashboard/DoctorAvailability';
-import DoctorDashboardProfile from './Pages/DoctorDashboard/DoctorProfile';
+import DoctorDashboardProfile from './Pages/DoctorDashboard/DashDoctProfile';
 import AdminDashboard from './Pages/AdminDashboard/AdminDashboard';
 import AdminOverview from './Pages/AdminDashboard/AdminOverview';
 import ManageDoctors from './Pages/AdminDashboard/ManageDoctors';
