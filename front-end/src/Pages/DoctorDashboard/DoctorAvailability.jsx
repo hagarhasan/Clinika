@@ -96,7 +96,7 @@ export default function DoctorAvailability() {
     }
   };
 
-   return (
+     return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <Helmet><title>Doctor Availability | Clinika</title></Helmet>
       <div>
@@ -162,17 +162,11 @@ export default function DoctorAvailability() {
                   </div>
                 )}
               </div>
-            );
-          })}
-        </div>
-
-        <Link
-          to="/doctors"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14, padding: 14, borderRadius: 12, background: C.low, color: C.p, fontSize: 14, fontWeight: 600, textDecoration: 'none' }}
-        >
-          Preview Public Profile & Booking <i className="fa-solid fa-arrow-right" />
-        </Link>
-      </div>
+            )}
+            <Link to="/doctors" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '12px', backgroundColor: C.low, color: C.primary, fontSize: '14px', fontWeight: 600, textDecoration: 'none' }}>
+              Preview Public Profile & Booking <Ic n="arrow_forward" s={18} />
+            </Link>
+          </div>
 
       <div style={{ ...card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
