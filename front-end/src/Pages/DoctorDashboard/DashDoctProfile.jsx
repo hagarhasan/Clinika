@@ -1,196 +1,333 @@
-import { useEffect, useState } from 'react';
-import axios from 'axios';
+import { useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useOutletContext } from 'react-router-dom';
+import { useDoctorData, api, TOKEN_KEY, errMsg, drName, C, card, pill, btn } from './DoctorDashboard';
 
-const TOKEN = 'token';
-const API = 'https://clinika-backend.vercel.app';
-const C = { p: '#0050cb', t: '#191c1e', m: '#424655', s: '#d7e4f4', low: '#f2f4f6', w: '#fff', b: '#c2c6d8', eb: '#ffdad6', et: '#93000a', pf: '#dae1ff' };
-const card = { background: C.w, borderRadius: 16, boxShadow: '0 1px 8px rgba(0,0,0,0.05)', padding: 24 };
-const DAYS = [[0, 'Mon', 'Monday'], [1, 'Tue', 'Tuesday'], [2, 'Wed', 'Wednesday'], [3, 'Thu', 'Thursday'], [4, 'Fri', 'Friday'], [5, 'Sat', 'Saturday'], [6, 'Sun', 'Sunday']];
-const DURATIONS = [15, 30, 45, 60];
-const TIMES = Array.from({ length: 33 }, (_, i) => {
-  const m = 360 + i * 30;
-  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-});
-const hhmm = (t) => (typeof t === 'string' ? t.slice(0, 5) : '00:00');
-const toMin = (t) => {
-  const x = hhmm(t);
-  return Number(x.slice(0, 2)) * 60 + Number(x.slice(3, 5));
+const inp = {
+  width: '100%', boxSizing: 'border-box', backgroundColor: C.low,
+  border: '1px solid transparent', outline: 'none', borderRadius: 12,
+  padding: '10px 14px', fontSize: 14, fontFamily: 'inherit', color: C.text,
 };
-const to12 = (t) => {
-  const x = hhmm(t);
-  const h = Number(x.slice(0, 2));
-  return `${String(h % 12 || 12).padStart(2, '0')}:${x.slice(3, 5)} ${h < 12 ? 'AM' : 'PM'}`;
-};
-const errMsg = (e) => {
-  const d = e?.response?.data?.detail;
-  return typeof d === 'string' ? d : Array.isArray(d) ? d.map((x) => x.msg || String(x)).join(', ') : e?.message || 'Request failed';
-};
-const hdr = () => {
-  const t = localStorage.getItem(TOKEN);
-  return t ? { Authorization: `Bearer ${t}` } : {};
-};
-const initDays = () => Object.fromEntries(DAYS.map(([k]) => [k, { on: k < 5, start: '09:00', end: '17:00' }]));
+const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 };
 
-export default function DoctorAvailability() {
-  const { user, profile } = useOutletContext() || {};
-  const isDoc = Boolean(profile?.id) && String(user?.role || '').toLowerCase() === 'doctor';
-  const doctorId = isDoc ? profile.id : null;
-  const clinics = isDoc ? (profile?.clinics?.length ? profile.clinics : profile?.clinic ? [profile.clinic] : []) : [];
+const Field = ({ label, hint, children }) => (
+  <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, fontWeight: 600, color: C.muted }}>
+    {label}
+    {children}
+    {hint && <span style={{ fontWeight: 400, color: C.outline }}>{hint}</span>}
+  </label>
+);
 
-  const [days, setDays] = useState(initDays);
-  const [durationDraft, setDurationDraft] = useState(null);
-  const [clinicDraft, setClinicDraft] = useState(undefined);
-  const [msg, setMsg] = useState(null);
-  const [saving, setSaving] = useState(false);
+const Section = ({ icon, title, sub, msg, saving, onSave, label = 'Save Changes', children }) => (
+  <div style={{ ...card, padding: 32, display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: C.secondary, color: C.primary, display: 'grid', placeItems: 'center' }}>
+        <i className={`fa-solid ${icon}`} />
+      </div>
+      <div>
+        <div style={{ fontSize: 18, fontWeight: 600 }}>{title}</div>
+        <div style={{ fontSize: 13, color: C.muted }}>{sub}</div>
+      </div>
+    </div>
+    {children}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+      <button
+        type="button"
+        disabled={saving}
+        onClick={onSave}
+        style={btn(C.primary, '#fff', { padding: '10px 24px', opacity: saving ? 0.6 : 1, boxShadow: '0 4px 14px rgba(27,104,246,0.28)' })}
+      >
+        {saving ? 'Saving...' : label}
+      </button>
+      {msg && (
+        <span style={{ fontSize: 13, fontWeight: 600, color: msg.ok ? '#15803d' : C.errText }}>
+          <i className={`fa-solid ${msg.ok ? 'fa-circle-check' : 'fa-circle-exclamation'}`} /> {msg.text}
+        </span>
+      )}
+    </div>
+  </div>
+);
 
-  const duration = durationDraft ?? (profile?.slot_duration_minutes || 30);
-  const clinicId = clinicDraft !== undefined ? clinicDraft : (clinics[0]?.id ?? null);
+export default function DashDoctProfile() {
+  const { user, profile, setUser, setProfile, isGuestPreview, refresh } = useDoctorData();
 
-  useEffect(() => {
-    if (!doctorId) return;
-    let alive = true;
-    axios.get(`${API}/doctors/${doctorId}/schedules`, { headers: hdr() })
-      .then((r) => {
-        if (!alive) return;
-        const rows = Array.isArray(r.data) ? r.data : [];
-        if (rows.length) {
-          const next = Object.fromEntries(DAYS.map(([k]) => [k, { on: false, start: '09:00', end: '17:00' }]));
-          DAYS.forEach(([k]) => {
-            const p = rows.filter((x) => x.day_of_week === k && x.is_active !== false).sort((a, b) => hhmm(a.start_time).localeCompare(hhmm(b.start_time)));
-            if (p.length) next[k] = { on: true, start: hhmm(p[0].start_time), end: hhmm(p[p.length - 1].end_time) };
-          });
-          setDays(next);
-        }
-        const foundClinic = rows.find((x) => x.clinic_id)?.clinic_id;
-        if (foundClinic) setClinicDraft(foundClinic);
-      })
-      .catch((e) => alive && setMsg({ ok: false, text: errMsg(e) }));
-    return () => { alive = false; };
-  }, [doctorId]);
+  const baseAcc = useMemo(
+    () => ({
+      first_name: user?.first_name || '',
+      last_name: user?.last_name || '',
+      phone: user?.phone || '',
+      email: user?.email || '',
+      current_password: '',
+    }),
+    [user]
+  );
 
-  const setDay = (k, patch) => setDays((p) => ({ ...p, [k]: { ...p[k], ...patch } }));
-  const active = DAYS.filter(([k]) => days[k].on);
-  const hrs = (d) => Math.max(0, toMin(d.end) - toMin(d.start)) / 60;
-  const invalid = !isDoc || active.some(([k]) => hrs(days[k]) <= 0);
+  const basePro = useMemo(
+    () => ({
+      title: profile?.title || '',
+      room: profile?.room || '',
+      bio: profile?.bio || '',
+      years_of_experience: Number(profile?.years_of_experience) || 0,
+      consultation_fee: Number(profile?.consultation_fee) || 0,
+      languages: (profile?.languages || []).join(', '),
+      focus_areas: (profile?.focus_areas || []).join(', '),
+      accepting_new_patients: Boolean(profile?.accepting_new_patients),
+      offers_online: Boolean(profile?.offers_online),
+    }),
+    [profile]
+  );
 
-  const save = async () => {
-    if (!doctorId) {
-      setMsg({ ok: false, text: 'Doctor account required.' });
-      return;
-    }
-    setSaving(true);
-    setMsg(null);
-    const items = active.map(([k]) => ({ day_of_week: k, start_time: days[k].start, end_time: days[k].end, is_active: true, clinic_id: clinicId }));
+  const [accDraft, setAccDraft] = useState(null);
+  const [proDraft, setProDraft] = useState(null);
+  const [pw, setPw] = useState({ current_password: '', new_password: '', confirm: '' });
+  const [busy, setBusy] = useState('');
+  const [msg, setMsg] = useState({});
+
+  const acc = accDraft ?? baseAcc;
+  const pro = proDraft ?? basePro;
+  const setAcc = (fn) => setAccDraft((p) => fn(p ?? baseAcc));
+  const setPro = (fn) => setProDraft((p) => fn(p ?? basePro));
+
+  const run = async (key, fn, okText, onFallback) => {
+    setBusy(key);
+    setMsg((m) => ({ ...m, [key]: null }));
     try {
-      await axios.put(`${API}/doctors/${doctorId}/schedules`, items, { headers: hdr() });
-      if (duration !== profile?.slot_duration_minutes) {
-        await axios.put(`${API}/doctors/${doctorId}`, { slot_duration_minutes: duration }, { headers: hdr() });
-      }
-      setMsg({ ok: true, text: 'Availability saved.' });
+      await fn();
+      setMsg((m) => ({ ...m, [key]: { ok: true, text: okText } }));
     } catch (e) {
-      setMsg({ ok: false, text: errMsg(e) });
+      if (onFallback) {
+        onFallback();
+        setMsg((m) => ({ ...m, [key]: { ok: true, text: `${okText} (${errMsg(e)})` } }));
+      } else {
+        setMsg((m) => ({ ...m, [key]: { ok: false, text: errMsg(e) } }));
+      }
     } finally {
-      setSaving(false);
+      setBusy('');
     }
   };
 
+  const splitCsv = (s) => s.split(',').map((x) => x.trim()).filter(Boolean);
+
+  const applyLocalAcc = () => {
+    const full = [acc.first_name.trim(), acc.last_name.trim()].filter(Boolean).join(' ');
+    setUser((prev) => ({
+      ...prev,
+      first_name: acc.first_name.trim(),
+      last_name: acc.last_name.trim(),
+      full_name: full ? drName(full) : prev?.full_name,
+      phone: acc.phone.trim(),
+      email: acc.email.trim(),
+    }));
+    setAccDraft(null);
+  };
+
+  const saveAcc = () =>
+    run(
+      'acc',
+      async () => {
+        if (isGuestPreview) {
+          applyLocalAcc();
+          return;
+        }
+        const data = {
+          first_name: acc.first_name.trim(),
+          last_name: acc.last_name.trim(),
+          phone: acc.phone.trim() || null,
+        };
+        if (user && acc.email.trim().toLowerCase() !== (user.email || '').toLowerCase()) {
+          data.email = acc.email.trim();
+          data.current_password = acc.current_password;
+        }
+        await api.put('/auth/me', data);
+        await refresh();
+        setAccDraft(null);
+      },
+      'Account updated',
+      applyLocalAcc
+    );
+
+  const applyLocalPro = () => {
+    setProfile((prev) => ({
+      ...prev,
+      title: pro.title.trim(),
+      room: pro.room.trim(),
+      bio: pro.bio.trim(),
+      years_of_experience: Number(pro.years_of_experience) || 0,
+      consultation_fee: Number(pro.consultation_fee) || 0,
+      languages: splitCsv(pro.languages),
+      focus_areas: splitCsv(pro.focus_areas),
+      accepting_new_patients: Boolean(pro.accepting_new_patients),
+      offers_online: Boolean(pro.offers_online),
+    }));
+    setProDraft(null);
+  };
+
+  const savePro = () =>
+    run(
+      'pro',
+      async () => {
+        const docId = Number(profile?.id);
+        if (isGuestPreview || !Number.isInteger(docId) || docId <= 0) {
+          applyLocalPro();
+          return;
+        }
+        await api.put(`/doctors/${docId}`, {
+          title: pro.title.trim() || null,
+          room: pro.room.trim() || null,
+          bio: pro.bio.trim() || null,
+          years_of_experience: Number(pro.years_of_experience) || 0,
+          consultation_fee: Number(pro.consultation_fee) || 0,
+          languages: splitCsv(pro.languages),
+          focus_areas: splitCsv(pro.focus_areas),
+          accepting_new_patients: Boolean(pro.accepting_new_patients),
+          offers_online: Boolean(pro.offers_online),
+        });
+        await refresh();
+        setProDraft(null);
+      },
+      'Professional details updated',
+      applyLocalPro
+    );
+
+  const savePw = () =>
+    run(
+      'pw',
+      async () => {
+        if (pw.new_password.length < 8) throw new Error('New password must be at least 8 characters');
+        if (pw.new_password !== pw.confirm) throw new Error('Passwords do not match');
+        if (!isGuestPreview) {
+          const r = await api.post('/auth/change-password', {
+            current_password: pw.current_password,
+            new_password: pw.new_password,
+          });
+          if (r.data?.access_token) localStorage.setItem(TOKEN_KEY, r.data.access_token);
+        }
+        setPw({ current_password: '', new_password: '', confirm: '' });
+      },
+      'Password changed'
+    );
+
+  const setField = (setter) => (k) => (e) =>
+    setter((p) => ({ ...p, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
+
+  const onAcc = setField(setAcc);
+  const onPro = setField(setPro);
+  const onPw = setField((fn) => setPw((p) => fn(p)));
+  const emailChanged = user && acc.email.trim().toLowerCase() !== (user.email || '').toLowerCase();
+
+  const displayDoctorName = drName(
+    user?.full_name || [acc.first_name, acc.last_name].filter(Boolean).join(' ') || 'Dr. Nadia Mansour'
+  );
+
+  const readOnly = [
+    ['Specialty', profile?.specialty?.name],
+    ['License Number', profile?.license_number],
+    ['Status', profile?.status],
+    ['Clinics', (profile?.clinics?.length ? profile.clinics : profile?.clinic ? [profile.clinic] : []).map((c) => c.name).join(', ')],
+  ];
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      <Helmet><title>Doctor Availability | Clinika</title></Helmet>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28, maxWidth: 960 }}>
+      <Helmet><title>My Profile | Clinika</title></Helmet>
+
       <div>
-        <div style={{ fontSize: 12, color: C.m }}>
-          Doctor Dashboard <i className="fa-solid fa-chevron-right" style={{ fontSize: 9 }} /> <b style={{ color: C.p }}>Manage Availability</b>
+        <div style={{ fontSize: 12, color: C.muted }}>
+          Doctor Dashboard <i className="fa-solid fa-chevron-right" style={{ fontSize: 9 }} />{' '}
+          <b style={{ color: C.primary }}>My Profile</b>
         </div>
-        <h1 style={{ fontSize: 34, fontWeight: 700, margin: '4px 0' }}>Manage Availability</h1>
+        <h1 style={{ fontSize: 40, lineHeight: '48px', fontWeight: 700, letterSpacing: '-0.025em', margin: '4px 0' }}>
+          My Profile
+        </h1>
+        <p style={{ fontSize: 14, color: C.muted, margin: 0 }}>
+          Manage your account settings, contact info, and professional details.
+        </p>
       </div>
 
-      {!isDoc && (
-        <div style={{ ...card, padding: 14, background: C.eb, color: C.et, fontSize: 13, fontWeight: 600 }}>
-          <i className="fa-solid fa-lock" /> Location selection and schedule saving require a registered doctor account.
-        </div>
-      )}
-      {msg && (
-        <div style={{ ...card, padding: 14, background: msg.ok ? C.w : C.eb, color: msg.ok ? C.t : C.et, fontSize: 13, fontWeight: 600 }}>
-          <i className={`fa-solid ${msg.ok ? 'fa-circle-check' : 'fa-circle-exclamation'}`} /> {msg.text}
-        </div>
-      )}
-
-      {isDoc && clinics.length > 0 && (
-        <div style={card}>
-          <h2 style={{ fontSize: 16, margin: '0 0 12px' }}><i className="fa-solid fa-building" style={{ color: C.p }} /> Practicing Clinic</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 }}>
-            {clinics.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setClinicDraft(c.id)}
-                style={{ textAlign: 'left', padding: 14, borderRadius: 12, cursor: 'pointer', border: c.id === clinicId ? `2px solid ${C.p}` : `1px solid ${C.b}`, background: c.id === clinicId ? C.pf : C.low }}
-              >
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{c.name}</div>
-                {c.address && <div style={{ fontSize: 12, color: C.m }}>{c.address}</div>}
-              </button>
-            ))}
+      <div style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 16, backgroundColor: C.secondary, color: C.primary,
+            display: 'grid', placeItems: 'center', fontSize: 22,
+          }}>
+            <i className="fa-solid fa-user-doctor" />
+          </div>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>{displayDoctorName}</div>
+            <div style={{ fontSize: 13, color: C.muted }}>
+              {profile?.specialty?.name || 'Internal Medicine'} • {pro.title || 'Consultant Physician'}
+            </div>
           </div>
         </div>
-      )}
-
-      <div style={card}>
-        <h2 style={{ fontSize: 16, margin: '0 0 12px' }}><i className="fa-solid fa-calendar-week" style={{ color: C.p }} /> Working Days & Hours</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {DAYS.map(([k, , full]) => {
-            const d = days[k];
-            const h = hrs(d);
-            return (
-              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, padding: 12, borderRadius: 12, background: C.low }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 14, cursor: isDoc ? 'pointer' : 'not-allowed' }}>
-                  <input type="checkbox" disabled={!isDoc} checked={d.on} onChange={(e) => setDay(k, { on: e.target.checked })} /> {full}
-                </label>
-                {d.on && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <select disabled={!isDoc} value={d.start} onChange={(e) => setDay(k, { start: e.target.value })}>
-                      {TIMES.map((t) => <option key={t} value={t}>{to12(t)}</option>)}
-                    </select>
-                    <span>to</span>
-                    <select disabled={!isDoc} value={d.end} onChange={(e) => setDay(k, { end: e.target.value })}>
-                      {TIMES.map((t) => <option key={t} value={t}>{to12(t)}</option>)}
-                    </select>
-                    <span style={{ fontSize: 12, fontWeight: 600, padding: '3px 8px', borderRadius: 999, background: h > 0 ? C.s : C.eb }}>
-                      {h > 0 ? `${+h.toFixed(1)}h` : 'Invalid'}
-                    </span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <span style={pill(C.secondary, C.primary)}>
+          <i className="fa-solid fa-shield-halved" /> {profile?.status || 'Active'}
+        </span>
       </div>
 
-      <div style={{ ...card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: C.m }}>Slot:</span>
-          {DURATIONS.map((m) => (
-            <button
-              key={m}
-              type="button"
-              disabled={!isDoc}
-              onClick={() => setDurationDraft(m)}
-              style={{ padding: '8px 14px', borderRadius: 10, border: 'none', cursor: isDoc ? 'pointer' : 'not-allowed', fontWeight: 600, background: duration === m ? C.p : C.low, color: duration === m ? C.w : C.m }}
-            >
-              {m}m
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          disabled={saving || invalid}
-          onClick={save}
-          style={{ padding: '11px 22px', borderRadius: 12, border: 'none', background: C.p, color: C.w, fontWeight: 600, cursor: saving || invalid ? 'not-allowed' : 'pointer', opacity: saving || invalid ? 0.6 : 1 }}
-        >
-          <i className={`fa-solid ${saving ? 'fa-spinner fa-spin' : 'fa-floppy-disk'}`} /> {saving ? 'Saving...' : 'Save Availability'}
-        </button>
+      <div style={{ ...card, display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+        {readOnly.map(([k, v]) => (
+          <div key={k} style={{ minWidth: 160 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: C.outline, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{k}</div>
+            <div style={{ fontSize: 14, fontWeight: 600, textTransform: k === 'Status' ? 'capitalize' : 'none' }}>{v || '—'}</div>
+          </div>
+        ))}
       </div>
+
+      <Section icon="fa-user" title="Account Settings" sub="Your personal sign-in details." msg={msg.acc} saving={busy === 'acc'} onSave={saveAcc}>
+        <div style={grid}>
+          <Field label="First name"><input style={inp} value={acc.first_name} onChange={onAcc('first_name')} /></Field>
+          <Field label="Last name"><input style={inp} value={acc.last_name} onChange={onAcc('last_name')} /></Field>
+          <Field label="Phone"><input style={inp} value={acc.phone} onChange={onAcc('phone')} /></Field>
+          <Field label="Email"><input style={inp} type="email" value={acc.email} onChange={onAcc('email')} /></Field>
+          {emailChanged && (
+            <Field label="Current password" hint="Required to change your email">
+              <input style={inp} type="password" value={acc.current_password} onChange={onAcc('current_password')} />
+            </Field>
+          )}
+        </div>
+      </Section>
+
+      <Section icon="fa-stethoscope" title="Professional Details" sub="Shown on your public profile." msg={msg.pro} saving={busy === 'pro'} onSave={savePro}>
+        <div style={grid}>
+          <Field label="Title"><input style={inp} value={pro.title} onChange={onPro('title')} /></Field>
+          <Field label="Room"><input style={inp} value={pro.room} onChange={onPro('room')} /></Field>
+          <Field label="Years of experience">
+            <input style={inp} type="number" min="0" max="70" value={pro.years_of_experience} onChange={onPro('years_of_experience')} />
+          </Field>
+          <Field label="Consultation fee">
+            <input style={inp} type="number" min="0" value={pro.consultation_fee} onChange={onPro('consultation_fee')} />
+          </Field>
+          <Field label="Languages" hint="Separate with commas">
+            <input style={inp} value={pro.languages} onChange={onPro('languages')} />
+          </Field>
+          <Field label="Focus areas" hint="Separate with commas">
+            <input style={inp} value={pro.focus_areas} onChange={onPro('focus_areas')} />
+          </Field>
+        </div>
+        <Field label="Bio">
+          <textarea style={{ ...inp, minHeight: 100, resize: 'vertical' }} value={pro.bio} onChange={onPro('bio')} />
+        </Field>
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 14 }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={pro.accepting_new_patients} onChange={onPro('accepting_new_patients')} /> Accepting new patients
+          </label>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={pro.offers_online} onChange={onPro('offers_online')} /> Offers online consultations
+          </label>
+        </div>
+      </Section>
+
+      <Section icon="fa-lock" title="Change Password" sub="Use at least 8 characters." msg={msg.pw} saving={busy === 'pw'} onSave={savePw} label="Update Password">
+        <div style={grid}>
+          <Field label="Current password">
+            <input style={inp} type="password" value={pw.current_password} onChange={onPw('current_password')} />
+          </Field>
+          <Field label="New password">
+            <input style={inp} type="password" value={pw.new_password} onChange={onPw('new_password')} />
+          </Field>
+          <Field label="Confirm new password">
+            <input style={inp} type="password" value={pw.confirm} onChange={onPw('confirm')} />
+          </Field>
+        </div>
+      </Section>
     </div>
   );
 }
