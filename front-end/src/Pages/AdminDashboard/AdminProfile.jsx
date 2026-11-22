@@ -166,13 +166,35 @@ export default function AdminProfile() {
   useEffect(() => {
     let isActive = true;
 
-    const loadLogs = async () => {
-      await fetchAdminLogs();
+    const loadProfileAndLogs = async () => {
+      const token = getToken();
+      if (token) {
+        try {
+          const res = await axios.get(`${API_BASE_URL}/admin/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 6000,
+          });
+          const profile = res?.data?.data || res?.data?.user || res?.data?.admin || res?.data;
+          if (isActive && profile && typeof profile === "object") {
+            const nextProfile = {
+              fullName: profile.full_name ?? profile.fullName ?? profile.name ?? "",
+              email: profile.email ?? "",
+              phone: profile.phone ?? "",
+            };
+            setAdminData((prev) => ({ ...prev, ...nextProfile }));
+            setSavedData((prev) => ({ ...prev, ...nextProfile }));
+          }
+        } catch (err) {
+          console.error("Error fetching admin profile:", err);
+        }
+      }
+
+      if (isActive) {
+        await fetchAdminLogs();
+      }
     };
 
-    if (isActive) {
-      loadLogs();
-    }
+    loadProfileAndLogs();
 
     return () => {
       isActive = false;

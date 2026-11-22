@@ -95,41 +95,46 @@ export default function AdminDashboard() {
             }}
           >
             <span
+            style={{
+              backgroundColor: '#1B68F6',
+              color: '#FFFFFF',
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '15px',
+              flexShrink: 0,
+            }}
+          >
+            <i className="fa-solid fa-plus" aria-hidden="true" />
+          </span>
+          <div>
+            <h2
               style={{
-                backgroundColor: '#1B68F6',
-                color: '#FFFFFF',
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
                 fontSize: '16px',
+                fontWeight: '700',
+                color: '#0F172A',
+                margin: 0,
+                lineHeight: 1.2,
               }}
             >
-              <i className="fa-solid fa-hospital" aria-hidden="true" />
+              Clinika
+            </h2>
+            <span
+              style={{
+                fontSize: '10px',
+                fontWeight: '700',
+                color: '#1B68F6',
+                letterSpacing: '0.08em',
+                display: 'block',
+                marginTop: '2px',
+              }}
+            >
+              ADMIN PORTAL
             </span>
-            <div>
-              <h2
-                style={{
-                  fontSize: '16px',
-                  fontWeight: 'bold',
-                  color: '#0F172A',
-                  margin: 0,
-                }}
-              >
-                Clinika
-              </h2>
-              <span
-                style={{
-                  fontSize: '11px',
-                  color: '#64748B',
-                  letterSpacing: '0.04em',
-                }}
-              >
-                ADMIN PORTAL
-              </span>
-            </div>
+          </div>
           </div>
 
           {/* Navigation Links */}
@@ -158,6 +163,28 @@ export default function AdminDashboard() {
               </NavLink>
             ))}
           </nav>
+        </div>
+
+        {/* Back to Site Link */}
+        <div style={{ marginBottom: '12px' }}>
+          <NavLink
+            to="/"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              color: '#475569',
+              backgroundColor: '#F8FAFC',
+              fontSize: '13px',
+              fontWeight: '500',
+            }}
+          >
+            <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+            <span>Back to site</span>
+          </NavLink>
         </div>
 
         {/* Logout Action */}

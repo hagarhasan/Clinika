@@ -112,10 +112,14 @@ export default function ManageDoctors() {
   }, [loadDoctors]);
   const filteredDoctors = doctors.filter((doc) => {
     const q = searchQuery.trim().toLowerCase();
-    const docName = (doc.name || '').toLowerCase();
-    const docSpecialty = (doc.specialty || '').toLowerCase();
-    const docNpi = String(doc.npi || '').toLowerCase();
-    const docEmail = (doc.email || '').toLowerCase();
+    const docName = String(doc.name || '').toLowerCase();
+const docSpecialty = String(
+  typeof doc.specialty === 'object' && doc.specialty !== null
+    ? doc.specialty.name || doc.specialty.title || ''
+    : doc.specialty || ''
+).toLowerCase();
+const docNpi = String(doc.npi || '').toLowerCase();
+const docEmail = String(doc.email || '').toLowerCase();
 
     const matchesSearch =
       !q ||
@@ -210,7 +214,7 @@ export default function ManageDoctors() {
         'Name,NPI,Specialty,Email,Experience,Status',
         ...filteredDoctors.map(
           (d) =>
-            `"${d.name || ''}","${d.npi || ''}","${d.specialty || ''}","${d.email || ''}","${d.experience || ''}","${d.status || ''}"`
+           `"${d.name || ''}","${d.npi || ''}","${typeof d.specialty === 'object' && d.specialty !== null ? (d.specialty.name || d.specialty.title || '') : (d.specialty || '')}","${d.email || ''}","${d.experience || ''}","${d.status || ''}"`,
         ),
       ].join('\n');
 
@@ -578,7 +582,9 @@ export default function ManageDoctors() {
                         </div>
                       </td>
                       <td style={{ padding: '16px 24px', fontSize: '14px', color: '#334155' }}>
-                        {doc.specialty || '—'}
+                        {typeof doc.specialty === 'object' && doc.specialty !== null
+                    ? doc.specialty.name || doc.specialty.title || '-'
+                    : doc.specialty || '-'}
                       </td>
                       <td style={{ padding: '16px 24px', fontSize: '14px', color: '#334155' }}>
                         {doc.email || '—'}
@@ -688,7 +694,15 @@ export default function ManageDoctors() {
               <i className="fa-solid fa-circle" style={{ color: '#1B68F6', fontSize: '8px', marginRight: '8px' }} aria-hidden="true" />
               Total Specialties:{' '}
               <strong>
-                {new Set(doctors.map((d) => d.specialty).filter(Boolean)).size}
+                {new Set(
+                  doctors
+                    .map((d) =>
+                      typeof d.specialty === 'object' && d.specialty !== null
+                        ? d.specialty.name || d.specialty.title || ''
+                        : d.specialty || ''
+                    )
+                    .filter(Boolean)
+                ).size}
               </strong>
             </div>
             <div>
