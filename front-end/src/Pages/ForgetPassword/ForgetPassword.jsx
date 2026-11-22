@@ -279,7 +279,7 @@ export default function ForgetPassword() {
               <div className="reset-footer">
                 <div className="create-account">
                   <span>Need a new record?</span>
-                  <a href="/register">Create Patient Account</a>
+                  <Link to="/register">Create Patient Account</Link>
                 </div>
               </div>
 
@@ -306,9 +306,9 @@ export default function ForgetPassword() {
           <span>© 2025 Clinika Health, Inc. All rights reserved.</span>
 
           <div>
-            <a href="/privacy">Privacy</a>
+            <Link to="/privacy">Privacy</Link>
             <span>•</span>
-            <a href="/terms">Terms</a>
+            <Link to="/terms">Terms</Link>
             <span>•</span>
             <a href="/hipaa-notice">HIPAA Notice</a>
           </div>

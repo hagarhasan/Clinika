@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { Link } from 'react-router-dom';
 
 const API = 'https://clinika-backend.vercel.app';
 const TOKEN_KEY = 'token'; // غيّريه لو Login.jsx بيخزن باسم تاني
@@ -363,9 +364,9 @@ export default function DoctorAvailability() {
                 <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: C.primary }} />
               </div>
             )}
-            <a href="#/doctors" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '12px', backgroundColor: C.low, color: C.primary, fontSize: '14px', fontWeight: 600, textDecoration: 'none' }}>
+            <Link to="/doctors" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '12px', backgroundColor: C.low, color: C.primary, fontSize: '14px', fontWeight: 600, textDecoration: 'none' }}>
               Preview Public Profile & Booking <Ic n="arrow_forward" s={18} />
-            </a>
+            </Link>
           </div>
 
           <div style={{ ...card, padding: '24px', gap: '16px' }}>
