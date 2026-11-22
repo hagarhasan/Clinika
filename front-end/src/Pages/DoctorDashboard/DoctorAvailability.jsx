@@ -176,53 +176,12 @@ export default function DoctorAvailability() {
     }
   };
 
-  const nextDay = (() => {
-    const todayDow = (new Date().getDay() + 6) % 7;
-    for (let i = 0; i < 7; i++) {
-      const k = (todayDow + i) % 7;
-      if (form.days[k]?.on) {
-        return { when: i === 0 ? 'Today' : DAYS[k][2], d: form.days[k] };
-      }
-    }
-    return null;
-  })();
-
-  const timeBoxStyle = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: C.low,
-    borderRadius: 14,
-    padding: '10px 14px',
-  };
-
-  const selectResetStyle = {
-    border: 'none',
-    background: 'transparent',
-    outline: 'none',
-    fontSize: 15,
-    fontWeight: 700,
-    color: C.text,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 28, maxWidth: 1280, margin: '0 auto' }}>
-      <Helmet><title>Manage Availability | Clinika</title></Helmet>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-        <div>
-          <div style={{ fontSize: 12, color: C.muted }}>
-            Doctor Dashboard <i className="fa-solid fa-chevron-right" style={{ fontSize: 9 }} />{' '}
-            <b style={{ color: C.primary }}>Manage Availability</b>
-          </div>
-          <h1 style={{ fontSize: 40, lineHeight: '48px', fontWeight: 700, letterSpacing: '-0.025em', margin: '4px 0' }}>
-            Manage Availability
-          </h1>
-          <p style={{ fontSize: 14, color: C.muted, margin: 0 }}>
-            Configure your recurring consultation days, clinic shifts, slot durations, and break intervals.
-          </p>
+     return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      <Helmet><title>Doctor Availability | Clinika</title></Helmet>
+      <div>
+        <div style={{ fontSize: 12, color: C.m }}>
+          Doctor Dashboard <i className="fa-solid fa-chevron-right" style={{ fontSize: 9 }} /> <b style={{ color: C.p }}>Manage Availability</b>
         </div>
         <span style={pill(C.secondary, C.primary)}>
           <i className="fa-solid fa-circle-check" /> Schedule Active
