@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Helmet } from 'react-helmet-async';
-import { Link } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
 
 const TOKEN = 'token';
 const API = 'https://clinika-backend.vercel.app';
@@ -162,11 +162,10 @@ export default function DoctorAvailability() {
                   </div>
                 )}
               </div>
-            )}
-            <Link to="/doctors" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '14px', borderRadius: '12px', backgroundColor: C.low, color: C.primary, fontSize: '14px', fontWeight: 600, textDecoration: 'none' }}>
-              Preview Public Profile & Booking <Ic n="arrow_forward" s={18} />
-            </Link>
-          </div>
+            );
+          })}
+        </div>
+      </div>
 
       <div style={{ ...card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
