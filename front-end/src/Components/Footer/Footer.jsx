@@ -1,114 +1,83 @@
+
 import { Link } from "react-router-dom";
-import logoImg from "../../assets/clinika-logo.png";
-import "./clinika-components.css";
+import { HeartPulse } from "lucide-react";
+import "./Footer.css";
 
-const footerColumns = [
-    {
-        title: "Specialties",
-        links: [
-            { label: "Cardiology", to: "/doctors" },
-            { label: "Neurology", to: "/doctors" },
-            { label: "Pediatrics", to: "/doctors" },
-            { label: "Orthopedics", to: "/doctors" },
-        ],
-    },
-    {
-        title: "For Patients",
-        links: [
-            { label: "Search Doctors", to: "/doctors" },
-            { label: "Schedule Visit", to: "/doctors" },
-            { label: "Clinic Locations", to: "/about" },
-            { label: "Patient Support", to: "/contact" },
-        ],
-    },
-    {
-        title: "Legal & Info",
-        links: [
-            { label: "For Doctors", to: "/about" },
-            { label: "Privacy Policy", to: "/privacy" },
-            { label: "Terms of Service", to: "/terms" },
-            { label: "HIPAA Notice", to: "/terms" },
-        ],
-    },
-];
+const Footer = () => {
+  return (
+    <footer className="clinika-footer">
 
-const bottomLinks = [
-    { label: "Privacy", to: "/privacy" },
-    { label: "Terms", to: "/terms" },
-    { label: "Accessibility", to: "/accessibility" },
-];
+      {/* Emergency Helpline */}
+      <div className="clinika-footer-emergency">
+        <HeartPulse size={20} strokeWidth={2} />
 
-export default function Footer() {
-    return (
-        <footer className="cl-footer-wrapper">
-            {/* 24/7 Emergency Helpline Banner */}
-            <div className="cl-emergency-banner">
-                <div className="cl-emergency-inner">
-                    <span className="material-symbols-outlined cl-emergency-icon">emergency</span>
-                    <span className="cl-emergency-text">
-                        24/7 Emergency Medical Helpline:
-                    </span>
-                    <a className="cl-emergency-phone" href="tel:18002546452">
-                        1-800-CLINIKA (254-6452)
-                    </a>
-                </div>
-            </div>
+        <span>
+          24/7 Emergency Medical Helpline:{" "}
+          <strong>1-800-CLINIKA (254-6452)</strong>
+        </span>
+      </div>
 
-            {/* Main Footer Container */}
-            <div className="cl-footer-main">
-                <div className="cl-footer-container">
-                    <div className="cl-footer-grid">
-                        {/* Brand Column */}
-                        <div className="cl-footer-brand-col">
-                            <Link className="cl-brand" to="/">
-                                <img src={logoImg} alt="Clinika" className="cl-brand-logo" />
-                            </Link>
-                            <p className="cl-footer-bio">
-                                Reliable medical appointment scheduling and healthcare
-                                practitioner discovery. Connecting you with verified
-                                specialists seamlessly.
-                            </p>
-                        </div>
+      {/* Main Footer */}
+      <div className="clinika-footer-main">
 
-                        {/* Navigation Columns */}
-                        <div className="cl-footer-links-grid">
-                            {footerColumns.map((col) => (
-                                <div className="cl-footer-col" key={col.title}>
-                                    <h4 className="cl-footer-heading">{col.title}</h4>
-                                    <ul className="cl-footer-list">
-                                        {col.links.map((link) => (
-                                            <li key={link.label}>
-                                                <Link className="cl-footer-link" to={link.to}>
-                                                    {link.label}
-                                                </Link>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+        {/* Brand Section */}
+        <div className="clinika-footer-brand">
+          <Link to="/" className="clinika-footer-logo">
+            <span className="footer-logo-text">Clinika</span>
+          </Link>
 
-                    {/* Bottom Copyright & Legal Links */}
-                    <div className="cl-footer-bottom">
-                        <p className="cl-footer-copy">
-                            © {new Date().getFullYear()} Clinika Health, Inc. All rights
-                            reserved. Non-diagnostic booking platform.
-                        </p>
-                        <div className="cl-footer-bottom-links">
-                            {bottomLinks.map((item) => (
-                                <Link
-                                    key={item.label}
-                                    className="cl-footer-legal-link"
-                                    to={item.to}
-                                >
-                                    {item.label}
-                                </Link>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </footer>
-    );
-}
+          <p>
+            Reliable medical appointment scheduling and healthcare
+            practitioner discovery. Connecting you with verified
+            specialists seamlessly.
+          </p>
+        </div>
+
+        {/* Specialties */}
+        <div className="clinika-footer-column">
+          <h3>SPECIALTIES</h3>
+          <Link to="/doctors">Cardiology</Link>
+          <Link to="/doctors">Neurology</Link>
+          <Link to="/doctors">Pediatrics</Link>
+          <Link to="/doctors">Orthopedics</Link>
+        </div>
+
+        {/* Patients */}
+        <div className="clinika-footer-column">
+          <h3>FOR PATIENTS</h3>
+          <Link to="/doctors">Search Doctors</Link>
+          <Link to="/doctors">Schedule Visit</Link>
+          <Link to="/contact">Clinic Locations</Link>
+          <Link to="/contact">Patient Support</Link>
+        </div>
+
+        {/* Legal */}
+        <div className="clinika-footer-column">
+          <h3>LEGAL & INFO</h3>
+          <Link to="/doctors">For Doctors</Link>
+          <Link to="/privacy">Privacy Policy</Link>
+          <Link to="/terms">Terms of Service</Link>
+          <Link to="/accessibility">Accessibility</Link>
+        </div>
+
+      </div>
+
+      {/* Bottom Footer */}
+      <div className="clinika-footer-bottom">
+        <p>
+          © 2025 Clinika Health, Inc. All rights reserved.
+          Non-diagnostic booking platform.
+        </p>
+
+        <div className="clinika-footer-bottom-links">
+          <Link to="/privacy">Privacy</Link>
+          <Link to="/terms">Terms</Link>
+          <Link to="/accessibility">Accessibility</Link>
+        </div>
+      </div>
+
+    </footer>
+  );
+};
+
+export default Footer;

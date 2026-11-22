@@ -1,168 +1,306 @@
-# Clinika Backend (FastAPI + Neon Postgres + Vercel)
+# Clinika Backend
 
-Backend كامل لمنصة Clinika: مرضى + دكاترة + أدمن.
+A robust RESTful API built with **Node.js, Express.js, and PostgreSQL**, powering a modern healthcare management platform.
 
-## التشغيل محليًا
+Clinika provides a complete backend infrastructure for managing patients, doctors, appointments, authentication, notifications, and administrative operations through a secure and well-structured API.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate        # على ويندوز: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env             # عدّلي DATABASE_URL و SECRET_KEY
-alembic revision --autogenerate -m "initial"   # مرة واحدة فقط (بيولّد ملف migration)
-alembic upgrade head             # إنشاء الجداول
-python -m app.seed               # بيانات تجريبية (اختياري)
-uvicorn app.main:app --reload
-```
+## ✨ Features
 
-افتحي: http://localhost:8000/docs  (زر Authorize بيشتغل بـ email + password)
+- **Authentication & Authorization** – Secure JWT-based authentication with role-based access control.
+- **User Management** – Support for administrators, doctors, and patients.
+- **Doctor Management** – Manage doctor profiles, specialties, availability, and approval workflows.
+- **Appointment Management** – Handle appointment scheduling, availability slots, booking, and cancellation.
+- **Patient Management** – Manage patient profiles and related healthcare information.
+- **Email Notifications** – Automated transactional emails using Resend.
+- **Cloudinary Integration** – Image and media upload management.
+- **Appointment Reminders** – Scheduled notifications for upcoming appointments.
+- **API Documentation** – Interactive Swagger documentation.
+- **Database Management** – PostgreSQL integration with safe, repeatable schema initialization.
+- **Input Validation** – Request validation using Zod.
+- **Automated Testing** – Unit tests and API smoke tests.
 
-> لو سبتي `DATABASE_URL` فاضي هيشتغل على SQLite محليًا للتجربة السريعة.
+## 🛠 Tech Stack
 
-## النشر على Vercel + Neon
-
-1. في Neon: اعملي Project وانسخي الـ connection string (الـ Pooled) وحطيه في `.env` محليًا.
-2. من جهازك (و`DATABASE_URL` بتاع Neon في `.env`) شغّلي: `alembic upgrade head` ثم `python -m app.seed`
-   (كده الجداول تتعمل على Neon).
-3. ارفعي المشروع على GitHub.
-4. في Vercel: New Project ← اختاري الـ repo ← من Settings > Environment Variables ضيفي:
-   `DATABASE_URL`, `SECRET_KEY`, `CORS_ORIGINS` (رابط الفرونت)، `CRON_SECRET`
-5. Deploy. الـ docs هتلاقيها على `https://YOUR-APP.vercel.app/docs`
-
-لو ظهر خطأ `channel_binding` في الاتصال: شيلي `&channel_binding=require` من الـ URL.
-
-## الصلاحيات
-
-| Role | يقدر |
+| Technology | Purpose |
 |---|---|
-| Patient | يسجّل، يبحث، يحجز/يلغي/يعدّل مواعيده، يشوف سجلاته وروشتاته، يقيّم الدكتور |
-| Doctor | جدوله وإجازاته، يأكد/ينهي الحجوزات، يكتب السجلات والروشتات لمرضاه |
-| Admin | المستخدمين، الأطباء، التخصصات، العيادات، التقارير، سجل الوصول (Audit) |
+| Node.js | JavaScript Runtime |
+| Express.js | Backend Framework |
+| PostgreSQL | Relational Database |
+| pg | PostgreSQL Client |
+| JWT | Authentication |
+| bcrypt | Password Hashing |
+| Zod | Request Validation |
+| Resend | Email Delivery |
+| Cloudinary | Media Storage |
+| Swagger | API Documentation |
+| Vercel | Deployment |
 
-الأدمن **مش** بيشوف المحتوى الطبي (سجلات/روشتات) لأسباب الخصوصية. الدكتور بيشوف سجلات
-المريض بس لو بينهم حجز غير ملغي، وكل وصول بيتسجل في `audit_logs`.
+## 🔐 Authentication & Security
 
-## Endpoints
+Clinika uses JWT-based authentication to secure API access.
 
-**Auth**: `POST /auth/register` · `POST /auth/login` · `POST /auth/token` (Swagger) · `GET/PUT /auth/me` · `POST /auth/change-password`
+Security features include:
 
-**Specialties**: `GET /specialties` · `GET /specialties/{id}` · `POST/PUT/DELETE` (admin)
+- Password hashing with bcrypt.
+- JWT access tokens.
+- Role-based authorization.
+- Token version validation.
+- Protected routes and permission checks.
+- Request body validation.
+- Configurable CORS policies.
+- Environment-based secret management.
 
-**Clinics**: `GET /clinics` · `GET /clinics/{id}` · `POST/PUT/DELETE` (admin)
+### Supported User Roles
 
-**Doctors**
-`GET /doctors` (q, specialty_id, clinic_id, city, min_rating, max_fee, sort) · `GET /doctors/{id}`
-`POST /doctors` (admin) · `PUT /doctors/{id}` · `DELETE /doctors/{id}` (admin)
-`GET /doctors/me/profile` · `GET /doctors/me/stats`
-`GET /doctors/{id}/slots?date=YYYY-MM-DD` · `GET /doctors/{id}/availability?days=14`
-`GET/PUT /doctors/{id}/schedules` · `GET/POST /doctors/{id}/time-off` · `DELETE /doctors/{id}/time-off/{off_id}`
-`GET /doctors/{id}/reviews`
+- **Admin** – Full administrative access and platform management.
+- **Doctor** – Manage professional profiles and appointments.
+- **Patient** – Manage personal information and appointments.
 
-**Patients**: `GET/PUT /patients/me` · `GET /patients` (doctor/admin) · `GET /patients/{id}`
+## 🗄 Database
 
-**Appointments**
-`POST /appointments` · `GET /appointments` (status, date_from, date_to, upcoming, ...) · `GET /appointments/today` · `GET /appointments/{id}`
-`PATCH /appointments/{id}/cancel` · `PATCH /appointments/{id}/reschedule` · `PATCH /appointments/{id}/status` (doctor/admin)
+Clinika uses PostgreSQL as its primary database, hosted on Neon.
 
-**Medical records**: `POST/GET /medical-records` · `GET/PUT /medical-records/{id}`
+The database handles:
 
-**Prescriptions**: `POST/GET /prescriptions` · `GET /prescriptions/{id}`
+- User accounts and authentication.
+- Doctor profiles and specialties.
+- Patient information.
+- Appointment records.
+- Availability and scheduling.
+- Administrative operations.
+- Related platform data.
 
-**Notifications**: `GET /notifications` · `GET /notifications/unread-count` · `PATCH /notifications/{id}/read` · `PATCH /notifications/read-all` · `DELETE /notifications/{id}`
+Database schema initialization is handled through a dedicated migration script designed to safely create missing database structures.
 
-**Reviews**: `POST /reviews`
+## 📁 Project Structure
 
-**Admin**: `GET /admin/stats` · `GET /admin/reports/appointments` · `GET/POST /admin/users` · `PATCH /admin/users/{id}/status` · `GET /admin/audit-logs`
-
-## قواعد الحجز
-
-- `day_of_week`: 0=الاثنين … 5=السبت، 6=الأحد.
-- المواعيد بتتولد من الجدول الأسبوعي × `slot_duration_minutes` مع استبعاد الإجازات والمحجوز والماضي.
-- منع الحجز المزدوج: فحص في الكود + unique index في قاعدة البيانات (الحجوزات الملغية مستثناة).
-- المريض مينفعش يلغي/يعدّل قبل الموعد بأقل من `CANCEL_MIN_HOURS_BEFORE` ساعة.
-- حالات الحجز: `pending → confirmed → completed | no_show`، و`cancelled` من pending/confirmed.
-- `AUTO_CONFIRM_APPOINTMENTS=true` لو عايزة الحجز يتأكد تلقائيًا.
-
-## الإشعارات والتذكير
-
-الإشعارات داخل التطبيق (جدول notifications). التذكير اليومي بيشتغل بـ Vercel Cron على
-`/internal/send-reminders` الساعة 16:00 UTC (محمي بـ `CRON_SECRET`).
-
-## ملاحظات
-
-- التوكن JWT: ابعتيه في الهيدر `Authorization: Bearer <token>`.
-
-## Migrations (Alembic)
-
-كل ما تعدّلي في `app/models.py` (عمود أو جدول جديد):
-
-```bash
-alembic revision --autogenerate -m "وصف التعديل"   # يولّد ملف في alembic/versions
-# راجعي الملف المتولّد قبل ما تطبّقيه
-alembic upgrade head                               # يطبّق على الداتابيز (Neon)
-alembic downgrade -1                               # يرجّع خطوة لو حصلت مشكلة
-alembic current                                    # الإصدار الحالي
+```text
+clinika-backend/
+│
+├── api/
+│   └── index.js
+│
+├── src/
+│   ├── routes/
+│   ├── services/
+│   ├── app.js
+│   ├── repo.js
+│   └── schemas.js
+│
+├── db/
+│   └── schema.sql
+│
+├── tests/
+│
+├── scripts/
+│
+├── .env.example
+├── .gitignore
+├── package.json
+├── vercel.json
+└── README.md
 ```
 
-- الـ migration بتتطبق من جهازك، مش من Vercel. ارفعي ملفات `alembic/versions` على GitHub.
-- لو الجداول موجودة أصلًا على Neon من `init_db`: اعملي migration الأولى ثم `alembic stamp head`
-  بدل `upgrade` (عشان ما يحاولش ينشئها تاني)، أو امسحي الجداول التجريبية وابدئي من الأول.
-- `app.init_db` اتساب للتجربة السريعة بس.
+### Architecture Overview
+
+- **api/** – Serverless entry point for Vercel.
+- **src/routes/** – API route definitions and request handling.
+- **src/services/** – Business logic, appointments, email delivery, notifications, and integrations.
+- **src/app.js** – Express application configuration, middleware, routing, and error handling.
+- **src/repo.js** – Database queries and data access operations.
+- **src/schemas.js** – Request validation schemas.
+- **db/** – Database schema definitions.
+- **tests/** – Automated tests and testing utilities.
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+Make sure you have the following installed:
+
+- Node.js
+- npm
+- PostgreSQL database (Neon recommended)
+
+### 1. Clone the Repository
+
+```bash
+git clone YOUR_REPOSITORY_URL
+cd clinika-backend
+```
+
+### 2. Install Dependencies
+
+```bash
+npm install
+```
+
+### 3. Configure Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+cp .env.example .env
+```
+
+Configure the required environment variables:
+
+```env
+DATABASE_URL=
+SECRET_KEY=
+
+CORS_ORIGINS=
+FRONTEND_URL=
+
+CRON_SECRET=
+
+RESEND_API_KEY=
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+```
+
+Additional configuration options are available in `.env.example`.
+
+### 4. Initialize the Database
+
+```bash
+npm run db:migrate
+```
+
+This command initializes the required database structures without deleting existing records.
+
+### 5. Start the Development Server
+
+```bash
+npm run dev
+```
+
+The API will be available at:
+
+```text
+http://localhost:8000
+```
+
+## 📚 API Documentation
+
+Clinika provides interactive API documentation through Swagger UI.
+
+Once the server is running, visit:
+
+```text
+http://localhost:8000/docs
+```
+
+The documentation provides an overview of available endpoints, request parameters, response structures, and API operations.
+
+To regenerate the API specification:
+
+```bash
+npm run docs:build
+```
+
+## 🧪 Testing
+
+The project includes automated tests for core application logic and API workflows.
+
+### Run Unit Tests
+
+```bash
+npm test
+```
+
+### Run API Smoke Tests
+
+Start the server in one terminal:
+
+```bash
+npm run dev
+```
+
+Then run:
+
+```bash
+npm run smoke
+```
+
+To test a deployed API:
+
+```bash
+BASE_URL=https://your-api-domain.vercel.app npm run smoke
+```
+
+## 🌐 Deployment
+
+Clinika Backend is configured for deployment on Vercel.
+
+### Deployment Steps
+
+1. Import the repository into Vercel.
+2. Configure the required environment variables.
+3. Connect the PostgreSQL database through Neon.
+4. Deploy the project.
+5. Run the smoke tests against the deployed API.
+6. Verify the API documentation and frontend integration.
+
+The project includes a `vercel.json` configuration for deployment and scheduled appointment reminder tasks.
+
+### Scheduled Tasks
+
+Appointment reminders are handled through a scheduled Vercel Cron Job.
+
+The reminder endpoint runs daily:
+
+```text
+/internal/send-reminders
+```
+
+Access is protected using the configured `CRON_SECRET`.
+
+## 📧 Email Templates
+
+Transactional emails are powered by Resend.
+
+The backend supports configurable email templates for:
+
+- Password reset.
+- Patient invitations.
+- Doctor approval.
+- Doctor rejection.
+- Appointment confirmation.
+
+Custom Resend templates can be configured through environment variables. Built-in HTML templates are used as a fallback when custom templates are unavailable.
+
+## 📌 API Capabilities
+
+The backend provides **86 REST API endpoints** covering the platform's main operations, including:
+
+- Authentication and account management.
+- Doctor profiles and management.
+- Patient management.
+- Appointment scheduling and booking.
+- Availability and time slots.
+- Administrative operations.
+- Notifications and reminders.
+
+All endpoints follow consistent JSON response structures and centralized error handling.
+
+## 🔒 Environment & Configuration
+
+Sensitive credentials and application settings are managed through environment variables.
+
+**Important:**
+- Never commit `.env` files.
+- Keep database credentials private.
+- Use strong secrets for JWT signing.
+- Configure allowed frontend origins.
+- Protect internal scheduled-task endpoints.
+
+## 📄 License
+
+This project is currently maintained as a private project.
 
 ---
 
-## تحديث: الـ endpoints الجديدة (متوافقة مع شاشات الـ UI)
-
-**Auth**
-`POST /auth/register/doctor` (طلب انضمام دكتور → حالة pending) · `POST /auth/forgot-password` ·
-`GET /auth/reset-password/validate?token=` · `POST /auth/reset-password` ·
-`POST /auth/login` بيقبل `remember_me: true` (توكن 30 يوم) ·
-`PUT /auth/me` بيقبل `full_name` واحد (أو first/last) و`avatar_url`، وتغيير `email` بيحتاج `current_password` ·
-`POST /auth/change-password` بيرجّع **توكن جديد** (200) ويقفل باقي الجلسات.
-`register` و`PUT /patients/me` و`POST /doctors` بيقبلوا `full_name` بدل first/last.
-
-**Public**: `GET /public/stats` · `GET /public/locations` · `POST /contact`
-
-**Doctors**
-`GET /doctors` فلاتر جديدة: `specialty_ids` · `cities` · `districts` · `gender` · `min_fee` · `verified` ·
-`accepting_new_patients` · `online` · `availability=today|tomorrow|this_week` · `date=YYYY-MM-DD` ·
-`sort=recommended|next_available` — والـ header `X-Total-Count` فيه العدد الكلي، وكل دكتور فيه `next_available`.
-`GET/PUT /doctors/{id}/credentials` (التعليم والشهادات).
-`/doctors/me/stats` بقى فيه: `completed_this_week` · `attendance_rate` · `visit_types_30d` · `today_capacity`.
-`/doctors/{id}/availability` بقى فيه `is_working_day` (لو true و`available_slots=0` اليوم "Full").
-
-**Appointments**
-`POST /appointments` بيقبل `consultation_type: in_person|online`، والرد فيه `reference_number` ·
-`fee_at_booking` · `meeting_link` · بيانات الدكتور (صورة، تقييم، سعر، عيادة بالعنوان والخريطة).
-`PATCH /appointments/{id}/meeting-link` · `GET /appointments?q=&consultation_type=`.
-
-**Patients**: `GET /patients/me/stats`
-
-**Admin**
-`GET /admin/doctors?status=pending|active|inactive|rejected` · `GET /admin/doctors/counts` ·
-`GET /admin/doctors/{id}` · `PATCH /admin/doctors/{id}/review` (approve/reject) · `PATCH /admin/doctors/{id}/verify` ·
-`GET /admin/doctors/export` (CSV) · `POST /admin/patients` · `POST /admin/appointments` ·
-`GET /admin/activity` · `GET /admin/contact-messages` · `PATCH /admin/contact-messages/{id}`
-
-**العيادات المتعددة للدكتور**
-الدكتور بيحدد العيادة لكل فترة في جدوله: `PUT /doctors/{id}/schedules` وكل عنصر فيه `clinic_id` (فاضي = عيادته الأساسية).
-المريض لما يفلتر بعيادة/مدينة/منطقة (`/doctors?clinic_id=` أو `cities` أو `districts`) مش بيشوف غير الدكاترة اللي فعلًا
-في العيادة دي، و`next_available` بيتحسب في العيادات المختارة بس. كل دكتور فيه `clinics` (كل عياداته).
-`GET /doctors/{id}/slots?date=&clinic_id=` و`/availability?clinic_id=` بيرجّعوا مواعيد العيادة دي بس.
-`POST /appointments` بيقبل `clinic_id` اختياري: لو الدكتور في عيادة تانية في الوقت ده الحجز بيترفض (400)،
-والحجز بيتسجل عليه العيادة (`clinic_id` و`clinic` في الرد). الدكتور مينفعش يبقى في عيادتين في نفس الوقت.
-
-**Uploads**: `POST /uploads/avatar` · `POST /uploads/image` (أدمن)
-
-## Environment Variables الجديدة
-`FRONTEND_URL` · `RESEND_API_KEY` · `EMAIL_FROM` · `CONTACT_RECEIVER_EMAIL` ·
-`CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` ·
-`MIN_BOOKING_NOTICE_MINUTES` · `PASSWORD_RESET_EXPIRE_MINUTES` · `REMEMBER_ME_EXPIRE_DAYS`
-(الإيميل والصور اختياريين: من غيرهم الباك اند بيشتغل عادي، بس الإيميل بيتجاهل والرفع بيرجّع 503).
-
-## تطبيق الـ migration الجديدة على Neon
-```bash
-alembic current                      # لازم يطلّع 74a942950602 (أو يبقى فاضي)
-# لو فاضي (الجداول اتعملت بـ create_all): alembic stamp 74a942950602
-alembic upgrade head                 # بيطبّق migration-تين دفاعيتين (a1f3c9d2b7e4 ثم b2d4e6f8a0c1) ويضيف الناقص بس
-```
+**Clinika Backend**  
+*Secure. Scalable. Reliable Healthcare Infrastructure.*

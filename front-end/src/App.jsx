@@ -1,5 +1,5 @@
 import Layout from './Components/Layout/Layout';
-import { RouterProvider, createHashRouter } from 'react-router-dom';
+import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import Privacy from './Pages/Privacy/Privacy';
 import Terms from './Pages/Terms/Terms';
 import Accessibility from './Pages/Accessibility/Accessibility';
@@ -31,7 +31,11 @@ import DoctorProfile from './Pages/Doctors/DoctorProfile';
 import BookAppointment from './Pages/Doctors/BookAppointment';
 import NotFound from './Pages/NotFound/NotFound';
 
-const router = createHashRouter([
+const basename = import.meta.env.BASE_URL === './'
+  ? '/'
+  : import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
+
+const router = createBrowserRouter([
   {
     path: "", element: <Layout />, children: [
       { index: true, element: <Home /> },
@@ -76,7 +80,7 @@ const router = createHashRouter([
     ]
   },
   { path: "*", element: <NotFound /> }
-])
+], { basename })
 
 export default function App() {
   return (
