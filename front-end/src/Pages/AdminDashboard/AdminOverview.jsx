@@ -39,12 +39,12 @@ export default function AdminOverview() {
       };
 
       try {
-       const [statsRes, activityRes, patientsRes] = await Promise.all([
+       const [statsRes, activityRes, patientsRes, doctorsRes] = await Promise.all([
           fetch(`${API_BASE_URL}/admin/stats`, { headers }),
           fetch(`${API_BASE_URL}/admin/activity?limit=10&offset=0`, { headers }),
           fetch(`${API_BASE_URL}/admin/users?role=patient`, { headers }),
+          fetch(`${API_BASE_URL}/admin/doctors`, { headers }),
         ]);
-
         if (
           statsRes.status === 401 ||
           statsRes.status === 403 ||
@@ -67,13 +67,27 @@ let patientsCountFromUsers = null;
           patientsCountFromUsers = pList.length;
         }
       }
+      let doctorsCountFromApi = null;
+        if (doctorsRes && doctorsRes.ok) {
+          const doctorsData = await doctorsRes.json();
+          const dList = Array.isArray(doctorsData)
+            ? doctorsData
+            : doctorsData?.items || doctorsData?.doctors || doctorsData?.users || doctorsData?.data || [];
+          if (Array.isArray(dList)) {
+            doctorsCountFromApi = dList.length;
+          }
+        }
 
       if (statsRes.ok) {
         const statsData = await statsRes.json();
         if (statsData) {
+          const statsDoctors = statsData.totalDoctors ?? statsData.total_doctors ?? 0;
           const statsPatients = statsData.totalPatients ?? statsData.total_patients ?? 0;
           setStats({
-            totalDoctors: statsData.totalDoctors ?? statsData.total_doctors ?? 0,
+            totalDoctors:
+              doctorsCountFromApi !== null && Number(statsDoctors) === 0
+                ? doctorsCountFromApi
+                : statsDoctors,
             totalPatients:
               patientsCountFromUsers !== null && Number(statsPatients) === 0
                 ? patientsCountFromUsers
@@ -82,11 +96,12 @@ let patientsCountFromUsers = null;
             pendingRequests: statsData.pendingRequests ?? statsData.pending_requests ?? 0,
           });
         }
-      } else if (patientsCountFromUsers !== null) {
-        setStats((prev) => ({
-          ...prev,
-          totalPatients: patientsCountFromUsers,
-        }));
+      } else if (patientsCountFromUsers !== null || doctorsCountFromApi !== null) {
+            setStats((prev) => ({
+              ...prev,
+              ...(doctorsCountFromApi !== null ? { totalDoctors: doctorsCountFromApi } : {}),
+              ...(patientsCountFromUsers !== null ? { totalPatients: patientsCountFromUsers } : {}),
+            }));
       }
 
         if (activityRes.ok) {
