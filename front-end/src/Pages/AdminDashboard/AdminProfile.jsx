@@ -170,11 +170,27 @@ export default function AdminProfile() {
       const token = getToken();
       if (token) {
         try {
-          const res = await axios.get(`${API_BASE_URL}/admin/profile`, {
-            headers: { Authorization: `Bearer ${token}` },
-            timeout: 6000,
-          });
-          const profile = res?.data?.data || res?.data?.user || res?.data?.admin || res?.data;
+          const endpoints = [
+            `${API_BASE_URL}/admin/profile`,
+            `${API_BASE_URL}/auth/me`,
+            `${API_BASE_URL}/admin/me`,
+          ];
+          let profile = null;
+
+          for (const url of endpoints) {
+            const res = await axios.get(url, {
+              headers: { Authorization: `Bearer ${token}` },
+              timeout: 6000,
+              validateStatus: (status) => (status >= 200 && status < 300) || status === 404,
+            });
+            if (res.status === 404) continue;
+            const candidate = res?.data?.data || res?.data?.user || res?.data?.admin || res?.data;
+            if (candidate && typeof candidate === "object") {
+              profile = candidate;
+              break;
+            }
+          }
+
           if (isActive && profile && typeof profile === "object") {
             const nextProfile = {
               fullName: profile.full_name ?? profile.fullName ?? profile.name ?? "",
@@ -185,7 +201,9 @@ export default function AdminProfile() {
             setSavedData((prev) => ({ ...prev, ...nextProfile }));
           }
         } catch (err) {
-          console.error("Error fetching admin profile:", err);
+          if (err?.response?.status !== 404) {
+            console.error("Error fetching admin profile:", err);
+          }
         }
       }
 

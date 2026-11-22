@@ -165,28 +165,7 @@ export default function AdminDashboard() {
           </nav>
         </div>
 
-        {/* Back to Site Link */}
-        <div style={{ marginBottom: '12px' }}>
-          <NavLink
-            to="/"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: '10px 16px',
-              borderRadius: '8px',
-              textDecoration: 'none',
-              color: '#475569',
-              backgroundColor: '#F8FAFC',
-              fontSize: '13px',
-              fontWeight: '500',
-            }}
-          >
-            <i className="fa-solid fa-arrow-left" aria-hidden="true" />
-            <span>Back to site</span>
-          </NavLink>
-        </div>
-
+       
         {/* Logout Action */}
         <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '16px' }}>
           <button
@@ -211,6 +190,26 @@ export default function AdminDashboard() {
             <i className="fa-solid fa-right-from-bracket" aria-hidden="true" />
             <span>Logout</span>
           </button>
+          <div style={{ marginTop: '8px' }}>
+              <NavLink
+                to="/"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  textDecoration: 'none',
+                  color: '#475569',
+                  backgroundColor: '#F8FAFC',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                }}
+              >
+                <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+                <span>Back to site</span>
+              </NavLink>
+            </div>
         </div>
       </aside>
 
