@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { C, pill } from './DoctorDashboard';
 
 export default function DashboardLayout({
@@ -6,14 +6,20 @@ export default function DashboardLayout({
   userName = 'Doctor',
   subtitle = '',
   links = [],
+  backTo = '/',
   onLogout,
   children,
 }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#f7f9fc', color: C.text }}>
-      {/* Sidebar */}
+      {/* Fixed/Sticky Sidebar */}
       <aside
         style={{
+          position: 'sticky',
+          top: 0,
+          alignSelf: 'flex-start',
+          height: '100vh',
+          overflowY: 'auto',
           width: 248,
           backgroundColor: C.white,
           borderRight: `1px solid ${C.container}`,
@@ -22,6 +28,7 @@ export default function DashboardLayout({
           flexDirection: 'column',
           justifyContent: 'space-between',
           flexShrink: 0,
+          boxSizing: 'border-box',
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -68,25 +75,54 @@ export default function DashboardLayout({
           </nav>
         </div>
 
-        {onLogout && (
-          <button
-            type="button"
-            onClick={onLogout}
+        {/* Bottom Sidebar Actions */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '12px 6px 0' }}>
+          <Link
+            to={backTo}
             style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
-              borderRadius: 10, border: 'none', background: 'none', color: C.muted,
-              fontSize: 14, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '10px 10px',
+              borderRadius: 10,
+              textDecoration: 'none',
+              fontSize: 14,
+              fontWeight: 500,
+              color: C.muted,
             }}
           >
-            <i className="fa-solid fa-arrow-right-from-bracket" />
-            <span>Logout</span>
-          </button>
-        )}
+            <i className="fa-solid fa-arrow-left" style={{ width: 16, textAlign: 'center' }} />
+            <span>Back to site</span>
+          </Link>
+
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '10px 10px',
+                borderRadius: 10,
+                border: 'none',
+                background: 'none',
+                color: C.error,
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <i className="fa-solid fa-arrow-right-from-bracket" style={{ width: 16, textAlign: 'center' }} />
+              <span>Sign out</span>
+            </button>
+          )}
+        </div>
       </aside>
 
       {/* Main Area */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        {/* Top Bar matching image */}
         <header
           style={{
             height: 68,
