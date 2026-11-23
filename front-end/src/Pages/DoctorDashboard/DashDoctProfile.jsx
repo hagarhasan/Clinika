@@ -1,333 +1,202 @@
 import { useMemo, useState } from 'react';
-import { Helmet } from 'react-helmet-async';
-import { useDoctorData, api, TOKEN_KEY, errMsg, drName, C, card, pill, btn } from './DoctorDashboard';
+import { useDoctorData, api, errMsg, drName, initials, C, card, btn } from './DoctorDashboard';
 
-const inp = {
-  width: '100%', boxSizing: 'border-box', backgroundColor: C.low,
-  border: '1px solid transparent', outline: 'none', borderRadius: 12,
-  padding: '10px 14px', fontSize: 14, fontFamily: 'inherit', color: C.text,
-};
-const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 };
+const joinList = (v) => (Array.isArray(v) ? v.join(', ') : v || '');
+const splitList = (v) =>
+  String(v || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
-const Field = ({ label, hint, children }) => (
-  <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, fontWeight: 600, color: C.muted }}>
-    {label}
-    {children}
-    {hint && <span style={{ fontWeight: 400, color: C.outline }}>{hint}</span>}
-  </label>
-);
-
-const Section = ({ icon, title, sub, msg, saving, onSave, label = 'Save Changes', children }) => (
-  <div style={{ ...card, padding: 32, display: 'flex', flexDirection: 'column', gap: 20 }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: C.secondary, color: C.primary, display: 'grid', placeItems: 'center' }}>
-        <i className={`fa-solid ${icon}`} />
-      </div>
-      <div>
-        <div style={{ fontSize: 18, fontWeight: 600 }}>{title}</div>
-        <div style={{ fontSize: 13, color: C.muted }}>{sub}</div>
-      </div>
-    </div>
-    {children}
-    <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-      <button
-        type="button"
-        disabled={saving}
-        onClick={onSave}
-        style={btn(C.primary, '#fff', { padding: '10px 24px', opacity: saving ? 0.6 : 1, boxShadow: '0 4px 14px rgba(27,104,246,0.28)' })}
-      >
-        {saving ? 'Saving...' : label}
-      </button>
-      {msg && (
-        <span style={{ fontSize: 13, fontWeight: 600, color: msg.ok ? '#15803d' : C.errText }}>
-          <i className={`fa-solid ${msg.ok ? 'fa-circle-check' : 'fa-circle-exclamation'}`} /> {msg.text}
-        </span>
-      )}
-    </div>
-  </div>
-);
+const toForm = (user, profile) => ({
+  title: profile?.title || '',
+  room: profile?.room || '',
+  years_of_experience: profile?.years_of_experience ?? '',
+  consultation_fee: profile?.consultation_fee ?? '',
+  languages: joinList(profile?.languages),
+  focus_areas: joinList(profile?.focus_areas),
+  bio: profile?.bio || '',
+  email: user?.email || '',
+  phone: user?.phone || '',
+});
 
 export default function DashDoctProfile() {
-  const { user, profile, setUser, setProfile, isGuestPreview, refresh } = useDoctorData();
+  const { user, profile, loading, refresh } = useDoctorData();
+  const base = useMemo(() => toForm(user, profile), [user, profile]);
+  const [draft, setDraft] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
 
-  const baseAcc = useMemo(
-    () => ({
-      first_name: user?.first_name || '',
-      last_name: user?.last_name || '',
-      phone: user?.phone || '',
-      email: user?.email || '',
-      current_password: '',
-    }),
-    [user]
-  );
+  const form = editing && draft ? draft : base;
+  const setField = (key, val) => setDraft((p) => ({ ...(p ?? base), [key]: val }));
 
-  const basePro = useMemo(
-    () => ({
-      title: profile?.title || '',
-      room: profile?.room || '',
-      bio: profile?.bio || '',
-      years_of_experience: Number(profile?.years_of_experience) || 0,
-      consultation_fee: Number(profile?.consultation_fee) || 0,
-      languages: (profile?.languages || []).join(', '),
-      focus_areas: (profile?.focus_areas || []).join(', '),
-      accepting_new_patients: Boolean(profile?.accepting_new_patients),
-      offers_online: Boolean(profile?.offers_online),
-    }),
-    [profile]
-  );
-
-  const [accDraft, setAccDraft] = useState(null);
-  const [proDraft, setProDraft] = useState(null);
-  const [pw, setPw] = useState({ current_password: '', new_password: '', confirm: '' });
-  const [busy, setBusy] = useState('');
-  const [msg, setMsg] = useState({});
-
-  const acc = accDraft ?? baseAcc;
-  const pro = proDraft ?? basePro;
-  const setAcc = (fn) => setAccDraft((p) => fn(p ?? baseAcc));
-  const setPro = (fn) => setProDraft((p) => fn(p ?? basePro));
-
-  const run = async (key, fn, okText, onFallback) => {
-    setBusy(key);
-    setMsg((m) => ({ ...m, [key]: null }));
+  const onSave = async (e) => {
+    e.preventDefault();
+    setMsg(null);
+    setSaving(true);
     try {
-      await fn();
-      setMsg((m) => ({ ...m, [key]: { ok: true, text: okText } }));
-    } catch (e) {
-      if (onFallback) {
-        onFallback();
-        setMsg((m) => ({ ...m, [key]: { ok: true, text: `${okText} (${errMsg(e)})` } }));
-      } else {
-        setMsg((m) => ({ ...m, [key]: { ok: false, text: errMsg(e) } }));
+      const docId = Number(profile?.id);
+      if (Number.isInteger(docId) && docId > 0) {
+        const langs = splitList(form.languages);
+        const areas = splitList(form.focus_areas);
+        await api.put(`/doctors/${docId}`, {
+          title: form.title.trim() || null,
+          room: form.room.trim() || null,
+          years_of_experience: form.years_of_experience === '' ? null : Number(form.years_of_experience),
+          consultation_fee: form.consultation_fee === '' ? null : Number(form.consultation_fee),
+          languages: langs.length ? langs : null,
+          focus_areas: areas.length ? areas : null,
+          bio: form.bio.trim() || null,
+        });
       }
+      await refresh();
+      setEditing(false);
+      setDraft(null);
+      setMsg({ ok: true, text: 'Public profile updated successfully.' });
+    } catch (err) {
+      setMsg({ ok: false, text: errMsg(err) });
     } finally {
-      setBusy('');
+      setSaving(false);
     }
   };
 
-  const splitCsv = (s) => s.split(',').map((x) => x.trim()).filter(Boolean);
+  if (loading) return <div style={card}>Loading profile...</div>;
 
-  const applyLocalAcc = () => {
-    const full = [acc.first_name.trim(), acc.last_name.trim()].filter(Boolean).join(' ');
-    setUser((prev) => ({
-      ...prev,
-      first_name: acc.first_name.trim(),
-      last_name: acc.last_name.trim(),
-      full_name: full ? drName(full) : prev?.full_name,
-      phone: acc.phone.trim(),
-      email: acc.email.trim(),
-    }));
-    setAccDraft(null);
+  const fullName = drName(user?.full_name || [user?.first_name, user?.last_name].filter(Boolean).join(' ') || 'Doctor');
+  const specialty = profile?.specialty?.name || 'General Medicine';
+  const clinicName = profile?.clinic?.name || profile?.clinic_name || 'Clinika Main Clinic';
+  const licenseNo = profile?.license_number || '—';
+  const statusText =
+    profile?.status === 'approved'
+      ? 'Approved & Verified'
+      : profile?.status === 'rejected'
+        ? 'Not Approved'
+        : 'Waiting for admin approval';
+
+  const inp = {
+    width: '100%', padding: '10px 12px', borderRadius: 10,
+    border: `1px solid ${C.border}`, fontSize: 14, color: C.text,
+    backgroundColor: editing ? C.white : '#fbfcfd', boxSizing: 'border-box',
   };
-
-  const saveAcc = () =>
-    run(
-      'acc',
-      async () => {
-        if (isGuestPreview) {
-          applyLocalAcc();
-          return;
-        }
-        const data = {
-          first_name: acc.first_name.trim(),
-          last_name: acc.last_name.trim(),
-          phone: acc.phone.trim() || null,
-        };
-        if (user && acc.email.trim().toLowerCase() !== (user.email || '').toLowerCase()) {
-          data.email = acc.email.trim();
-          data.current_password = acc.current_password;
-        }
-        await api.put('/auth/me', data);
-        await refresh();
-        setAccDraft(null);
-      },
-      'Account updated',
-      applyLocalAcc
-    );
-
-  const applyLocalPro = () => {
-    setProfile((prev) => ({
-      ...prev,
-      title: pro.title.trim(),
-      room: pro.room.trim(),
-      bio: pro.bio.trim(),
-      years_of_experience: Number(pro.years_of_experience) || 0,
-      consultation_fee: Number(pro.consultation_fee) || 0,
-      languages: splitCsv(pro.languages),
-      focus_areas: splitCsv(pro.focus_areas),
-      accepting_new_patients: Boolean(pro.accepting_new_patients),
-      offers_online: Boolean(pro.offers_online),
-    }));
-    setProDraft(null);
-  };
-
-  const savePro = () =>
-    run(
-      'pro',
-      async () => {
-        const docId = Number(profile?.id);
-        if (isGuestPreview || !Number.isInteger(docId) || docId <= 0) {
-          applyLocalPro();
-          return;
-        }
-        await api.put(`/doctors/${docId}`, {
-          title: pro.title.trim() || null,
-          room: pro.room.trim() || null,
-          bio: pro.bio.trim() || null,
-          years_of_experience: Number(pro.years_of_experience) || 0,
-          consultation_fee: Number(pro.consultation_fee) || 0,
-          languages: splitCsv(pro.languages),
-          focus_areas: splitCsv(pro.focus_areas),
-          accepting_new_patients: Boolean(pro.accepting_new_patients),
-          offers_online: Boolean(pro.offers_online),
-        });
-        await refresh();
-        setProDraft(null);
-      },
-      'Professional details updated',
-      applyLocalPro
-    );
-
-  const savePw = () =>
-    run(
-      'pw',
-      async () => {
-        if (pw.new_password.length < 8) throw new Error('New password must be at least 8 characters');
-        if (pw.new_password !== pw.confirm) throw new Error('Passwords do not match');
-        if (!isGuestPreview) {
-          const r = await api.post('/auth/change-password', {
-            current_password: pw.current_password,
-            new_password: pw.new_password,
-          });
-          if (r.data?.access_token) localStorage.setItem(TOKEN_KEY, r.data.access_token);
-        }
-        setPw({ current_password: '', new_password: '', confirm: '' });
-      },
-      'Password changed'
-    );
-
-  const setField = (setter) => (k) => (e) =>
-    setter((p) => ({ ...p, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
-
-  const onAcc = setField(setAcc);
-  const onPro = setField(setPro);
-  const onPw = setField((fn) => setPw((p) => fn(p)));
-  const emailChanged = user && acc.email.trim().toLowerCase() !== (user.email || '').toLowerCase();
-
-  const displayDoctorName = drName(
-    user?.full_name || [acc.first_name, acc.last_name].filter(Boolean).join(' ') || 'Dr. Nadia Mansour'
-  );
-
-  const readOnly = [
-    ['Specialty', profile?.specialty?.name],
-    ['License Number', profile?.license_number],
-    ['Status', profile?.status],
-    ['Clinics', (profile?.clinics?.length ? profile.clinics : profile?.clinic ? [profile.clinic] : []).map((c) => c.name).join(', ')],
-  ];
+  const labelStyle = { fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: C.muted, textTransform: 'uppercase' };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 28, maxWidth: 960 }}>
-      <Helmet><title>My Profile | Clinika</title></Helmet>
-
-      <div>
-        <div style={{ fontSize: 12, color: C.muted }}>
-          Doctor Dashboard <i className="fa-solid fa-chevron-right" style={{ fontSize: 9 }} />{' '}
-          <b style={{ color: C.primary }}>My Profile</b>
+    <div style={{ maxWidth: 1040, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: C.text }}>Account &amp; Profile</h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: C.muted }}>What patients see when they look at your profile.</p>
         </div>
-        <h1 style={{ fontSize: 40, lineHeight: '48px', fontWeight: 700, letterSpacing: '-0.025em', margin: '4px 0' }}>
-          My Profile
-        </h1>
-        <p style={{ fontSize: 14, color: C.muted, margin: 0 }}>
-          Manage your account settings, contact info, and professional details.
-        </p>
+        {!editing && (
+          <button type="button" onClick={() => { setMsg(null); setDraft(base); setEditing(true); }} style={btn(C.primary, C.white)}>
+            Edit Public Profile
+          </button>
+        )}
       </div>
 
-      <div style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: 16, backgroundColor: C.secondary, color: C.primary,
-            display: 'grid', placeItems: 'center', fontSize: 22,
-          }}>
-            <i className="fa-solid fa-user-doctor" />
+      {msg && (
+        <div style={{ ...card, padding: '12px 16px', backgroundColor: msg.ok ? '#ECFDF5' : C.errBg, color: msg.ok ? '#047857' : C.errText, fontSize: 13, fontWeight: 600 }}>
+          {msg.text}
+        </div>
+      )}
+
+      {/* Account Summary Card */}
+      <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: C.primaryFixed, color: C.primary, display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 16 }}>
+            {initials(fullName) || 'DR'}
           </div>
           <div>
-            <div style={{ fontSize: 20, fontWeight: 700 }}>{displayDoctorName}</div>
-            <div style={{ fontSize: 13, color: C.muted }}>
-              {profile?.specialty?.name || 'Internal Medicine'} • {pro.title || 'Consultant Physician'}
-            </div>
+            <div style={{ fontWeight: 700, fontSize: 18, color: C.text }}>{fullName}</div>
+            <div style={{ fontSize: 13, color: C.muted }}>{specialty}</div>
           </div>
         </div>
-        <span style={pill(C.secondary, C.primary)}>
-          <i className="fa-solid fa-shield-halved" /> {profile?.status || 'Active'}
-        </span>
-      </div>
 
-      <div style={{ ...card, display: 'flex', flexWrap: 'wrap', gap: 24 }}>
-        {readOnly.map(([k, v]) => (
-          <div key={k} style={{ minWidth: 160 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: C.outline, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{k}</div>
-            <div style={{ fontSize: 14, fontWeight: 600, textTransform: k === 'Status' ? 'capitalize' : 'none' }}>{v || '—'}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>
+          <div>
+            <div style={labelStyle}>EMAIL</div>
+            <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>{form.email || '—'}</div>
           </div>
-        ))}
+          <div>
+            <div style={labelStyle}>PHONE</div>
+            <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>{form.phone || '—'}</div>
+          </div>
+          <div>
+            <div style={labelStyle}>SPECIALTY</div>
+            <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>{specialty}</div>
+          </div>
+          <div>
+            <div style={labelStyle}>CLINIC</div>
+            <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>{clinicName}</div>
+          </div>
+          <div>
+            <div style={labelStyle}>LICENSE NUMBER</div>
+            <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>{licenseNo}</div>
+          </div>
+          <div>
+            <div style={labelStyle}>VERIFICATION</div>
+            <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>{statusText}</div>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 12, color: C.muted, paddingTop: 4 }}>
+          Name, email, specialty and license are managed by the Clinika team. Contact an admin to change them.
+        </div>
       </div>
 
-      <Section icon="fa-user" title="Account Settings" sub="Your personal sign-in details." msg={msg.acc} saving={busy === 'acc'} onSave={saveAcc}>
-        <div style={grid}>
-          <Field label="First name"><input style={inp} value={acc.first_name} onChange={onAcc('first_name')} /></Field>
-          <Field label="Last name"><input style={inp} value={acc.last_name} onChange={onAcc('last_name')} /></Field>
-          <Field label="Phone"><input style={inp} value={acc.phone} onChange={onAcc('phone')} /></Field>
-          <Field label="Email"><input style={inp} type="email" value={acc.email} onChange={onAcc('email')} /></Field>
-          {emailChanged && (
-            <Field label="Current password" hint="Required to change your email">
-              <input style={inp} type="password" value={acc.current_password} onChange={onAcc('current_password')} />
-            </Field>
-          )}
-        </div>
-      </Section>
+      {/* Public Profile Form */}
+      <form onSubmit={onSave} style={{ ...card, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <strong style={{ fontSize: 17, color: C.text }}>Public profile</strong>
 
-      <Section icon="fa-stethoscope" title="Professional Details" sub="Shown on your public profile." msg={msg.pro} saving={busy === 'pro'} onSave={savePro}>
-        <div style={grid}>
-          <Field label="Title"><input style={inp} value={pro.title} onChange={onPro('title')} /></Field>
-          <Field label="Room"><input style={inp} value={pro.room} onChange={onPro('room')} /></Field>
-          <Field label="Years of experience">
-            <input style={inp} type="number" min="0" max="70" value={pro.years_of_experience} onChange={onPro('years_of_experience')} />
-          </Field>
-          <Field label="Consultation fee">
-            <input style={inp} type="number" min="0" value={pro.consultation_fee} onChange={onPro('consultation_fee')} />
-          </Field>
-          <Field label="Languages" hint="Separate with commas">
-            <input style={inp} value={pro.languages} onChange={onPro('languages')} />
-          </Field>
-          <Field label="Focus areas" hint="Separate with commas">
-            <input style={inp} value={pro.focus_areas} onChange={onPro('focus_areas')} />
-          </Field>
-        </div>
-        <Field label="Bio">
-          <textarea style={{ ...inp, minHeight: 100, resize: 'vertical' }} value={pro.bio} onChange={onPro('bio')} />
-        </Field>
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 14 }}>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input type="checkbox" checked={pro.accepting_new_patients} onChange={onPro('accepting_new_patients')} /> Accepting new patients
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: C.text }}>
+            Title
+            <input type="text" disabled={!editing} value={form.title} onChange={(e) => setField('title', e.target.value)} style={inp} />
           </label>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input type="checkbox" checked={pro.offers_online} onChange={onPro('offers_online')} /> Offers online consultations
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: C.text }}>
+            Room
+            <input type="text" disabled={!editing} value={form.room} onChange={(e) => setField('room', e.target.value)} style={inp} />
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: C.text }}>
+            Years of experience
+            <input type="number" disabled={!editing} value={form.years_of_experience} onChange={(e) => setField('years_of_experience', e.target.value)} style={inp} />
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: C.text }}>
+            Consultation fee (EGP)
+            <input type="number" disabled={!editing} value={form.consultation_fee} onChange={(e) => setField('consultation_fee', e.target.value)} style={inp} />
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: C.text }}>
+            Languages (separate with commas)
+            <input type="text" disabled={!editing} value={form.languages} onChange={(e) => setField('languages', e.target.value)} style={inp} />
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: C.text }}>
+            Focus areas (separate with commas)
+            <input type="text" disabled={!editing} value={form.focus_areas} onChange={(e) => setField('focus_areas', e.target.value)} style={inp} />
           </label>
         </div>
-      </Section>
 
-      <Section icon="fa-lock" title="Change Password" sub="Use at least 8 characters." msg={msg.pw} saving={busy === 'pw'} onSave={savePw} label="Update Password">
-        <div style={grid}>
-          <Field label="Current password">
-            <input style={inp} type="password" value={pw.current_password} onChange={onPw('current_password')} />
-          </Field>
-          <Field label="New password">
-            <input style={inp} type="password" value={pw.new_password} onChange={onPw('new_password')} />
-          </Field>
-          <Field label="Confirm new password">
-            <input style={inp} type="password" value={pw.confirm} onChange={onPw('confirm')} />
-          </Field>
-        </div>
-      </Section>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, fontWeight: 600, color: C.text }}>
+          About you
+          <textarea rows={3} disabled={!editing} value={form.bio} onChange={(e) => setField('bio', e.target.value)} style={{ ...inp, resize: 'vertical' }} />
+        </label>
+
+        {editing && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <button type="button" onClick={() => { setEditing(false); setDraft(null); setMsg(null); }} style={btn(C.low, C.text, { border: `1px solid ${C.border}` })}>
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} style={btn(C.primary, C.white)}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        )}
+      </form>
     </div>
   );
 }

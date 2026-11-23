@@ -1,16 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import axios from 'axios';
+import DashboardLayout from './DashboardLayout';
 /* eslint-disable react-refresh/only-export-components */
 
 export const TOKEN_KEY = 'token';
-
 export const api = axios.create({ baseURL: 'https://clinika-backend.vercel.app' });
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+api.interceptors.request.use((cfg) => {
+  const t = localStorage.getItem(TOKEN_KEY);
+  if (t) cfg.headers.Authorization = `Bearer ${t}`;
+  return cfg;
 });
 
 export const errMsg = (e) => {
@@ -19,7 +19,6 @@ export const errMsg = (e) => {
   if (Array.isArray(d)) return d.map((x) => x.msg).filter(Boolean).join(', ');
   return e?.message || 'Something went wrong';
 };
-
 export const hhmm = (t) => (t || '').slice(0, 5);
 export const toMin = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 export const to12 = (t) => {
@@ -44,12 +43,7 @@ export const C = {
   container: '#eceef0', high: '#e6e8ea', white: '#ffffff', border: '#c2c6d8', outline: '#737687',
   errBg: '#ffdad6', errText: '#93000a', error: '#ba1a1a', primaryFixed: '#dae1ff', sec: '#53606d',
 };
-export const card = {
-  backgroundColor: '#fff',
-  borderRadius: '16px',
-  boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
-  padding: '24px',
-};
+export const card = { backgroundColor: '#fff', borderRadius: '16px', boxShadow: '0 1px 8px rgba(0,0,0,0.05)', padding: '24px' };
 export const pill = (bg, color) => ({
   display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: bg, color,
   padding: '4px 12px', borderRadius: '999px', fontSize: '11px', fontWeight: 700,
@@ -57,9 +51,8 @@ export const pill = (bg, color) => ({
 });
 export const btn = (bg, color, extra = {}) => ({
   backgroundColor: bg, color, padding: '10px 16px', borderRadius: '12px', border: 'none',
-  fontWeight: 600, fontSize: '14px', cursor: 'pointer', ...extra,
+  fontWeight: 600, fontSize: 14, cursor: 'pointer', ...extra,
 });
-
 export const STATUS_UI = {
   pending: { bg: C.secondary, color: '#101d28', dot: C.sec },
   confirmed: { bg: C.primaryFixed, color: C.primary, dot: C.primary },
@@ -72,267 +65,179 @@ export const STATUS_UI = {
 const DoctorDataContext = createContext(null);
 export const useDoctorData = () => useContext(DoctorDataContext);
 
-const links = [
-  { to: '/doctor-dashboard', label: 'Overview', icon: 'fa-table-columns', end: true },
-  { to: '/doctor-dashboard/manage-appointments', label: 'Manage Appointments', icon: 'fa-calendar-days' },
+const DOCTOR_LINKS = [
+  { to: '/doctor-dashboard', label: 'Overview', icon: 'fa-chart-line', end: true },
+  { to: '/doctor-dashboard/manage-appointments', label: 'Manage Appointments', icon: 'fa-calendar-check' },
   { to: '/doctor-dashboard/manage-availability', label: 'Manage Availability', icon: 'fa-clock' },
-  { to: '/doctor-dashboard/my-profile', label: 'My Profile', icon: 'fa-circle-user' },
+  { to: '/doctor-dashboard/my-profile', label: 'My Profile', icon: 'fa-user-doctor' },
 ];
 
-function SiteLogo() {
-  return (
-    <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}>
-      <div
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 12,
-          backgroundColor: C.primary,
-          color: C.white,
-          display: 'grid',
-          placeItems: 'center',
-          fontSize: 19,
-          flexShrink: 0,
-          boxShadow: '0 6px 16px rgba(0, 80, 203, 0.28)',
-        }}
-      >
-        <i className="fa-solid fa-plus" />
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
-        <span style={{ fontSize: 19, fontWeight: 700, color: C.text, letterSpacing: '-0.02em' }}>
-          Clinika
-        </span>
-        <span style={{ fontSize: 10, fontWeight: 700, color: C.primary, letterSpacing: '0.12em' }}>
-          DOCTOR PORTAL
-        </span>
-      </div>
-    </Link>
-  );
-}
-
 export default function DoctorDashboard() {
-  const navigate = useNavigate();
+  const [state, setState] = useState({
+    user: null, profile: null, stats: null, today: [], appointments: [], slots: [], schedules: [], loading: true, error: '',
+  });
+  const [authForm, setAuthForm] = useState({ email: '', password: '' });
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authErr, setAuthErr] = useState('');
+  const [needsLogin, setNeedsLogin] = useState(false);
 
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [stats, setStats] = useState(null);
-  const [today, setToday] = useState([]);
-  const [appointments, setAppointments] = useState([]);
-  const [slots, setSlots] = useState([]);
-  const [schedules, setSchedules] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const redirectToLogin = useCallback(() => {
+  const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
-    navigate('/login', { replace: true });
-  }, [navigate]);
+    setNeedsLogin(true);
+    setState((p) => ({ ...p, user: null, profile: null, loading: false }));
+  }, []);
 
-  const fetchDoctorData = useCallback(async (isActive = () => true) => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      if (isActive()) navigate('/login', { replace: true });
+  const load = useCallback(async (isActive = () => true) => {
+    if (!localStorage.getItem(TOKEN_KEY)) {
+      if (isActive()) {
+        setNeedsLogin(true);
+        setState((p) => ({ ...p, loading: false, error: '' }));
+      }
       return;
     }
-
-    if (isActive()) {
-      setLoading(true);
-      setError('');
-    }
-
+    if (isActive()) setState((p) => ({ ...p, loading: true, error: '' }));
     try {
       const { data: me } = await api.get('/auth/me');
       if (!isActive()) return;
-
       if (!me || me.role !== 'doctor') {
-        redirectToLogin();
+        localStorage.removeItem(TOKEN_KEY);
+        setNeedsLogin(true);
+        setState((p) => ({ ...p, loading: false, error: 'This account is not a doctor account.' }));
         return;
       }
-      setUser(me);
 
       const { data: prof } = await api.get('/doctors/me/profile');
       if (!isActive()) return;
-      setProfile(prof);
 
       const docId = Number(prof?.id);
-      const validDocId = Number.isInteger(docId) && docId > 0;
-
+      const validId = Number.isInteger(docId) && docId > 0;
       const [st, td, ap, sl, sc] = await Promise.all([
         api.get('/doctors/me/stats').catch(() => ({ data: null })),
         api.get('/appointments/today').catch(() => ({ data: [] })),
         api.get('/appointments', { params: { limit: 100 } }).catch(() => ({ data: [] })),
-        validDocId
-          ? api.get(`/doctors/${docId}/slots`, { params: { date: isoDate() } }).catch(() => ({ data: [] }))
-          : Promise.resolve({ data: [] }),
-        validDocId
-          ? api.get(`/doctors/${docId}/schedules`).catch(() => ({ data: [] }))
-          : Promise.resolve({ data: [] }),
+        validId ? api.get(`/doctors/${docId}/slots`, { params: { date: isoDate() } }).catch(() => ({ data: [] })) : { data: [] },
+        validId ? api.get(`/doctors/${docId}/schedules`).catch(() => ({ data: [] })) : { data: [] },
       ]);
-
       if (!isActive()) return;
-      setStats(st?.data ?? null);
-      setToday(Array.isArray(td?.data) ? td.data : []);
-      setAppointments(Array.isArray(ap?.data) ? ap.data : []);
-      setSlots(Array.isArray(sl?.data) ? sl.data : []);
-      setSchedules(Array.isArray(sc?.data) ? sc.data : []);
+
+      setNeedsLogin(false);
+      setState({
+        user: me, profile: prof, stats: st?.data ?? null,
+        today: Array.isArray(td?.data) ? td.data : [],
+        appointments: Array.isArray(ap?.data) ? ap.data : [],
+        slots: Array.isArray(sl?.data) ? sl.data : [],
+        schedules: Array.isArray(sc?.data) ? sc.data : [],
+        loading: false, error: '',
+      });
     } catch (e) {
       if (!isActive()) return;
-      const status = e?.response?.status;
-      if (status === 401 || status === 403) {
-        redirectToLogin();
+      const code = e?.response?.status;
+      if (code === 401 || code === 403) {
+        localStorage.removeItem(TOKEN_KEY);
+        setNeedsLogin(true);
+        setState((p) => ({ ...p, loading: false, error: '' }));
         return;
       }
-      setError(errMsg(e));
-    } finally {
-      if (isActive()) setLoading(false);
+      setState((p) => ({ ...p, loading: false, error: errMsg(e) }));
     }
-  }, [navigate, redirectToLogin]);
+  }, []);
 
   useEffect(() => {
     let active = true;
-    const timer = setTimeout(() => {
-      fetchDoctorData(() => active);
-    }, 0);
+    const t = setTimeout(() => load(() => active), 0);
+    return () => { active = false; clearTimeout(t); };
+  }, [load]);
 
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [fetchDoctorData]);
+  const handleInlineLogin = async (e) => {
+    e.preventDefault();
+    setAuthErr('');
+    setAuthBusy(true);
+    try {
+      const { data } = await api.post('/auth/login', {
+        email: authForm.email.trim(),
+        password: authForm.password,
+      });
+      const token = data?.access_token || data?.token || data?.data?.access_token || data?.data?.token;
+      if (!token) {
+        setAuthErr('No token returned from server.');
+        return;
+      }
+      localStorage.setItem(TOKEN_KEY, token);
+      await load(() => true);
+    } catch (err) {
+      setAuthErr(errMsg(err));
+    } finally {
+      setAuthBusy(false);
+    }
+  };
 
-  const refresh = useCallback(() => fetchDoctorData(() => true), [fetchDoctorData]);
+  const refresh = useCallback(() => load(() => true), [load]);
+  const setUser = useCallback((fn) => setState((p) => ({ ...p, user: typeof fn === 'function' ? fn(p.user) : fn })), []);
+  const setProfile = useCallback((fn) => setState((p) => ({ ...p, profile: typeof fn === 'function' ? fn(p.profile) : fn })), []);
+  const setAppointments = useCallback((fn) => setState((p) => ({ ...p, appointments: typeof fn === 'function' ? fn(p.appointments) : fn })), []);
+  const setSchedules = useCallback((fn) => setState((p) => ({ ...p, schedules: typeof fn === 'function' ? fn(p.schedules) : fn })), []);
 
-  const ctxValue = useMemo(
-    () => ({
-      user,
-      profile,
-      stats,
-      today,
-      appointments,
-      slots,
-      schedules,
-      loading,
-      error,
-      setUser,
-      setProfile,
-      setAppointments,
-      setSchedules,
-      refresh,
-    }),
-    [user, profile, stats, today, appointments, slots, schedules, loading, error, refresh]
+  const ctx = useMemo(
+    () => ({ ...state, setUser, setProfile, setAppointments, setSchedules, refresh }),
+    [state, setUser, setProfile, setAppointments, setSchedules, refresh]
   );
 
-  const name = user?.full_name || [user?.first_name, user?.last_name].filter(Boolean).join(' ') || 'Doctor';
-  const specialty = profile?.specialty?.name || '';
-
-  return (
-    <DoctorDataContext.Provider value={ctxValue}>
-      <Helmet><title>Doctor Workspace | Clinika</title></Helmet>
-      <div style={{ minHeight: '100vh', backgroundColor: C.low, color: C.text, display: 'flex' }}>
-        <aside style={{
-          width: 264, flexShrink: 0, backgroundColor: C.white, borderRight: `1px solid ${C.container}`,
-          display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 20,
-          position: 'sticky', top: 0, height: '100vh',
-        }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <div style={{ padding: '4px 6px' }}>
-              <SiteLogo />
-            </div>
-
-            <Link
-              to="/doctor-dashboard/my-profile"
-              title="Open My Profile & Account Settings"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 12,
-                backgroundColor: C.low, textDecoration: 'none', color: C.text,
-              }}
-            >
-              <div style={{
-                width: 42, height: 42, borderRadius: 12, backgroundColor: C.secondary, color: C.primary,
-                display: 'grid', placeItems: 'center', fontSize: 18, flexShrink: 0,
-              }}>
-                <i className="fa-solid fa-user-doctor" />
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {drName(name)}
-                </div>
-                {specialty && (
-                  <div style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {specialty}
-                  </div>
-                )}
-              </div>
-            </Link>
-
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {links.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  style={({ isActive }) => ({
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 12,
-                    textDecoration: 'none', fontSize: 14, fontWeight: isActive ? 700 : 500,
-                    backgroundColor: isActive ? C.secondary : 'transparent',
-                    color: isActive ? C.primary : C.muted,
-                  })}
-                >
-                  <i className={`fa-solid ${item.icon}`} style={{ width: 18, textAlign: 'center' }} />
-                  <span>{item.label}</span>
-                </NavLink>
-              ))}
-            </nav>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 16, borderTop: `1px solid ${C.container}` }}>
-            <button
-              type="button"
-              onClick={redirectToLogin}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                padding: '10px 14px', borderRadius: 12, border: 'none', cursor: 'pointer',
-                backgroundColor: C.errBg, color: C.errText, fontWeight: 600, fontSize: 14,
-              }}
-            >
-              <i className="fa-solid fa-right-from-bracket" />
-              <span>Sign Out</span>
-            </button>
-
-            <Link
-              to="/"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                padding: '10px 14px', borderRadius: 12, textDecoration: 'none',
-                backgroundColor: C.low, color: C.text, fontWeight: 600, fontSize: 14,
-              }}
-            >
-              <i className="fa-solid fa-arrow-left" />
-              <span>Back to site</span>
-            </Link>
-          </div>
-        </aside>
-
-        <main style={{ flex: 1, padding: 28, minWidth: 0 }}>
-          {error && (
-            <div style={{
-              ...card,
-              backgroundColor: C.errBg,
-              color: C.errText,
-              fontSize: 13,
-              padding: '12px 18px',
-              marginBottom: 20,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-            }}>
-              <i className="fa-solid fa-circle-exclamation" />
-              <span>{error}</span>
+  if (needsLogin) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', backgroundColor: '#f6f8fb', padding: 20 }}>
+        <Helmet><title>Doctor Sign In | Clinika</title></Helmet>
+        <form onSubmit={handleInlineLogin} style={{ ...card, width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <h2 style={{ margin: 0, fontSize: 22 }}>Doctor Sign In</h2>
+          <p style={{ margin: 0, fontSize: 13, color: C.muted }}>Sign in with your approved doctor account.</p>
+          {(authErr || state.error) && (
+            <div style={{ backgroundColor: C.errBg, color: C.errText, padding: '10px 12px', borderRadius: 10, fontSize: 13 }}>
+              {authErr || state.error}
             </div>
           )}
-          <Outlet context={{ user, profile, refresh }} />
-        </main>
+          <input
+            type="email"
+            required
+            placeholder="Email address"
+            value={authForm.email}
+            onChange={(e) => setAuthForm((p) => ({ ...p, email: e.target.value }))}
+            style={{ padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 14 }}
+          />
+          <input
+            type="password"
+            required
+            placeholder="Password"
+            value={authForm.password}
+            onChange={(e) => setAuthForm((p) => ({ ...p, password: e.target.value }))}
+            style={{ padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 14 }}
+          />
+          <button type="submit" disabled={authBusy} style={btn(C.primary, C.white)}>
+            {authBusy ? 'Signing in...' : 'Sign In'}
+          </button>
+        </form>
       </div>
+    );
+  }
+
+  const name = drName(state.user?.full_name || [state.user?.first_name, state.user?.last_name].filter(Boolean).join(' ') || 'Doctor');
+  const specialty = state.profile?.specialty?.name || 'General Medicine';
+
+  return (
+    <DoctorDataContext.Provider value={ctx}>
+      <Helmet><title>Doctor Portal | Clinika</title></Helmet>
+      <DashboardLayout
+        portalLabel="DOCTOR PORTAL"
+        userName={name}
+        subtitle={specialty}
+        links={DOCTOR_LINKS}
+        onLogout={logout}
+      >
+        {state.error && (
+          <div style={{ ...card, backgroundColor: '#fdecec', color: '#b71c1c', fontSize: 13, padding: '12px 16px', marginBottom: 18 }}>
+            <i className="fa-solid fa-circle-exclamation" /> {state.error}
+          </div>
+        )}
+        <Outlet context={{ user: state.user, profile: state.profile, refresh }} />
+      </DashboardLayout>
     </DoctorDataContext.Provider>
   );
 }

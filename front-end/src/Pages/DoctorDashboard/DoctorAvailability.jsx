@@ -1,176 +1,107 @@
 import { useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link } from 'react-router-dom';
-import {
-  useDoctorData, api, errMsg, hhmm, toMin, to12, drName, C, card, pill, btn,
-} from './DoctorDashboard';
+import { useDoctorData, api, errMsg, hhmm, toMin, to12, C, card, pill, btn } from './DoctorDashboard';
+import AvailabilitySummary from './AvailabilitySummary';
 
 const DAYS = [
-  [0, 'Mon', 'Monday'],
-  [1, 'Tue', 'Tuesday'],
-  [2, 'Wed', 'Wednesday'],
-  [3, 'Thu', 'Thursday'],
-  [4, 'Fri', 'Friday'],
-  [5, 'Sat', 'Saturday'],
-  [6, 'Sun', 'Sunday'],
+  { idx: 0, short: 'Mon', label: 'Monday', note: 'Full Day Consultation' },
+  { idx: 1, short: 'Tue', label: 'Tuesday', note: 'Full Day Consultation' },
+  { idx: 2, short: 'Wed', label: 'Wednesday', note: 'Full Day Consultation' },
+  { idx: 3, short: 'Thu', label: 'Thursday', note: 'Full Day Consultation' },
+  { idx: 4, short: 'Fri', label: 'Friday', note: 'Half Day Consultation' },
+  { idx: 5, short: 'Sat', label: 'Saturday', note: 'Weekend Schedule' },
+  { idx: 6, short: 'Sun', label: 'Sunday', note: 'Weekend Schedule' },
 ];
-
-const DURATIONS = [
-  [15, 'Rapid check'],
-  [30, 'Recommended'],
-  [45, 'Extended'],
-  [60, 'Comprehensive'],
-];
-
-const POLICIES = [
-  'Patients cannot book within 2 hours of current time to prevent last-minute clinic disruption.',
-  'Modifications to active slots take effect immediately for upcoming patient searches.',
-  'Pre-existing patient appointments are preserved during slot reconfigurations.',
-];
-
-const FALLBACK_LOCATIONS = [
-  { id: 'loc-1', name: 'Clinika Main Medical Center', address: 'Nasr City, Cairo' },
-  { id: 'loc-2', name: 'Clinika Nile Branch', address: 'Maadi, Cairo' },
-  { id: 'loc-3', name: 'Online Tele-Consultation Hub', address: 'Virtual Clinic' },
-];
-
-const TIME_OPTIONS = Array.from({ length: 36 }, (_, idx) => {
-  const mins = 7 * 60 + idx * 30;
-  const h = String(Math.floor(mins / 60)).padStart(2, '0');
-  const m = String(mins % 60).padStart(2, '0');
-  return `${h}:${m}`;
+const TIMES = Array.from({ length: 29 }, (_, i) => {
+  const m = 7 * 60 + i * 30;
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 });
-
-function buildState(schedules, profile) {
-  const days = {};
-  for (const [k] of DAYS) {
-    const row = schedules.find((r) => r.day_of_week === k && r.is_active);
-    const isWeekday = k <= 4;
-    days[k] = {
-      on: row ? true : !schedules.length && isWeekday,
-      start: row ? hhmm(row.start_time) : '09:00',
-      end: row ? hhmm(row.end_time) : '17:00',
+const DURATIONS = [
+  { mins: 15, tag: 'Rapid Check' },
+  { mins: 30, tag: 'Recommended' },
+  { mins: 45, tag: 'Specialized' },
+  { mins: 60, tag: 'Comprehensive' },
+];
+const makeDays = (schedules = []) => {
+  const map = new Map((Array.isArray(schedules) ? schedules : []).map((s) => [Number(s.day_of_week), s]));
+  return DAYS.map((d) => {
+    const s = map.get(d.idx);
+    return {
+      day_of_week: d.idx,
+      active: s ? s.is_active !== false : d.idx < 5,
+      start: hhmm(s?.start_time) || '09:00',
+      end: hhmm(s?.end_time) || (d.idx === 4 ? '13:00' : '17:00'),
     };
-  }
-  return {
-    days,
-    duration: Number(profile?.slot_duration_minutes) || 30,
-    breakOn: true,
-    bStart: '13:00',
-    bEnd: '14:00',
-  };
-}
+  });
+};
 
 export default function DoctorAvailability() {
-  const { user, profile, schedules, setSchedules, loading, isGuestPreview, refresh } = useDoctorData();
-  const clinics = useMemo(() => {
-    const fromProfile = profile?.clinics?.length ? profile.clinics : profile?.clinic ? [profile.clinic] : [];
-    return fromProfile.length ? fromProfile : FALLBACK_LOCATIONS;
-  }, [profile]);
-
-  const [clinicId, setClinicId] = useState('');
-  const [draft, setDraft] = useState(null);
+  const { profile, schedules, setSchedules, loading, refresh } = useDoctorData();
+  const docId = Number(profile?.id);
+  const [days, setDays] = useState(() => makeDays(schedules));
+  const [duration, setDuration] = useState(() => Number(profile?.slot_duration_minutes) || 30);
+  const [breakOn, setBreakOn] = useState(true);
+  const [breakStart, setBreakStart] = useState('13:00');
+  const [breakEnd, setBreakEnd] = useState('14:00');
+  const [clinicIdx, setClinicIdx] = useState(0);
+  const [bannerOpen, setBannerOpen] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
 
-  const baseForm = useMemo(() => buildState(schedules, profile), [schedules, profile]);
-  const form = draft ?? baseForm;
-  const hasUnsaved = draft !== null;
+  const clinics = useMemo(() => {
+    const list = [profile?.clinic, ...(Array.isArray(profile?.clinics) ? profile.clinics : [])].filter(Boolean);
+    const unique = list.filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i);
+    return unique.length
+      ? unique
+      : [{ id: profile?.clinic_id ?? null, name: profile?.clinic_name || 'Main Clinic', address: profile?.room ? `Room ${profile.room}` : 'Consultation Suite' }];
+  }, [profile]);
 
-  const setForm = (updater) =>
-    setDraft((prev) => {
-      const current = prev ?? baseForm;
-      return typeof updater === 'function' ? updater(current) : updater;
+  const activeClinic = clinics[clinicIdx] || clinics[0];
+  const safeDuration = Number(duration) > 0 ? Number(duration) : 30;
+  const breakMins = breakOn && toMin(breakEnd) > toMin(breakStart) ? toMin(breakEnd) - toMin(breakStart) : 0;
+
+  const stats = useMemo(() => {
+    const perDay = days.map((d) => {
+      if (!d.active || toMin(d.end) <= toMin(d.start)) return { ...d, hrs: 0, net: 0, slots: 0 };
+      const raw = toMin(d.end) - toMin(d.start);
+      const net = Math.max(0, raw - breakMins);
+      return { ...d, hrs: +(raw / 60).toFixed(1), net, slots: Math.floor(net / safeDuration) };
     });
+    const totalMins = perDay.reduce((sum, x) => sum + x.net, 0);
+    const totalSlots = perDay.reduce((sum, x) => sum + x.slots, 0);
+    const activeCount = perDay.filter((x) => x.active).length;
+    return {
+      perDay,
+      activeCount,
+      weeklyHrs: +(totalMins / 60).toFixed(1),
+      totalSlots,
+      avgDailySlots: activeCount ? Math.round(totalSlots / activeCount) : 0,
+    };
+  }, [days, safeDuration, breakMins]);
 
-  const activeClinic = clinics.find((c) => String(c.id) === String(clinicId)) || clinics[0] || null;
-  const docId = Number(profile?.id);
-  const hasDoctorId = Number.isInteger(docId) && docId > 0;
-
-  const activeDays = DAYS.filter(([k]) => form.days[k]?.on);
-  const dayHours = (d) => Math.max(0, toMin(d.end) - toMin(d.start)) / 60;
-  const breakDurationMins = Math.max(0, toMin(form.bEnd) - toMin(form.bStart));
-  const breakMins = (d) =>
-    form.breakOn
-      ? Math.max(0, Math.min(toMin(d.end), toMin(form.bEnd)) - Math.max(toMin(d.start), toMin(form.bStart)))
-      : 0;
-  const daySlots = (d) => Math.max(0, Math.floor((dayHours(d) * 60 - breakMins(d)) / form.duration));
-
-  const weekHours = activeDays.reduce((acc, [k]) => acc + dayHours(form.days[k]), 0);
-  const weekSlots = activeDays.reduce((acc, [k]) => acc + daySlots(form.days[k]), 0);
-  const maxSlots = Math.max(1, ...DAYS.map(([k]) => (form.days[k]?.on ? daySlots(form.days[k]) : 0)));
-  const invalid =
-    activeDays.some(([k]) => dayHours(form.days[k]) <= 0) ||
-    (form.breakOn && toMin(form.bEnd) <= toMin(form.bStart));
-
-  const toggleDay = (k) => {
+  const onSave = async () => {
     setMsg(null);
-    setForm((p) => ({ ...p, days: { ...p.days, [k]: { ...p.days[k], on: !p.days[k].on } } }));
-  };
-
-  const setDayTime = (k, field, value) => {
-    setMsg(null);
-    setForm((p) => ({ ...p, days: { ...p.days, [k]: { ...p.days[k], [field]: value } } }));
-  };
-
-  const applyWeekdays = () => {
-    setMsg(null);
-    setForm((p) => {
-      const next = { ...p.days };
-      for (let k = 0; k < 7; k++) {
-        next[k] = { ...next[k], on: k <= 4 };
-      }
-      return { ...p, days: next };
-    });
-  };
-
-  const copyMonToAll = () => {
-    setMsg(null);
-    const mon = form.days[0];
-    setForm((p) => {
-      const next = { ...p.days };
-      for (let k = 0; k < 7; k++) {
-        if (next[k].on) next[k] = { ...next[k], start: mon.start, end: mon.end };
-      }
-      return { ...p, days: next };
-    });
-  };
-
-  const save = async () => {
-    setMsg(null);
-    if (invalid) {
-      setMsg({ ok: false, text: 'Please check your start/end times and break window.' });
-      return;
-    }
-
-    const payloadSchedules = DAYS.map(([k], idx) => ({
-      id: idx + 1,
-      day_of_week: k,
-      start_time: `${form.days[k].start}:00`,
-      end_time: `${form.days[k].end}:00`,
-      is_active: Boolean(form.days[k].on),
-      ...(activeClinic?.id ? { clinic_id: activeClinic.id } : {}),
-    }));
+    const bad = days.find((d) => d.active && toMin(d.end) <= toMin(d.start));
+    if (bad) return setMsg({ ok: false, text: `${DAYS[bad.day_of_week].label}: end time must be after start time.` });
 
     setSaving(true);
     try {
-      if (!isGuestPreview && hasDoctorId) {
-        await api.put(`/doctors/${docId}`, { slot_duration_minutes: Number(form.duration) }).catch(() => null);
-        try {
-          await api.put(`/doctors/${docId}/schedules`, { schedules: payloadSchedules });
-        } catch {
-          await api.post(`/doctors/${docId}/schedules`, payloadSchedules);
-        }
+      if (Number.isInteger(docId) && docId > 0) {
+        const payload = days.map((d) => ({
+          day_of_week: d.day_of_week,
+          start_time: `${d.start}:00`,
+          end_time: `${d.end}:00`,
+          is_active: d.active,
+          clinic_id: activeClinic?.id ?? null,
+        }));
+        const { data } = await api.put(`/doctors/${docId}/schedules`, payload);
+        await api.put(`/doctors/${docId}`, { slot_duration_minutes: safeDuration }).catch(() => null);
+        if (Array.isArray(data)) setSchedules(data);
         await refresh();
-      } else {
-        setSchedules(payloadSchedules);
       }
-      setDraft(null);
-      setMsg({ ok: true, text: `Availability updated for ${activeClinic?.name || 'selected location'}.` });
+      setMsg({ ok: true, text: 'Availability schedule saved and synced.' });
     } catch (e) {
-      setSchedules(payloadSchedules);
-      setDraft(null);
-      setMsg({ ok: true, text: `Saved locally (${errMsg(e)}).` });
+      setMsg({ ok: false, text: errMsg(e) });
     } finally {
       setSaving(false);
     }
@@ -183,173 +114,210 @@ export default function DoctorAvailability() {
         <div style={{ fontSize: 12, color: C.m }}>
           Doctor Dashboard <i className="fa-solid fa-chevron-right" style={{ fontSize: 9 }} /> <b style={{ color: C.p }}>Manage Availability</b>
         </div>
-        <span style={pill(C.secondary, C.primary)}>
-          <i className="fa-solid fa-circle-check" /> Schedule Active
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={pill(C.primaryFixed, C.primary)}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: C.primary }} />
+            SCHEDULE ACTIVE
+          </span>
+          <span style={{ fontSize: 12, color: C.muted }}>
+            <i className="fa-regular fa-clock" /> Synchronized
+          </span>
+        </div>
       </div>
 
       {msg && (
-        <div style={{
-          ...card, padding: '14px 20px', fontSize: 13, fontWeight: 600,
-          backgroundColor: msg.ok ? '#ECFDF5' : C.errBg,
-          color: msg.ok ? '#047857' : C.errText,
-        }}>
-          <i className={`fa-solid ${msg.ok ? 'fa-circle-check' : 'fa-circle-exclamation'}`} /> {msg.text}
+        <div style={{ ...card, padding: '12px 16px', backgroundColor: msg.ok ? '#ECFDF5' : C.errBg, color: msg.ok ? '#047857' : C.errText, fontSize: 13, fontWeight: 600 }}>
+          {msg.text}
         </div>
       )}
 
       {loading ? (
-        <div style={{ ...card, textAlign: 'center', color: C.muted }}>Loading schedule...</div>
+        <div style={card}>Loading availability...</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 8fr) minmax(280px, 4fr)', gap: 28, alignItems: 'start' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            <div style={card}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.primary, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                Location • Select Practicing Clinic
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 310px', gap: 20, alignItems: 'start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {bannerOpen && (
+              <div style={{ ...card, padding: '14px 18px', backgroundColor: '#f3f7fd', border: '1px solid #d8e5f8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: C.primary, color: C.white, display: 'grid', placeItems: 'center' }}>
+                    <i className="fa-solid fa-check" style={{ fontSize: 12 }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Your availability is live &amp; verified</div>
+                    <div style={{ fontSize: 12, color: C.muted }}>New booking slots are reflected on Clinika search and booking portals.</div>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setBannerOpen(false)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 15 }}>✕</button>
               </div>
-              <p style={{ fontSize: 13, color: C.muted, margin: '4px 0 16px' }}>
-                Availability, working days, and consultation hours are managed per clinic location.
-              </p>
+            )}
+
+            {/* Clinic Selector */}
+            <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: C.muted }}>
+                    LOCATION • <span style={{ color: C.text, textTransform: 'none', fontSize: 15 }}>Select Practicing Clinic</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                    Availability, working days, and consultation hours are managed per clinic location.
+                  </div>
+                </div>
+                {clinics.length > 1 && <span style={pill(C.low, C.muted)}>Multi-Clinic Mode</span>}
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-                {clinics.map((cl) => {
-                  const selected = activeClinic && String(cl.id) === String(activeClinic.id);
-                  return (
-                    <button
-                      type="button"
-                      key={cl.id}
-                      onClick={() => { setClinicId(String(cl.id)); setMsg(null); }}
-                      style={{
-                        textAlign: 'left', padding: 16, borderRadius: 14, cursor: 'pointer',
-                        backgroundColor: selected ? C.secondary : C.low,
-                        border: `1.5px solid ${selected ? C.primary : 'transparent'}`,
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: C.text }}>
-                        <i className="fa-solid fa-location-dot" style={{ color: C.primary }} />
-                        <span>{cl.name}</span>
-                      </div>
-                      <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{cl.address || 'Main Clinic'}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div style={card}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.primary, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                    Step 01 • Working Days
-                  </div>
-                  <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>Select the days of the week when you accept patient appointments.</div>
-                </div>
-                <button type="button" onClick={applyWeekdays} style={btn(C.low, C.primary, { padding: '8px 14px', fontSize: 12 })}>
-                  Apply Weekdays Mon–Fri
-                </button>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8 }}>
-                {DAYS.map(([k, short]) => {
-                  const isOn = Boolean(form.days[k]?.on);
-                  return (
-                    <button
-                      type="button"
-                      key={k}
-                      onClick={() => toggleDay(k)}
-                      style={{
-                        padding: '12px 6px', borderRadius: 12, border: 'none', cursor: 'pointer',
-                        backgroundColor: isOn ? C.primary : C.low,
-                        color: isOn ? '#fff' : C.muted,
-                        fontWeight: 700, fontSize: 12,
-                      }}
-                    >
-                      <div>{short}</div>
-                      <div style={{ fontSize: 10, opacity: 0.85, marginTop: 4 }}>{isOn ? 'Active' : 'Off'}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div style={card}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.primary, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                    Step 02 • Shift Hours & Daily Schedule
-                  </div>
-                  <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>Specify arrival and departure consulting windows per active day.</div>
-                </div>
-                <button type="button" onClick={copyMonToAll} style={btn(C.low, C.text, { padding: '8px 14px', fontSize: 12 })}>
-                  <i className="fa-regular fa-copy" /> Copy Mon hours to all
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {DAYS.map(([k, , full]) => {
-                  const d = form.days[k];
-                  const hrs = d.on ? +dayHours(d).toFixed(1) : 0;
+                {clinics.map((c, i) => {
+                  const active = i === clinicIdx;
                   return (
                     <div
-                      key={k}
+                      key={c.id ?? i}
+                      onClick={() => setClinicIdx(i)}
                       style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        flexWrap: 'wrap', gap: 12, padding: '12px 16px', borderRadius: 12,
-                        backgroundColor: d.on ? C.low : '#f8f9fa', opacity: d.on ? 1 : 0.65,
+                        padding: 14, borderRadius: 14, cursor: 'pointer',
+                        border: `1.5px solid ${active ? C.primary : C.border}`,
+                        backgroundColor: active ? '#f6f9ff' : C.white,
+                        display: 'flex', flexDirection: 'column', gap: 6,
                       }}
                     >
-                      <div style={{ minWidth: 130 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600 }}>{full}</div>
-                        <div style={{ fontSize: 11, color: C.muted }}>{d.on ? 'Full Day Consultation' : 'Unavailable'}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <strong style={{ fontSize: 14, color: C.text }}>{c.name}</strong>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999,
+                          backgroundColor: active ? C.primary : C.low, color: active ? C.white : C.muted,
+                        }}>
+                          {active ? 'Active Location' : 'Switch'}
+                        </span>
                       </div>
-                      {d.on ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <select
-                            value={d.start}
-                            onChange={(e) => setDayTime(k, 'start', e.target.value)}
-                            style={{ padding: '8px 10px', borderRadius: 10, border: `1px solid ${C.border}`, backgroundColor: C.white, fontSize: 13 }}
-                          >
-                            {TIME_OPTIONS.map((t) => <option key={t} value={t}>{to12(t)}</option>)}
-                          </select>
-                          <span style={{ fontSize: 12, color: C.muted }}>to</span>
-                          <select
-                            value={d.end}
-                            onChange={(e) => setDayTime(k, 'end', e.target.value)}
-                            style={{ padding: '8px 10px', borderRadius: 10, border: `1px solid ${C.border}`, backgroundColor: C.white, fontSize: 13 }}
-                          >
-                            {TIME_OPTIONS.map((t) => <option key={t} value={t}>{to12(t)}</option>)}
-                          </select>
-                          <span style={pill(C.secondary, C.primary)}>{hrs}h</span>
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: 12, color: C.muted }}>Day off</span>
-                      )}
+                      <div style={{ fontSize: 12, color: C.muted }}>{c.address || 'Clinic Location'}</div>
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            <div style={card}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.primary, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 14 }}>
-                Step 03 • Consultation Slot Duration
+            {/* STEP 01: Working Days */}
+            <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: C.primary }}>
+                  STEP 01 • <span style={{ color: C.text, fontSize: 16 }}>Working Days</span>
+                </div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Select the days of the week you accept patient appointments.</div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 }}>
-                {DURATIONS.map(([mins, tag]) => {
-                  const active = Number(form.duration) === mins;
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8 }}>
+                {days.map((d) => (
+                  <button
+                    key={d.day_of_week}
+                    type="button"
+                    onClick={() => { setMsg(null); setDays((p) => p.map((x) => (x.day_of_week === d.day_of_week ? { ...x, active: !x.active } : x))); }}
+                    style={{
+                      padding: '12px 6px', borderRadius: 12, cursor: 'pointer',
+                      border: `1.5px solid ${d.active ? C.primary : C.border}`,
+                      backgroundColor: d.active ? C.primary : C.white,
+                      color: d.active ? C.white : C.text,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>{DAYS[d.day_of_week].short}</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999,
+                      backgroundColor: d.active ? 'rgba(255,255,255,0.2)' : C.low,
+                      color: d.active ? C.white : C.muted,
+                    }}>
+                      {d.active ? 'Active' : 'Off'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* STEP 02: Shift Hours */}
+            <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: C.primary }}>
+                    STEP 02 • <span style={{ color: C.text, fontSize: 16 }}>Shift Hours &amp; Daily Schedule</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Specify arrival and departure consulting windows per active day.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const m = days[0];
+                    if (m) { setMsg(null); setDays((p) => p.map((x) => (x.active ? { ...x, start: m.start, end: m.end } : x))); }
+                  }}
+                  style={btn(C.low, C.text, { border: `1px solid ${C.border}`, padding: '8px 12px', fontSize: 12 })}
+                >
+                  <i className="fa-regular fa-copy" /> Copy Mon hours to all
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {stats.perDay.filter((d) => d.active).map((d) => (
+                  <div key={d.day_of_week} style={{ padding: '12px 14px', borderRadius: 12, backgroundColor: C.low, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: C.primaryFixed, color: C.primary, display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 13 }}>
+                        {DAYS[d.day_of_week].short[0]}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{DAYS[d.day_of_week].label}</div>
+                        <div style={{ fontSize: 11, color: C.muted }}>{DAYS[d.day_of_week].note}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 12, color: C.muted }}>From</span>
+                      <select
+                        value={d.start}
+                        onChange={(e) => { setMsg(null); setDays((p) => p.map((x) => (x.day_of_week === d.day_of_week ? { ...x, start: e.target.value } : x))); }}
+                        style={{ padding: '8px 12px', borderRadius: 10, border: `1px solid ${C.border}`, backgroundColor: C.white, color: C.text, fontSize: 13, fontWeight: 600 }}
+                      >
+                        {TIMES.map((t) => <option key={t} value={t}>{to12(t)}</option>)}
+                      </select>
+                      <span style={{ fontSize: 12, color: C.muted }}>to</span>
+                      <select
+                        value={d.end}
+                        onChange={(e) => { setMsg(null); setDays((p) => p.map((x) => (x.day_of_week === d.day_of_week ? { ...x, end: e.target.value } : x))); }}
+                        style={{ padding: '8px 12px', borderRadius: 10, border: `1px solid ${C.border}`, backgroundColor: C.white, color: C.text, fontSize: 13, fontWeight: 600 }}
+                      >
+                        {TIMES.map((t) => <option key={t} value={t}>{to12(t)}</option>)}
+                      </select>
+                      <span style={pill(C.primaryFixed, C.primary)}>{d.hrs} hrs</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* STEP 03: Consultation Slot Duration */}
+            <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: C.primary }}>
+                  STEP 03 • <span style={{ color: C.text, fontSize: 16 }}>Consultation Slot Duration</span>
+                </div>
+                <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Each booking slot will be generated based on this consultation window.</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
+                {DURATIONS.map((item) => {
+                  const selected = safeDuration === item.mins;
                   return (
                     <button
+                      key={item.mins}
                       type="button"
-                      key={mins}
-                      onClick={() => { setMsg(null); setForm((p) => ({ ...p, duration: mins })); }}
+                      onClick={() => setDuration(item.mins)}
                       style={{
-                        padding: 14, borderRadius: 12, cursor: 'pointer', textAlign: 'center',
-                        backgroundColor: active ? C.primary : C.low,
-                        color: active ? '#fff' : C.text,
-                        border: 'none',
+                        padding: '18px 12px', borderRadius: 14, cursor: 'pointer',
+                        border: `1.5px solid ${selected ? C.primary : 'transparent'}`,
+                        backgroundColor: selected ? C.primary : C.low,
+                        color: selected ? C.white : C.text,
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                       }}
                     >
-                      <div style={{ fontSize: 20, fontWeight: 700 }}>{mins}</div>
-                      <div style={{ fontSize: 11, opacity: 0.9 }}>MINUTES</div>
-                      <div style={{ fontSize: 11, marginTop: 4, opacity: 0.85 }}>{tag}</div>
+                      <span style={{ fontSize: 22, fontWeight: 700 }}>{item.mins}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', opacity: selected ? 0.9 : 0.7 }}>MINUTES</span>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, marginTop: 4, padding: '3px 10px', borderRadius: 999,
+                        backgroundColor: selected ? C.white : 'transparent',
+                        color: selected ? C.primary : C.muted,
+                      }}>
+                        {item.tag}
+                      </span>
                     </button>
                   );
                 })}
@@ -357,223 +325,105 @@ export default function DoctorAvailability() {
             </div>
 
             {/* Lunch / Midday Break */}
-            <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: form.breakOn ? 20 : 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: 12, backgroundColor: C.secondary, color: C.primary,
-                    display: 'grid', placeItems: 'center', fontSize: 18, flexShrink: 0,
-                  }}>
-                    <i className="fa-solid fa-utensils" />
+            <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: C.primaryFixed, color: C.primary, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <i className="fa-solid fa-utensils" style={{ fontSize: 15 }} />
                   </div>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 16, fontWeight: 700 }}>Lunch / Midday Break</span>
-                      <span style={{
-                        backgroundColor: C.low, color: C.muted, fontSize: 10, fontWeight: 700,
-                        letterSpacing: '0.06em', padding: '3px 8px', borderRadius: 6,
-                      }}>
-                        OPTIONAL
-                      </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <strong style={{ fontSize: 15, color: C.text }}>Lunch / Midday Break</strong>
+                      <span style={pill(C.low, C.muted)}>OPTIONAL</span>
                     </div>
-                    <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
                       Slots falling within this break window will be automatically hidden from patient booking.
                     </div>
                   </div>
                 </div>
 
+                {/* Pill Toggle Switch */}
                 <button
                   type="button"
                   role="switch"
-                  aria-checked={form.breakOn}
-                  onClick={() => { setMsg(null); setForm((p) => ({ ...p, breakOn: !p.breakOn })); }}
+                  aria-checked={breakOn}
+                  onClick={() => setBreakOn((v) => !v)}
                   style={{
-                    width: 46, height: 26, borderRadius: 999, border: 'none', padding: 3,
-                    backgroundColor: form.breakOn ? C.primary : C.high,
+                    width: 44, height: 24, borderRadius: 999, border: 'none', padding: 2,
+                    backgroundColor: breakOn ? C.primary : C.border,
                     display: 'flex', alignItems: 'center',
-                    justifyContent: form.breakOn ? 'flex-end' : 'flex-start',
-                    cursor: 'pointer', flexShrink: 0, transition: 'background-color 0.2s',
+                    justifyContent: breakOn ? 'flex-end' : 'flex-start',
+                    cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s ease',
                   }}
                 >
-                  <span style={{
-                    width: 20, height: 20, borderRadius: '50%', backgroundColor: C.white,
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                  }} />
+                  <span style={{ width: 20, height: 20, borderRadius: '50%', backgroundColor: C.white }} />
                 </button>
               </div>
 
-              {form.breakOn && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', paddingLeft: 58 }}>
-                  <div style={timeBoxStyle}>
-                    <i className="fa-regular fa-clock" style={{ color: C.muted, fontSize: 16 }} />
-                    <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                      <span style={{ fontSize: 11, color: C.muted, fontWeight: 500 }}>Break Starts</span>
-                      <select
-                        value={form.bStart}
-                        onChange={(e) => setDayTime ? setForm((p) => ({ ...p, bStart: e.target.value })) : null}
-                        style={selectResetStyle}
-                      >
-                        {TIME_OPTIONS.map((t) => <option key={t} value={t}>{to12(t)}</option>)}
+              {breakOn && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={timeBox}>
+                    <i className="fa-regular fa-clock" style={{ color: C.muted, fontSize: 14 }} />
+                    <div>
+                      <div style={{ fontSize: 10, color: C.muted, fontWeight: 600 }}>Break Starts</div>
+                      <select value={breakStart} onChange={(e) => setBreakStart(e.target.value)} style={selClean}>
+                        {TIMES.map((t) => <option key={t} value={t}>{to12(t)}</option>)}
                       </select>
                     </div>
                   </div>
 
-                  <span style={{ fontSize: 14, color: C.muted, fontWeight: 500 }}>until</span>
+                  <span style={{ fontSize: 13, color: C.muted }}>until</span>
 
-                  <div style={timeBoxStyle}>
-                    <i className="fa-regular fa-clock" style={{ color: C.muted, fontSize: 16 }} />
-                    <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                      <span style={{ fontSize: 11, color: C.muted, fontWeight: 500 }}>Break Ends</span>
-                      <select
-                        value={form.bEnd}
-                        onChange={(e) => setForm((p) => ({ ...p, bEnd: e.target.value }))}
-                        style={selectResetStyle}
-                      >
-                        {TIME_OPTIONS.map((t) => <option key={t} value={t}>{to12(t)}</option>)}
+                  <div style={timeBox}>
+                    <i className="fa-regular fa-clock" style={{ color: C.muted, fontSize: 14 }} />
+                    <div>
+                      <div style={{ fontSize: 10, color: C.muted, fontWeight: 600 }}>Break Ends</div>
+                      <select value={breakEnd} onChange={(e) => setBreakEnd(e.target.value)} style={selClean}>
+                        {TIMES.map((t) => <option key={t} value={t}>{to12(t)}</option>)}
                       </select>
                     </div>
                   </div>
 
-                  {breakDurationMins > 0 && (
-                    <span style={{
-                      backgroundColor: C.secondary, color: C.primary, borderRadius: 10,
-                      padding: '8px 14px', fontSize: 13, fontWeight: 600,
-                      display: 'inline-flex', alignItems: 'center', gap: 8,
-                    }}>
-                      <i className="fa-solid fa-circle-info" />
-                      <span>{breakDurationMins}-minute recurring buffer reserved</span>
-                    </span>
-                  )}
+                  <span style={{ ...pill('#eef3fc', C.primary), textTransform: 'none', letterSpacing: 0, fontSize: 12, padding: '8px 14px' }}>
+                    <i className="fa-solid fa-circle-info" />
+                    {breakMins > 0 ? `${breakMins}-minute recurring buffer reserved` : 'Select valid break window'}
+                  </span>
                 </div>
               )}
             </div>
 
-            {/* Save Bar */}
-            <div style={{
-              ...card, padding: '16px 24px', display: 'flex', justifyContent: 'space-between',
-              alignItems: 'center', flexWrap: 'wrap', gap: 16,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: C.muted }}>
-                <i className={`fa-solid ${hasUnsaved ? 'fa-cloud-arrow-up' : 'fa-cloud-check'}`} style={{ color: C.primary, fontSize: 16 }} />
-                <span>{hasUnsaved ? 'Unsaved modifications are cached locally' : 'Schedule is up to date'}</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Bottom Action Bar */}
+            <div style={{ ...card, padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <span style={{ fontSize: 12, color: C.muted, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <i className="fa-solid fa-cloud-arrow-up" style={{ color: C.primary }} />
+                Unsaved modifications are cached locally
+              </span>
+              <div style={{ display: 'flex', gap: 10 }}>
                 <button
                   type="button"
-                  onClick={() => { setMsg(null); setDraft(null); }}
-                  style={btn(C.low, C.text, { padding: '12px 22px', fontWeight: 700 })}
+                  onClick={() => {
+                    setMsg(null);
+                    setDays(makeDays(schedules));
+                    setDuration(Number(profile?.slot_duration_minutes) || 30);
+                  }}
+                  style={btn(C.low, C.text, { padding: '10px 16px', fontSize: 13 })}
                 >
                   Reset Changes
                 </button>
                 <button
                   type="button"
                   disabled={saving}
-                  onClick={save}
-                  style={btn(C.primary, '#fff', {
-                    padding: '12px 24px', fontWeight: 700,
-                    display: 'inline-flex', alignItems: 'center', gap: 8,
-                    opacity: saving ? 0.65 : 1, boxShadow: '0 4px 14px rgba(0,80,203,0.28)',
-                  })}
+                  onClick={onSave}
+                  style={btn(C.primary, C.white, { padding: '10px 18px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 8 })}
                 >
                   <i className="fa-regular fa-floppy-disk" />
-                  <span>{saving ? 'Saving...' : 'Save Availability'}</span>
+                  {saving ? 'Saving...' : 'Save Availability'}
                 </button>
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <div style={card}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: C.secondary, color: C.primary, display: 'grid', placeItems: 'center', fontWeight: 700 }}>
-                  <i className="fa-solid fa-user-doctor" />
-                </div>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>{user?.full_name ? drName(user.full_name) : 'Dr. Nadia Mansour'}</div>
-                  <div style={{ fontSize: 12, color: C.muted }}>{profile?.specialty?.name || 'Internal Medicine'}</div>
-                </div>
-              </div>
-              {activeClinic && (
-                <div style={{ marginTop: 14, padding: 12, borderRadius: 12, backgroundColor: C.low }}>
-                  <div style={{ fontSize: 11, color: C.muted }}>Configuring Clinic</div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{activeClinic.name}</div>
-                </div>
-              )}
-            </div>
-
-            <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Live Schedule Capacity</h3>
-                <span style={pill(C.secondary, C.primary)}>Calculated</span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div style={{ backgroundColor: C.low, borderRadius: 12, padding: 14 }}>
-                  <div style={{ fontSize: 11, color: C.muted }}>Weekly Consulting</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, margin: '4px 0' }}>{+weekHours.toFixed(1)} hrs</div>
-                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 600 }}>Across {activeDays.length} days</div>
-                </div>
-                <div style={{ backgroundColor: C.low, borderRadius: 12, padding: 14 }}>
-                  <div style={{ fontSize: 11, color: C.muted }}>Available Daily</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, margin: '4px 0' }}>
-                    ~{activeDays.length ? Math.round(weekSlots / activeDays.length) : 0} Slots
-                  </div>
-                  <div style={{ fontSize: 11, color: C.primary, fontWeight: 600 }}>At {form.duration}m / patient</div>
-                </div>
-              </div>
-
-              <div style={{ backgroundColor: C.low, borderRadius: 12, padding: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
-                  <span>Weekly Slot Allocation</span>
-                  <span style={{ color: C.primary }}>{weekSlots} Slots / Week</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: 48, borderBottom: `1px dashed ${C.border}` }}>
-                  {DAYS.map(([k]) => {
-                    const n = form.days[k]?.on ? daySlots(form.days[k]) : 0;
-                    return (
-                      <div
-                        key={k}
-                        style={{
-                          width: 22,
-                          height: n > 0 ? Math.max(6, (n / maxSlots) * 44) : 4,
-                          borderRadius: 4,
-                          backgroundColor: n > 0 ? C.primary : '#e0e3e5',
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, color: C.muted, marginTop: 6, padding: '0 6px' }}>
-                  {DAYS.map(([k, short]) => <span key={k}>{short[0]}</span>)}
-                </div>
-              </div>
-
-              {nextDay && (
-                <div style={{ padding: 12, borderRadius: 12, backgroundColor: C.secondary, fontSize: 13 }}>
-                  <div style={{ fontWeight: 700, color: '#101d28' }}>Next Operating Day</div>
-                  <div style={{ color: '#3c4855', marginTop: 2 }}>
-                    {nextDay.when} • {to12(nextDay.d.start)} – {to12(nextDay.d.end)}
-                  </div>
-                </div>
-              )}
-
-              {hasDoctorId && (
-                <Link to={`/doctors/doctor_profile/${docId}`} style={{ textAlign: 'center', backgroundColor: C.low, color: C.primary, padding: 12, borderRadius: 12, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
-                  Preview Public Profile & Booking <i className="fa-solid fa-arrow-right" />
-                </Link>
-              )}
-            </div>
-
-            <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <h4 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Clinika Schedule Policies</h4>
-              {POLICIES.map((p) => (
-                <div key={p} style={{ display: 'flex', gap: 8, fontSize: 12, color: C.muted, lineHeight: '18px' }}>
-                  <i className="fa-solid fa-check" style={{ color: C.primary, marginTop: 3 }} />
-                  <span>{p}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <AvailabilitySummary activeClinic={activeClinic} stats={stats} duration={safeDuration} />
         </div>
       )}
     </div>
