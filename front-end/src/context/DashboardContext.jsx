@@ -216,6 +216,7 @@ export function DashboardProvider({ children }) {
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDashboardData({ silent: hasCache });
   }, [fetchDashboardData, hasCache]);
 
