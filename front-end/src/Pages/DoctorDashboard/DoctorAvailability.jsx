@@ -35,6 +35,27 @@ const makeDays = (schedules = []) => {
   });
 };
 
+const timeBox = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  padding: '8px 14px',
+  borderRadius: 12,
+  border: `1px solid ${C.border}`,
+  backgroundColor: C.white,
+};
+
+const selClean = {
+  border: 'none',
+  outline: 'none',
+  background: 'transparent',
+  color: C.text,
+  fontSize: 14,
+  fontWeight: 700,
+  padding: 0,
+  cursor: 'pointer',
+};
+
 export default function DoctorAvailability() {
   const { profile, schedules, setSchedules, loading, refresh } = useDoctorData();
   const docId = Number(profile?.id);
