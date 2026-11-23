@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
+import api from "../../api";
 import {
   Home,
   ChevronRight,
@@ -33,9 +34,12 @@ export default function DoctorProfile() {
   const [error, setError] = useState("");
 
   // Fetch doctor data if not received through navigation
+  
   useEffect(() => {
     const fetchDoctor = async () => {
       try {
+        setError("");
+
         if (passedDoctor && String(passedDoctor.id) === String(id)) {
           setDoctor(passedDoctor);
           setLoading(false);
@@ -44,16 +48,58 @@ export default function DoctorProfile() {
 
         setLoading(true);
 
-        const response = await fetch(`/api/doctors/${id}`);
+        const response = await api.get("/doctors", {
+          params: {
+            limit: 20,
+            offset: 0,
+            sort: "recommended",
+          },
+        });
 
-        if (!response.ok) {
+        const doctorFromApi = response.data.find(
+          (item) => String(item.id) === String(id)
+        );
+
+        if (!doctorFromApi) {
           throw new Error("Doctor not found");
         }
 
-        const data = await response.json();
-        setDoctor(data);
+        const nextAvailable = doctorFromApi.next_available;
+const formattedDoctor = {
+  id: doctorFromApi.id,
+  clinicId: doctorFromApi.clinic?.id || nextAvailable?.clinic_id || null,
+  appointmentDate: nextAvailable?.appointment_date || "",
+  startTime: nextAvailable?.start_time || "",
+
+  name: doctorFromApi.full_name,
+  specialty: doctorFromApi.specialty?.name || "Medical Specialist",
+  clinic: doctorFromApi.clinic?.name || "Medical Center",
+  location: doctorFromApi.clinic?.city || "",
+  fee: doctorFromApi.consultation_fee ?? 0,
+  rating: doctorFromApi.rating_avg,
+  reviews: doctorFromApi.reviews_count ?? 0,
+  experience: doctorFromApi.years_of_experience ?? 0,
+  degree: doctorFromApi.title || "",
+  image: doctorFromApi.photo_url || "",
+  gender: doctorFromApi.gender || "",
+  about: doctorFromApi.bio || "",
+  time: nextAvailable?.start_time || "",
+  availability: nextAvailable?.appointment_date || "Unavailable",
+  clinicAddress: doctorFromApi.clinic?.address || "",
+  verified: doctorFromApi.is_verified ?? false,
+  languages: [],
+  focusAreas: [],
+  education: [],
+  availableDays: [],
+  availableSlots: [],
+};
+
+        setDoctor(formattedDoctor);
       } catch (err) {
-        setError("Unable to load doctor profile.");
+        setError(
+          err.response?.data?.detail ||
+          "Unable to load doctor profile."
+        );
       } finally {
         setLoading(false);
       }
@@ -61,6 +107,7 @@ export default function DoctorProfile() {
 
     fetchDoctor();
   }, [id, passedDoctor]);
+
 
   // Loading
   if (loading) {
@@ -111,7 +158,7 @@ export default function DoctorProfile() {
 
     fee: doctor.fee || doctor.consultationFee || 0,
 
-    rating: doctor.rating || 0,
+  rating: doctor.rating ?? 0,
     reviews: doctor.reviews || doctor.reviewCount || 0,
 
     experience: doctor.experience || 0,
@@ -156,14 +203,22 @@ export default function DoctorProfile() {
       doctor.location ||
       "",
 
-    verified: doctor.verified ?? true,
+    verified: doctor.verified ?? false,
   };
 
   // Book appointment
 
 const handleBookAppointment = () => {
   navigate(`/doctors/doctor_profile/${doctor.id}/book-appointment`, {
-    state: { doctor },
+    state: {
+      doctor: {
+        ...doctor,
+        clinicId: doctor.clinicId,
+        appointmentDate: doctor.appointmentDate,
+        startTime: doctor.startTime,
+        fee: doctor.fee,
+      },
+    },
   });
 };
 

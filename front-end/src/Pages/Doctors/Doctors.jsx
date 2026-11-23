@@ -1,6 +1,7 @@
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import api from "../../api";
 import {
   Home,
   ChevronRight,
@@ -135,6 +136,7 @@ const specialties = [
 ];
 
 const locations = [
+    "Qena",
   "New Cairo",
   "Maadi",
   "Zamalek",
@@ -145,6 +147,97 @@ const locations = [
 
 export default function Doctors() {
   const navigate = useNavigate();
+
+  // API Data
+  const [doctorsData, setDoctorsData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        setLoading(true);
+        setApiError("");
+
+        const response = await api.get("/doctors", {
+          params: {
+            limit: 20,
+            offset: 0,
+            sort: "recommended",
+          },
+        });
+
+       
+const formattedDoctors = response.data.map((doctor) => {
+  const nextAvailable = doctor.next_available;
+  const appointmentDate = nextAvailable?.appointment_date;
+
+  let doctorAvailability = "This Week";
+
+  if (appointmentDate) {
+    const today = new Date();
+    const appointment = new Date(`${appointmentDate}T00:00:00`);
+
+    const todayDate = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+
+    const difference = Math.round(
+      (appointment - todayDate) / (1000 * 60 * 60 * 24)
+    );
+
+    if (difference === 0) {
+      doctorAvailability = "Today";
+    } else if (difference === 1) {
+      doctorAvailability = "Tomorrow";
+    } else if (difference < 0 || difference > 7) {
+      doctorAvailability = "Unavailable";
+    }
+  } else {
+    doctorAvailability = "Unavailable";
+  }
+
+  return {
+    id: doctor.id,
+    name: doctor.full_name,
+    specialty: doctor.specialty?.name || "Specialty not specified",
+    category: doctor.specialty?.name || "",
+    location: doctor.clinic?.city || "Location not specified",
+    clinic: doctor.clinic?.name || "Clinic not specified",
+    degree: doctor.title || "Credentials not provided",
+    experience: doctor.years_of_experience ?? 0,
+    fee: doctor.consultation_fee ?? 0,
+    rating: doctor.rating_avg,
+    reviews: doctor.reviews_count ?? 0,
+    availability: doctorAvailability,
+    time: nextAvailable?.start_time || "Not available",
+    gender: doctor.gender || "",
+    image: doctor.photo_url || "",
+
+    clinicId: doctor.clinic?.id || nextAvailable?.clinic_id || null,
+    appointmentDate: nextAvailable?.appointment_date || "",
+    startTime: nextAvailable?.start_time || "",
+  };
+});
+
+
+        setDoctorsData(formattedDoctors);
+
+      } catch (err) {
+        setApiError(
+          err.response?.data?.detail ||
+          "Failed to load doctors. Please try again."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDoctors();
+  }, []);
+
   // Search
   const [keyword, setKeyword] = useState("");
   const [location, setLocation] = useState("All Locations");
@@ -236,7 +329,7 @@ export default function Doctors() {
   // Sorting
   const sortedDoctors = [...filteredDoctors].sort((a, b) => {
     if (sortBy === "Highest Rated") {
-      return b.rating - a.rating;
+      return (b.rating ?? 0) - (a.rating ?? 0);
     }
 
     if (sortBy === "Lowest Fee") {
@@ -247,7 +340,7 @@ export default function Doctors() {
       return b.experience - a.experience;
     }
 
-    return b.rating - a.rating;
+    return (b.rating ?? 0) - (a.rating ?? 0);
   });
 
   return (
@@ -539,7 +632,8 @@ export default function Doctors() {
                   >
                     {item}
                   </button>
-                ))}
+                )
+                )}
               </div>
             </div>
           </aside>
@@ -590,14 +684,18 @@ export default function Doctors() {
             {/* Doctor Cards */}
             <div className="doctors-list">
 
-              {sortedDoctors.length > 0 ? (
+              {loading ? (
+                <p>Loading doctors...</p>
+              ) : apiError ? (
+                <p role="alert">{apiError}</p>
+              ) : sortedDoctors.length > 0 ? (
                 sortedDoctors.map((doctor) => (
                   <article className="doctor-card" key={doctor.id}>
 
                     {/* Doctor Image */}
                     <div className="doctor-image-wrapper">
                       <img
-                        src={doctor.image}
+                        src={doctor.image || undefined}
                         alt={doctor.name}
                         className="doctor-image"
                         onError={(e) => {
@@ -629,9 +727,15 @@ export default function Doctors() {
                         </div>
 
                         <div className="doctor-rating">
-                          <Star size={12} fill="currentColor" />
-                          <strong>{doctor.rating}</strong>
-                          <span>({doctor.reviews})</span>
+                          {doctor.rating != null ? (
+                            <>
+                              <Star size={12} fill="currentColor" />
+                              <strong>{doctor.rating}</strong>
+                              <span>({doctor.reviews})</span>
+                            </>
+                          ) : (
+                            <span>No ratings yet</span>
+                          )}
                         </div>
                       </div>
 
@@ -686,36 +790,35 @@ export default function Doctors() {
                       </div>
 
                       {/* Card Actions */}
-                <div className="doctor-card-actions">
+                      <div className="doctor-card-actions">
 
-  {/* View Doctor Profile */}
- <button
-  type="button"
-  className="view-profile-btn"
-  onClick={() =>
-    navigate(`/doctors/doctor_profile/${doctor.id}`, {
-      state: { doctor },
-    })
-  }
->
-  View Profile
-</button>
+                        {/* View Doctor Profile */}
+                        <button
+                          type="button"
+                          className="view-profile-btn"
+                          onClick={() =>
+                            navigate(`/doctors/doctor_profile/${doctor.id}`, {
+                              state: { doctor },
+                            })
+                          }
+                        >
+                          View Profile
+                        </button>
 
-  {/* Book Appointment */}
- 
-<button
-  type="button"
-  className="book-appointment-btn"
-  onClick={() =>
-    navigate(`/doctors/doctor_profile/${doctor.id}/book-appointment`, {
-      state: { doctor },
-    })
-  }
->
-  Book Appointment
-</button>
+                        {/* Book Appointment */}
+                        <button
+                          type="button"
+                          className="book-appointment-btn"
+                          onClick={() =>
+                            navigate(`/doctors/doctor_profile/${doctor.id}/book-appointment`, {
+                              state: { doctor },
+                            })
+                          }
+                        >
+                          Book Appointment
+                        </button>
 
-</div>
+                      </div>
 
                     </div>
                   </article>

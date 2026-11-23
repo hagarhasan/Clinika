@@ -1,4 +1,6 @@
 import { Helmet } from 'react-helmet-async';
+import { useState } from 'react';
+import api from '../../api';
 import { 
   ShieldAlert, 
   User, 
@@ -16,6 +18,53 @@ import './Contact.css';
 import contactus from '../../assets/images/contact.png';
 
 export default function Contact() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [subject, setSubject] = useState("General Inquiry");
+  const [message, setMessage] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    setLoading(true);
+    setSuccess("");
+    setError("");
+
+    try {
+      const response = await api.post("/contact", {
+        name,
+        email,
+        subject,
+        message,
+      });
+
+      setSuccess(
+        response.data?.message ||
+        "Thanks! We received your message and will get back to you soon."
+      );
+
+      setName("");
+      setEmail("");
+      setSubject("General Inquiry");
+      setMessage("");
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+
+      setError(
+        typeof detail === "string"
+          ? detail
+          : err.response?.data?.message ||
+            "Failed to send your message. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <Helmet>
@@ -72,12 +121,18 @@ export default function Contact() {
                 </div>
               </div>
 
-              <form onSubmit={(e) => e.preventDefault()}>
+         <form onSubmit={handleSubmit}>
                 <div className="input-group">
                   <label>FULL NAME *</label>
                   <div className="input-with-icon">
                     <User size={16} className="field-icon" />
-                    <input type="text" placeholder="e.g. Sarah Jenkins" required />
+                    <input
+  type="text"
+  placeholder="e.g. Sarah Jenkins"
+  value={name}
+  onChange={(e) => setName(e.target.value)}
+  required
+/>
                   </div>
                 </div>
 
@@ -85,7 +140,13 @@ export default function Contact() {
                   <label>EMAIL ADDRESS *</label>
                   <div className="input-with-icon">
                     <Mail size={16} className="field-icon" />
-                    <input type="email" placeholder="e.g. sarah.j@example.com" required />
+                    <input
+  type="email"
+  placeholder="e.g. sarah.j@example.com"
+  value={email}
+  onChange={(e) => setEmail(e.target.value)}
+  required
+/>
                   </div>
                 </div>
 
@@ -93,24 +154,49 @@ export default function Contact() {
                   <label>SUBJECT *</label>
                   <div className="select-with-icons">
                     <AlignLeft size={16} className="field-icon" />
-                    <select defaultValue="General Inquiry">
-                      <option value="General Inquiry">General Inquiry</option>
-                      <option value="Technical Support">Technical Support</option>
-                      <option value="Billing">Billing & Payments</option>
-                    </select>
+                   <select
+  value={subject}
+  onChange={(e) => setSubject(e.target.value)}
+  required
+>
+  <option value="General Inquiry">General Inquiry</option>
+  <option value="Technical Support">Technical Support</option>
+  <option value="Billing">Billing & Payments</option>
+</select>
                     <ChevronDown size={14} className="select-arrow-icon" />
                   </div>
                 </div>
 
                 <div className="input-group">
                   <label>YOUR MESSAGE *</label>
-                  <textarea rows="4" placeholder="How can our team help you today?" required></textarea>
+                  <textarea
+  rows="4"
+  placeholder="How can our team help you today?"
+  value={message}
+  onChange={(e) => setMessage(e.target.value)}
+  required
+></textarea>
                 </div>
 
-                <button type="submit" className="send-message-btn">
-                  Send Message <Send size={15} />
-                </button>
+               <button
+  type="submit"
+  className="send-message-btn"
+  disabled={loading}
+>
+  {loading ? "Sending..." : "Send Message"}
+  <Send size={15} />
+</button>
+{success && (
+  <p className="contact-success" role="status">
+    {success}
+  </p>
+)}
 
+{error && (
+  <p className="contact-error" role="alert">
+    {error}
+  </p>
+)}
                 <div className="form-security-note">
                   <Lock size={12} style={{ display: 'inline', marginRight: '4px' }} />
                   <span>Encrypted & confidential • We protect your personal health information.</span>

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useParams, useLocation } from "react-router-dom";
-
+import api from "../../api";
 import {
   Home,
   ShieldCheck,
@@ -20,23 +20,6 @@ import {
 } from "lucide-react";
 
 import "./Doctors.css";
-
-const dates = [
-  { day: "TUE", number: "20", month: "May", status: "Available" },
-  { day: "WED", number: "21", month: "May", status: "Selected" },
-  { day: "THU", number: "22", month: "May", status: "Available" },
-  { day: "SAT", number: "24", month: "May", status: "2 Left" },
-  { day: "MON", number: "26", month: "May", status: "Full", disabled: true },
-];
-
-const timeSlots = [
-  "09:30 AM",
-  "10:30 AM",
-  "02:30 PM",
-  "03:15 PM",
-  "04:00 PM",
-  "04:45 PM",
-];
 
 export default function BookAppointment() {
   const { id } = useParams();
@@ -62,30 +45,76 @@ export default function BookAppointment() {
   const doctorLocation =
     doctor?.location || "Location unavailable";
 
-  const doctorPrice = doctor?.price ?? 0;
+  const doctorPrice = doctor?.fee ?? doctor?.consultationFee ?? 0;
 
   const [modality, setModality] = useState("in-person");
-  const [selectedDate, setSelectedDate] = useState("21");
-  const [selectedTime, setSelectedTime] = useState("02:30 PM");
+
   const [confirmed, setConfirmed] = useState(false);
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState("");
+ const appointmentDate = doctor?.appointmentDate || "";
+const appointmentTime = doctor?.startTime || "";
 
-  const selectedDateObject = dates.find(
-    (date) => date.number === selectedDate
-  );
+const formattedDate = appointmentDate
+  ? new Date(`${appointmentDate}T00:00:00`).toLocaleDateString("en-US", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
+  : "No date available";
 
-  const handleConfirm = () => {
-    if (!selectedDate || !selectedTime) {
-      alert("Please select a date and time slot.");
-      return;
-    }
+const formattedMonth = appointmentDate
+  ? new Date(`${appointmentDate}T00:00:00`).toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric",
+    })
+  : "Availability unavailable";
 
-    if (!doctor) {
-      alert("Doctor information is unavailable. Please return to the doctor's profile.");
-      return;
-    }
+const formattedTime = appointmentTime
+  ? new Date(`2000-01-01T${appointmentTime}`).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+  : "No time available";
+ const handleConfirm = async () => {
+  setError("");
+  setConfirmed(false);
+
+  if (!doctor) {
+    setError("Doctor information is unavailable.");
+    return;
+  }
+
+  if (!doctor.appointmentDate || !doctor.startTime || !doctor.clinicId) {
+    setError("Appointment availability information is missing.");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    await api.post("/appointments", {
+      doctor_id: Number(doctor.id),
+      appointment_date: doctor.appointmentDate,
+      start_time: doctor.startTime,
+      reason: "General consultation",
+      consultation_type: modality === "in-person" ? "in_person" : "video",
+      clinic_id: Number(doctor.clinicId),
+    });
 
     setConfirmed(true);
-  };
+  } catch (err) {
+    setError(
+      err.response?.data?.detail ||
+      err.response?.data?.message ||
+      "Unable to book appointment. Please try again."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <>
@@ -304,49 +333,43 @@ export default function BookAppointment() {
                 </h3>
 
                 <span className="booking-month">
-                  <CalendarDays size={13} />
-                  May 2025
-                </span>
+  <CalendarDays size={13} />
+  {formattedMonth}
+</span>
 
               </div>
 
-              <div className="date-options">
+            <div className="date-options">
+  <button
+    type="button"
+    className="date-card selected"
+    disabled={!appointmentDate}
+  >
+    <span className="date-day">
+      {appointmentDate
+        ? formattedDate.split(",")[0].slice(0, 3).toUpperCase()
+        : "--"}
+    </span>
 
-                {dates.map((date) => (
-                  <button
-                    type="button"
-                    key={date.number}
-                    disabled={date.disabled}
-                    onClick={() => {
-                      setSelectedDate(date.number);
-                      setConfirmed(false);
-                    }}
-                    className={`date-card ${
-                      selectedDate === date.number ? "selected" : ""
-                    } ${date.disabled ? "disabled" : ""}`}
-                  >
-                    <span className="date-day">
-                      {date.day}
-                    </span>
+    <strong>
+      {appointmentDate
+        ? new Date(`${appointmentDate}T00:00:00`).getDate()
+        : "--"}
+    </strong>
 
-                    <strong>
-                      {date.number}
-                    </strong>
+    <span className="date-month">
+      {appointmentDate
+        ? new Date(`${appointmentDate}T00:00:00`).toLocaleDateString("en-US", {
+            month: "short",
+          })
+        : "--"}
+    </span>
 
-                    <span className="date-month">
-                      {date.month}
-                    </span>
-
-                    <span className="date-status">
-                      {selectedDate === date.number
-                        ? "Selected"
-                        : date.status}
-                    </span>
-
-                  </button>
-                ))}
-
-              </div>
+    <span className="date-status">
+      {appointmentDate ? "Available" : "Unavailable"}
+    </span>
+  </button>
+</div>
             </section>
 
             {/* Select Time */}
@@ -359,46 +382,23 @@ export default function BookAppointment() {
                   Select Time Slot
                 </h3>
 
-                <span className="available-slots">
-                  <span></span>
-                  4 slots remaining for Wednesday, May {selectedDate}
-                </span>
-
+               <span className="available-slots">
+  <span></span>
+  {appointmentTime ? "Next available appointment" : "No available slots"}
+</span>
               </div>
 
               <div className="time-options">
-
-                {timeSlots.map((time) => {
-                  const unavailable = time === "04:00 PM";
-
-                  return (
-                    <button
-                      type="button"
-                      key={time}
-                      disabled={unavailable}
-                      onClick={() => {
-                        setSelectedTime(time);
-                        setConfirmed(false);
-                      }}
-                      className={`time-card ${
-                        selectedTime === time ? "selected" : ""
-                      } ${unavailable ? "unavailable" : ""}`}
-                    >
-                      <Clock size={13} />
-
-                      <span>{time}</span>
-
-                      {selectedTime === time ? (
-                        <Check size={14} />
-                      ) : (
-                        <span className="time-dot"></span>
-                      )}
-
-                    </button>
-                  );
-                })}
-
-              </div>
+  <button
+    type="button"
+    className="time-card selected"
+    disabled={!appointmentTime}
+  >
+    <Clock size={13} />
+    <span>{formattedTime}</span>
+    <Check size={14} />
+  </button>
+</div>
             </section>
 
           </div>
@@ -440,28 +440,15 @@ export default function BookAppointment() {
                     : "Video Consultation"}
                 </strong>
               </div>
+<div className="summary-row">
+  <span>Date:</span>
+  <strong>{formattedDate}</strong>
+</div>
 
-              <div className="summary-row">
-                <span>Date:</span>
-
-                <strong>
-                  {selectedDateObject?.day === "WED"
-                    ? "Wednesday"
-                    : selectedDateObject?.day === "TUE"
-                    ? "Tuesday"
-                    : selectedDateObject?.day === "THU"
-                    ? "Thursday"
-                    : selectedDateObject?.day === "SAT"
-                    ? "Saturday"
-                    : "Monday"}
-                  , May {selectedDate}, 2025
-                </strong>
-              </div>
-
-              <div className="summary-row">
-                <span>Time Slot:</span>
-                <strong>{selectedTime} (30 min)</strong>
-              </div>
+             <div className="summary-row">
+  <span>Time Slot:</span>
+  <strong>{formattedTime} (30 min)</strong>
+</div>
 
               <div className="summary-divider"></div>
 
@@ -499,23 +486,24 @@ export default function BookAppointment() {
               </div>
 
             </div>
-
-            <button
-              type="button"
-              className="confirm-booking-btn"
-              onClick={handleConfirm}
-              disabled={!doctor}
-            >
-              Confirm Appointment
-              <ArrowRight size={16} />
-            </button>
-
+<button
+  type="button"
+  className="confirm-booking-btn"
+  onClick={handleConfirm}
+  disabled={!doctor || loading}
+>
+  {loading ? "Booking..." : "Confirm Appointment"}
+  <ArrowRight size={16} />
+</button>
+{error && (
+  <p className="booking-error" role="alert">
+    {error}
+  </p>
+)}
             {confirmed && (
               <div className="booking-success">
                 <CheckCircle2 size={17} />
-
-                Your selections are ready. Booking confirmation
-                requires backend integration.
+Appointment booked successfully!
               </div>
             )}
 

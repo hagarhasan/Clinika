@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
+import api from "../../api";
 import {
   Stethoscope,
   BadgeCheck,
@@ -22,6 +23,8 @@ ArrowRight,
 import "./Login.css";
 
 export default function Login() {
+  const [loading, setLoading] = useState(false);
+const [error, setError] = useState("");
   const [role, setRole] = useState("patient");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -30,15 +33,45 @@ export default function Login() {
 
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
-    e.preventDefault();
+ const handleLogin = async (e) => {
+  e.preventDefault();
 
-    if (role === "patient") {
-      navigate("/patient-dashboard");
-    } else {
-      navigate("/doctor-dashboard");
+  setLoading(true);
+  setError("");
+
+  try {
+    const response = await api.post("/auth/login", {
+  email,
+  password,
+  remember_me: rememberMe,
+});
+
+    const token = response.data.access_token;
+
+    if (!token) {
+      throw new Error("Login succeeded but no access token was returned.");
     }
-  };
+
+   localStorage.setItem("token", token);
+localStorage.setItem("role", role);
+
+navigate(
+  role === "patient"
+    ? "/patient-dashboard"
+    : role === "doctor"
+    ? "/doctor-dashboard"
+    : "/admin-dashboard"
+);
+  } catch (err) {
+    setError(
+      err.response?.data?.detail ||
+      err.response?.data?.message ||
+      "Login failed. Please check your email and password."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDemo = (selectedRole) => {
     setRole(selectedRole);
@@ -323,15 +356,20 @@ export default function Login() {
 
               {/* BUTTON */}
               <button
-                type="submit"
-                className="clinika-submit-button"
-              >
-                <span>Sign In to Clinika</span>
-                <ArrowRight size={17} />
-              </button>
+  type="submit"
+  className="clinika-submit-button"
+  disabled={loading}
+>
+  <span>{loading ? "Signing In..." : "Sign In to Clinika"}</span>
+  <ArrowRight size={17} />
+</button>
 
             </form>
-
+{error && (
+  <p className="login-error" role="alert">
+    {error}
+  </p>
+)}
             {/* DEMO */}
             <div className="clinika-demo-section">
 

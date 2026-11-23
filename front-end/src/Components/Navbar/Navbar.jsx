@@ -22,7 +22,14 @@ const Navbar = () => {
   const closeMenu = () => {
     setMenuOpen(false);
   };
+const getDashboardPath = () => {
+  const role = localStorage.getItem("role");
 
+  if (role === "doctor") return "/doctor-dashboard";
+  if (role === "admin") return "/admin-dashboard";
+
+  return "/patient-dashboard";
+};
   return (
     <header className={`clinika-navbar ${scrolled ? "scrolled" : ""}`}>
       <div className="navbar-container">
@@ -116,14 +123,12 @@ const Navbar = () => {
               Book Appointment
             </NavLink>
 
-            <NavLink
-              to="/patient-dashboard"
-              className={({ isActive }) =>
-                `profile-btn ${isActive ? "active" : ""}`
-              }
-              aria-label="User Profile"
-              onClick={closeMenu}
-            >
+            <Link
+  to={getDashboardPath()}
+  className="profile-btn"
+  aria-label="User Profile"
+  onClick={closeMenu}
+>
               <svg
                 className="profile-icon"
                 xmlns="http://www.w3.org/2000/svg"
@@ -141,7 +146,7 @@ const Navbar = () => {
               </svg>
 
               <span className="profile-text">My Profile</span>
-            </NavLink>
+         </Link>
 
           </div>
         </div>
