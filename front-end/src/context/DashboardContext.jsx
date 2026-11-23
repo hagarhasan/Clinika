@@ -35,13 +35,17 @@ const readDashboardCache = () => {
 const writeDashboardCache = (payload) => {
   try {
     sessionStorage.setItem(CACHE_KEY, JSON.stringify(payload));
-  } catch {}
+  } catch {
+       // ignore: sessionStorage may be unavailable or full
+  }
 };
 
 const clearDashboardCache = () => {
   try {
     sessionStorage.removeItem(CACHE_KEY);
-  } catch {}
+  } catch {
+        // ignore: sessionStorage may be unavailable
+  }
 };
 
 const hasMeaningfulCache = (cache) => {
