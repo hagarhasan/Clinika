@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useDashboard } from "../../context/DashboardContext";
 
 const API_BASE_URL = "https://clinika-backend.vercel.app";
 
@@ -42,9 +43,11 @@ const INITIAL_ADMIN = {
 
 export default function AdminProfile() {
   const navigate = useNavigate();
-
+  const { getToken, activities } = useDashboard();
   const [adminData, setAdminData] = useState(INITIAL_ADMIN);
   const [savedData, setSavedData] = useState(INITIAL_ADMIN);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -64,9 +67,6 @@ export default function AdminProfile() {
     confirm: false,
   });
 
-  const getToken = () =>
-    localStorage.getItem("token") || localStorage.getItem("access_token") || "";
-
   const notify = useCallback((type, text) => {
     setBanner({ type, text });
     setTimeout(() => {
@@ -74,95 +74,87 @@ export default function AdminProfile() {
     }, 4500);
   }, []);
 
-  const fetchAdminLogs = useCallback(
-    async () => {
-      const token = getToken();
-      if (!token) {
-      
-          setLoadingLogs(false);
-          navigate("/login", { replace: true });
-        
+  const fetchAdminLogs = useCallback(async () => {
+    const token = getToken();
+    if (!token) {
+      setLoadingLogs(false);
+      navigate("/login", { replace: true });
+      return;
+    }
+
+    setLoadingLogs(true);
+    if (Array.isArray(activities) && activities.length > 0) {
+      setLogs(
+        activities.map((row, idx) => ({
+          id: row.id ?? row._id ?? idx + 1,
+          title: row.action || row.title || row.event || "Activity log",
+          time: row.time || row.created_at || row.timestamp || "",
+          actor: row.actor || row.admin_name || row.user || "",
+          note: row.detail || row.details || "",
+        }))
+      );
+    }
+    const headers = { Authorization: `Bearer ${token}` };
+
+    try {
+      const res = await axios.get(`${API_BASE_URL}/admin/audit-logs`, {
+        headers,
+        timeout: 6000,
+      });
+      const list = Array.isArray(res.data)
+        ? res.data
+        : res.data?.data || res.data?.logs || res.data?.items || [];
+
+      setLogs(
+        Array.isArray(list)
+          ? list.map((row, idx) => ({
+              id: row.id ?? row._id ?? idx + 1,
+              title:
+                row.action ||
+                row.title ||
+                row.event ||
+                row.description ||
+                "Administrative action",
+              time: row.time || row.created_at || row.timestamp || "",
+              actor: row.actor || row.admin_name || row.user || "",
+              note: row.detail || row.details || "",
+            }))
+          : []
+      );
+    } catch (err) {
+      if (err?.response?.status === 401 || err?.response?.status === 403) {
+        setLogs([]);
+        notify("error", "You are not authorized to view admin audit logs.");
         return;
       }
 
-      
-        setLoadingLogs(true);
-      
-
-      const headers = { Authorization: `Bearer ${token}` };
-
       try {
-        const res = await axios.get(`${API_BASE_URL}/admin/audit-logs`, {
+        const fallbackRes = await axios.get(`${API_BASE_URL}/admin/activity`, {
           headers,
-          timeout: 6000,
+          timeout: 5000,
         });
-        const list = Array.isArray(res.data)
-          ? res.data
-          : res.data?.data || res.data?.logs || res.data?.items || [];
+        const actList = Array.isArray(fallbackRes.data)
+          ? fallbackRes.data
+          : fallbackRes.data?.data || fallbackRes.data?.items || [];
 
-       
-          setLogs(
-            Array.isArray(list)
-              ? list.map((row, idx) => ({
-                  id: row.id ?? row._id ?? idx + 1,
-                  title:
-                    row.action ||
-                    row.title ||
-                    row.event ||
-                    row.description ||
-                    "Administrative action",
-                  time: row.time || row.created_at || row.timestamp || "",
-                  actor: row.actor || row.admin_name || row.user || "",
-                  note: row.detail || row.details || "",
-                }))
-              : []
-          );
-        
-      } catch (err) {
-        if (err?.response?.status === 401 || err?.response?.status === 403) {
-          
-            setLogs([]);
-            notify("error", "You are not authorized to view admin audit logs.");
-          
-          return;
-        }
-
-        try {
-          const fallbackRes = await axios.get(`${API_BASE_URL}/admin/activity`, {
-            headers,
-            timeout: 5000,
-          });
-          const actList = Array.isArray(fallbackRes.data)
-            ? fallbackRes.data
-            : fallbackRes.data?.data || fallbackRes.data?.items || [];
-
-          
-            setLogs(
-              Array.isArray(actList)
-                ? actList.map((row, idx) => ({
-                    id: row.id ?? row._id ?? idx + 1,
-                    title: row.action || row.title || row.event || "Activity log",
-                    time: row.time || row.created_at || "",
-                    actor: row.actor || "",
-                    note: row.detail || "",
-                  }))
-                : []
-            );
-          
-        } catch {
-          
-            setLogs([]);
-          
-        }
-      } finally {
-        
-          setLoadingLogs(false);
-        
+        setLogs(
+          Array.isArray(actList)
+            ? actList.map((row, idx) => ({
+                id: row.id ?? row._id ?? idx + 1,
+                title: row.action || row.title || row.event || "Activity log",
+                time: row.time || row.created_at || "",
+                actor: row.actor || "",
+                note: row.detail || "",
+              }))
+            : []
+        );
+      } catch {
+        setLogs([]);
       }
-    },
-    [navigate, notify]
-  );
-
+    } finally {
+      setLoadingLogs(false);
+    }
+  }, [getToken, navigate, notify, activities]);
   useEffect(() => {
     let isActive = true;
 
@@ -196,6 +188,7 @@ export default function AdminProfile() {
               fullName: profile.full_name ?? profile.fullName ?? profile.name ?? "",
               email: profile.email ?? "",
               phone: profile.phone ?? "",
+              adminId: profile.admin_id ?? profile.id ?? profile._id ?? "",
             };
             setAdminData((prev) => ({ ...prev, ...nextProfile }));
             setSavedData((prev) => ({ ...prev, ...nextProfile }));
@@ -217,8 +210,10 @@ export default function AdminProfile() {
     return () => {
       isActive = false;
     };
-  }, [fetchAdminLogs]);
+  }, [getToken, fetchAdminLogs]);
+
   const handleField = (key, value) => {
+    if (key === "email" || !isEditingProfile) return;
     setAdminData((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -231,19 +226,51 @@ export default function AdminProfile() {
     }));
   };
 
+  const handleStartProfileEdit = () => {
+    setIsEditingProfile(true);
+  };
+
+  const handleCancelProfileEdit = () => {
+    setAdminData((prev) => ({
+      ...prev,
+      fullName: savedData.fullName,
+      phone: savedData.phone,
+    }));
+    setIsEditingProfile(false);
+    notify("info", "Profile edits cancelled.");
+  };
+
   const handleDiscard = () => {
     setAdminData(savedData);
+    setIsEditingProfile(false);
     setPassForm({
       currentPassword: "",
       newPassword: "",
       confirmPassword: "",
     });
+    setIsEditingPassword(false);
     notify("info", "Unsaved changes discarded.");
   };
 
   const handleSaveProfile = async () => {
-    if (!adminData.fullName.trim() || !adminData.email.trim()) {
-      notify("error", "Full Name and Admin Email Address are required.");
+    if (!isEditingProfile) {
+      notify("info", "Click Edit first to modify profile information.");
+      return;
+    }
+
+    const trimmedName = adminData.fullName.trim();
+    const trimmedPhone = adminData.phone.trim();
+
+    if (!trimmedName) {
+      notify("error", "Full Name is required.");
+      return;
+    }
+
+    if (
+      trimmedName === savedData.fullName.trim() &&
+      trimmedPhone === savedData.phone.trim()
+    ) {
+      notify("info", "No changes made to save.");
       return;
     }
 
@@ -255,25 +282,42 @@ export default function AdminProfile() {
 
     setSaving(true);
     try {
-      await axios.patch(
-        `${API_BASE_URL}/admin/profile`,
-        {
-          full_name: adminData.fullName.trim(),
-          email: adminData.email.trim(),
-          phone: adminData.phone.trim(),
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 6000,
-        }
-      );
+      const payload = {
+        full_name: trimmedName,
+        phone: trimmedPhone,
+      };
 
-      setSavedData(adminData);
+      const res = await axios.patch(`${API_BASE_URL}/admin/profile`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 6000,
+      });
+
+      const updatedFromServer =
+        res?.data?.data || res?.data?.user || res?.data?.admin || res?.data;
+
+      const updatedProfile = {
+        ...adminData,
+        fullName:
+          updatedFromServer?.full_name ??
+          updatedFromServer?.fullName ??
+          updatedFromServer?.name ??
+          trimmedName,
+        phone: updatedFromServer?.phone ?? trimmedPhone,
+        email: savedData.email || adminData.email,
+      };
+
+      setAdminData(updatedProfile);
+      setSavedData(updatedProfile);
+      setIsEditingProfile(false);
       notify("success", "Profile information saved.");
       await fetchAdminLogs();
     } catch (err) {
       console.error("Error saving profile:", err);
-      notify("error", "Failed to save profile information on server.");
+      const serverMsg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to save profile information on server.";
+      notify("error", typeof serverMsg === "string" ? serverMsg : "Failed to save profile information on server.");
     } finally {
       setSaving(false);
     }
@@ -289,8 +333,27 @@ export default function AdminProfile() {
       passForm.newPassword === passForm.confirmPassword,
   };
 
+  const handleStartPasswordEdit = () => {
+    setIsEditingPassword(true);
+  };
+
+  const handleCancelPasswordEdit = () => {
+    setPassForm({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
+    setIsEditingPassword(false);
+    notify("info", "Password change cancelled.");
+  };
+
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
+    if (!isEditingPassword) {
+      notify("info", "Click Edit Password first to update your password.");
+      return;
+    }
+
     if (!passForm.currentPassword) {
       notify("error", "Please enter your current password.");
       return;
@@ -332,11 +395,16 @@ export default function AdminProfile() {
         newPassword: "",
         confirmPassword: "",
       });
+      setIsEditingPassword(false);
       notify("success", "Password updated successfully.");
       await fetchAdminLogs();
     } catch (err) {
       console.error("Error updating password:", err);
-      notify("error", "Failed to update password on server.");
+      const serverMsg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to update password on server.";
+      notify("error", typeof serverMsg === "string" ? serverMsg : "Failed to update password on server.");
     } finally {
       setUpdatingPass(false);
     }
@@ -355,66 +423,6 @@ export default function AdminProfile() {
       <Helmet>
         <title>Admin Profile | Clinika</title>
       </Helmet>
-
-      {/* Top Status Strip */}
-      <header
-        style={{
-          backgroundColor: "#FFFFFF",
-          border: "1px solid #E2E8F0",
-          borderRadius: "12px",
-          padding: "12px 20px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "12px",
-          flexWrap: "wrap",
-          marginBottom: "16px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-          <span style={{ fontSize: "14px", fontWeight: 700 }}>
-            Clinika Platform Admin Network
-          </span>
-          <span
-            style={{
-              fontSize: "12px",
-              color: "#16A34A",
-              backgroundColor: "#F0FDF4",
-              padding: "3px 10px",
-              borderRadius: "999px",
-              fontWeight: 500,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            <i className="fa-solid fa-circle" style={{ fontSize: "7px" }} aria-hidden="true" />
-            <span>System Status: Operational / Online</span>
-          </span>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "12px", fontWeight: 700 }}>System Admin</div>
-            <div style={{ fontSize: "11px", color: "#64748B" }}>Platform Administration</div>
-          </div>
-          <div
-            style={{
-              width: "32px",
-              height: "32px",
-              borderRadius: "50%",
-              backgroundColor: "#1B68F6",
-              color: "#FFFFFF",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "13px",
-            }}
-          >
-            <i className="fa-solid fa-user-shield" aria-hidden="true" />
-          </div>
-        </div>
-      </header>
 
       {banner && (
         <div
@@ -526,6 +534,7 @@ export default function AdminProfile() {
           </span>
         </div>
       </div>
+
       {/* Profile Summary Card */}
       <section
         style={{
@@ -694,13 +703,17 @@ export default function AdminProfile() {
                   type="text"
                   placeholder="Administrator Name"
                   value={adminData.fullName}
+                  disabled={!isEditingProfile}
+                  readOnly={!isEditingProfile}
                   onChange={(e) => handleField("fullName", e.target.value)}
                   style={{
                     width: "100%",
                     boxSizing: "border-box",
                     padding: "8px 10px",
                     borderRadius: "8px",
-                    border: "1px solid #CBD5E1",
+                    border: isEditingProfile ? "1px solid #CBD5E1" : "1px solid #E2E8F0",
+                    backgroundColor: isEditingProfile ? "#FFFFFF" : "#F8FAFC",
+                    color: isEditingProfile ? "#0F172A" : "#64748B",
                     fontSize: "13px",
                   }}
                 />
@@ -743,13 +756,18 @@ export default function AdminProfile() {
                   type="email"
                   placeholder="admin@clinika.com"
                   value={adminData.email}
-                  onChange={(e) => handleField("email", e.target.value)}
+                  readOnly
+                  aria-readonly="true"
+                  title="Admin email cannot be changed"
                   style={{
                     width: "100%",
                     boxSizing: "border-box",
                     padding: "8px 10px",
                     borderRadius: "8px",
-                    border: "1px solid #CBD5E1",
+                    border: "1px solid #E2E8F0",
+                    backgroundColor: "#F8FAFC",
+                    color: "#64748B",
+                    cursor: "not-allowed",
                     fontSize: "13px",
                   }}
                 />
@@ -767,13 +785,17 @@ export default function AdminProfile() {
                   type="text"
                   placeholder="+20 100 000 0000"
                   value={adminData.phone}
+                  disabled={!isEditingProfile}
+                  readOnly={!isEditingProfile}
                   onChange={(e) => handleField("phone", e.target.value)}
                   style={{
                     width: "100%",
                     boxSizing: "border-box",
                     padding: "8px 10px",
                     borderRadius: "8px",
-                    border: "1px solid #CBD5E1",
+                    border: isEditingProfile ? "1px solid #CBD5E1" : "1px solid #E2E8F0",
+                    backgroundColor: isEditingProfile ? "#FFFFFF" : "#F8FAFC",
+                    color: isEditingProfile ? "#0F172A" : "#64748B",
                     fontSize: "13px",
                   }}
                 />
@@ -791,13 +813,87 @@ export default function AdminProfile() {
                 color: "#475569",
                 display: "flex",
                 alignItems: "center",
-                gap: "8px",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "10px",
               }}
             >
-              <i className="fa-solid fa-circle-info" style={{ color: "#1B68F6" }} aria-hidden="true" />
-              <span>
-                To update administrative credentials, contact authorization is audited and changes trigger instant dual-factor alerts.
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "1 1 220px" }}>
+                <i className="fa-solid fa-circle-info" style={{ color: "#1B68F6" }} aria-hidden="true" />
+                <span>
+                  To update administrative credentials, contact authorization is audited and changes trigger instant dual-factor alerts.
+                </span>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {!isEditingProfile ? (
+                  <button
+                    type="button"
+                    onClick={handleStartProfileEdit}
+                    style={{
+                      backgroundColor: "#16A34A",
+                      color: "#FFFFFF",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "7px 14px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <i className="fa-solid fa-pen" aria-hidden="true" />
+                    <span>Edit</span>
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={handleSaveProfile}
+                      style={{
+                        backgroundColor: "#16A34A",
+                        color: "#FFFFFF",
+                        border: "none",
+                        borderRadius: "8px",
+                        padding: "7px 14px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        cursor: saving ? "not-allowed" : "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <i className="fa-solid fa-check" aria-hidden="true" />
+                      <span>{saving ? "Saving..." : "Save"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={handleCancelProfileEdit}
+                      style={{
+                        backgroundColor: "#15803D",
+                        color: "#FFFFFF",
+                        border: "none",
+                        borderRadius: "8px",
+                        padding: "7px 14px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        cursor: saving ? "not-allowed" : "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <i className="fa-solid fa-xmark" aria-hidden="true" />
+                      <span>Cancel</span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </section>
           {/* Security & Password Management */}
@@ -830,6 +926,8 @@ export default function AdminProfile() {
                   type={showSecrets.current ? "text" : "password"}
                   placeholder="Enter current passphrase"
                   value={passForm.currentPassword}
+                  disabled={!isEditingPassword}
+                  readOnly={!isEditingPassword}
                   onChange={(e) =>
                     setPassForm((p) => ({
                       ...p,
@@ -840,12 +938,15 @@ export default function AdminProfile() {
                     flex: 1,
                     padding: "8px 10px",
                     borderRadius: "8px",
-                    border: "1px solid #CBD5E1",
+                    border: isEditingPassword ? "1px solid #CBD5E1" : "1px solid #E2E8F0",
+                    backgroundColor: isEditingPassword ? "#FFFFFF" : "#F8FAFC",
+                    color: isEditingPassword ? "#0F172A" : "#64748B",
                     fontSize: "13px",
                   }}
                 />
                 <button
                   type="button"
+                  disabled={!isEditingPassword}
                   onClick={() =>
                     setShowSecrets((s) => ({ ...s, current: !s.current }))
                   }
@@ -855,7 +956,8 @@ export default function AdminProfile() {
                     border: "1px solid #CBD5E1",
                     backgroundColor: "#F8FAFC",
                     fontSize: "12px",
-                    cursor: "pointer",
+                    cursor: isEditingPassword ? "pointer" : "not-allowed",
+                    opacity: isEditingPassword ? 1 : 0.6,
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "6px",
@@ -890,6 +992,8 @@ export default function AdminProfile() {
                   type={showSecrets.newPass ? "text" : "password"}
                   placeholder="Min. 12 characters"
                   value={passForm.newPassword}
+                  disabled={!isEditingPassword}
+                  readOnly={!isEditingPassword}
                   onChange={(e) =>
                     setPassForm((p) => ({
                       ...p,
@@ -901,7 +1005,9 @@ export default function AdminProfile() {
                     boxSizing: "border-box",
                     padding: "8px 10px",
                     borderRadius: "8px",
-                    border: "1px solid #CBD5E1",
+                    border: isEditingPassword ? "1px solid #CBD5E1" : "1px solid #E2E8F0",
+                    backgroundColor: isEditingPassword ? "#FFFFFF" : "#F8FAFC",
+                    color: isEditingPassword ? "#0F172A" : "#64748B",
                     fontSize: "13px",
                   }}
                 />
@@ -919,6 +1025,8 @@ export default function AdminProfile() {
                   type={showSecrets.confirm ? "text" : "password"}
                   placeholder="Re-type new password"
                   value={passForm.confirmPassword}
+                  disabled={!isEditingPassword}
+                  readOnly={!isEditingPassword}
                   onChange={(e) =>
                     setPassForm((p) => ({
                       ...p,
@@ -930,7 +1038,9 @@ export default function AdminProfile() {
                     boxSizing: "border-box",
                     padding: "8px 10px",
                     borderRadius: "8px",
-                    border: "1px solid #CBD5E1",
+                    border: isEditingPassword ? "1px solid #CBD5E1" : "1px solid #E2E8F0",
+                    backgroundColor: isEditingPassword ? "#FFFFFF" : "#F8FAFC",
+                    color: isEditingPassword ? "#0F172A" : "#64748B",
                     fontSize: "13px",
                   }}
                 />
@@ -964,28 +1074,77 @@ export default function AdminProfile() {
               </span>
             </div>
 
-            <button
-              type="submit"
-              disabled={updatingPass}
-              style={{
-                backgroundColor: "#1B68F6",
-                color: "#FFFFFF",
-                border: "none",
-                borderRadius: "8px",
-                padding: "9px 16px",
-                fontSize: "12px",
-                fontWeight: 600,
-                cursor: updatingPass ? "not-allowed" : "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              <i className="fa-solid fa-key" aria-hidden="true" />
-              <span>{updatingPass ? "Updating..." : "Update Password"}</span>
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              {!isEditingPassword ? (
+                <button
+                  type="button"
+                  onClick={handleStartPasswordEdit}
+                  style={{
+                    backgroundColor: "#16A34A",
+                    color: "#FFFFFF",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "9px 16px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <i className="fa-solid fa-key" aria-hidden="true" />
+                  <span>Edit Password</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="submit"
+                    disabled={updatingPass}
+                    style={{
+                      backgroundColor: "#16A34A",
+                      color: "#FFFFFF",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "9px 16px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: updatingPass ? "not-allowed" : "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <i className="fa-solid fa-check" aria-hidden="true" />
+                    <span>{updatingPass ? "Saving..." : "Save"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={updatingPass}
+                    onClick={handleCancelPasswordEdit}
+                    style={{
+                      backgroundColor: "#15803D",
+                      color: "#FFFFFF",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "9px 16px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: updatingPass ? "not-allowed" : "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <i className="fa-solid fa-xmark" aria-hidden="true" />
+                    <span>Cancel</span>
+                  </button>
+                </>
+              )}
+            </div>
           </form>
         </div>
+
         {/* Right Column */}
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <section
@@ -1168,7 +1327,7 @@ export default function AdminProfile() {
           </button>
           <button
             type="button"
-            disabled={saving}
+            disabled={saving || !isEditingProfile}
             onClick={handleSaveProfile}
             style={{
               backgroundColor: "#1B68F6",
@@ -1178,7 +1337,8 @@ export default function AdminProfile() {
               padding: "9px 18px",
               fontSize: "12px",
               fontWeight: 600,
-              cursor: saving ? "not-allowed" : "pointer",
+              cursor: saving || !isEditingProfile ? "not-allowed" : "pointer",
+              opacity: saving || !isEditingProfile ? 0.6 : 1,
             }}
           >
             {saving ? "Saving..." : "Save Profile Information"}

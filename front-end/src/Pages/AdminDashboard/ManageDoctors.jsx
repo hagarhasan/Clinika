@@ -1,24 +1,106 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
+import { useDashboard } from '../../context/DashboardContext';
 
 const API_BASE_URL = 'https://clinika-backend.vercel.app';
+const PAGE_LIMIT = 5;
+
+const normalizeDoctorStatus = (rawStatus) => {
+  const s = String(rawStatus || '').trim().toLowerCase();
+  if (s === 'active' || s === 'approved' || s === 'accepted') return 'Active';
+  if (s === 'pending' || s === 'pending_approval' || s === 'pending approval' || s === 'review') {
+    return 'Pending Approval';
+  }
+  if (s === 'rejected' || s === 'declined') return 'Rejected';
+  if (s === 'inactive' || s === 'suspended' || s === 'disabled') return 'Inactive';
+  return 'Pending Approval';
+};
+
+const getDoctorId = (doc) => {
+  if (!doc || typeof doc !== 'object') return '';
+  return doc.id ?? doc.doctor_id ?? doc._id ?? '';
+};
+
+const getDoctorName = (doc) => {
+  if (!doc || typeof doc !== 'object') return '';
+  return (
+    doc.name ||
+    doc.full_name ||
+    doc.doctor_name ||
+    doc.user?.full_name ||
+    doc.user?.name ||
+    [doc.first_name, doc.last_name].filter(Boolean).join(' ') ||
+    ''
+  );
+};
+
+const getDoctorNpi = (doc) => {
+  if (!doc || typeof doc !== 'object') return '';
+  return (
+    doc.npi ||
+    doc.npi_number ||
+    doc.license_number ||
+    doc.license ||
+    doc.medical_license ||
+    ''
+  );
+};
+
+const getDoctorExperience = (doc) => {
+  if (!doc || typeof doc !== 'object') return '';
+  const exp =
+    doc.experience ??
+    doc.years_of_experience ??
+    doc.experience_years ??
+    doc.yearsOfExperience ??
+    '';
+  if (exp === '' || exp === null || exp === undefined) return '';
+  return typeof exp === 'number' ? `${exp} years` : String(exp);
+};
+
+const getDoctorSpecialty = (doc) => {
+  if (!doc || typeof doc !== 'object') return '';
+  const spec = doc.specialty ?? doc.specialization ?? '';
+  if (typeof spec === 'object' && spec !== null) {
+    return spec.name || spec.title || '';
+  }
+  return String(spec || '');
+};
+
+const getDoctorEmail = (doc) => {
+  if (!doc || typeof doc !== 'object') return '';
+  return doc.email || doc.contact_email || doc.user?.email || '';
+};
 
 export default function ManageDoctors() {
   const navigate = useNavigate();
 
-  const [doctors, setDoctors] = useState([]);
+  const {
+    doctors: contextDoctors,
+    setDoctors: setContextDoctors,
+    loading: contextLoading,
+    errorMsg: contextErrorMsg,
+    getToken,
+    refreshDashboard,
+  } = useDashboard();
+
+  const [doctorsList, setDoctorsList] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [tableLoading, setTableLoading] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
-  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+
   const [submitting, setSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [localErrorMsg, setLocalErrorMsg] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
-  const [editStatus, setEditStatus] = useState('Active');
+  const [editStatus, setEditStatus] = useState('Pending Approval');
 
   const [newDoctor, setNewDoctor] = useState({
     name: '',
@@ -29,127 +111,159 @@ export default function ManageDoctors() {
     status: 'Pending Approval',
   });
 
-  const getToken = () =>
-    localStorage.getItem('token') || localStorage.getItem('access_token');
-
   const getAuthHeaders = useCallback(() => {
     const token = getToken();
     return {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     };
-  }, []);
+  }, [getToken]);
 
-  const loadDoctors = useCallback(
-    async () => {
+  useEffect(() => {
+    if (!getToken()) {
+      navigate('/login', { replace: true });
+    }
+  }, [getToken, navigate]);
+
+  useEffect(() => {
+    if (Array.isArray(contextDoctors) && contextDoctors.length > 0 && doctorsList.length === 0) {
+      setDoctorsList(contextDoctors);
+      setTotalCount((prev) => (prev > 0 ? prev : contextDoctors.length));
+    }
+  }, [contextDoctors, doctorsList.length]);
+
+  const fetchDoctorsPaginated = useCallback(
+    async ({ page = currentPage, status = filterStatus, query = searchQuery } = {}) => {
       const token = getToken();
-      if (!token) {
-        
-          setLoading(false);
-          navigate('/login', { replace: true });
-        
-        return;
-      }
+      if (!token) return;
 
-      
-        setLoading(true);
-        setErrorMsg('');
-      
+      const offset = (page - 1) * PAGE_LIMIT;
+      setTableLoading(true);
+      setLocalErrorMsg('');
 
       try {
-        const res = await fetch(`${API_BASE_URL}/admin/doctors`, {
+        const params = new URLSearchParams();
+        params.set('limit', String(PAGE_LIMIT));
+        params.set('offset', String(offset));
+
+        if (status && status !== 'All') {
+          params.set('status', status);
+        }
+        if (query && query.trim()) {
+          params.set('search', query.trim());
+        }
+
+        const res = await fetch(`${API_BASE_URL}/admin/doctors/?${params.toString()}`, {
           headers: getAuthHeaders(),
         });
 
-        if (res.status === 401 || res.status === 403) {
-          
-            setErrorMsg('You are not authorized to view or manage doctors.');
-            setDoctors([]);
-          
-          return;
+        if (!res.ok) {
+          throw new Error(`Failed to load doctors (${res.status})`);
         }
 
-        if (!res.ok) {
-          throw new Error('Failed to load doctors list');
-        }
+        const headerTotal =
+          res.headers.get('x-total-count') ||
+          res.headers.get('X-Total-Count') ||
+          res.headers.get('total-count') ||
+          res.headers.get('x-count');
 
         const data = await res.json();
-        const list = Array.isArray(data)
+        const rawList = Array.isArray(data)
           ? data
-          : data?.doctors || data?.items || data?.data || [];
+          : data?.items || data?.doctors || data?.data || [];
 
-        
-          setDoctors(Array.isArray(list) ? list : []);
-        
+        const safeList = Array.isArray(rawList) ? rawList : [];
+        setDoctorsList(safeList);
+
+        const parsedHeaderTotal = headerTotal ? Number(headerTotal) : NaN;
+        const bodyTotal =
+          data?.total ?? data?.count ?? data?.totalCount ?? data?.total_count;
+
+        if (!Number.isNaN(parsedHeaderTotal) && parsedHeaderTotal >= 0) {
+          setTotalCount(parsedHeaderTotal);
+        } else if (typeof bodyTotal === 'number') {
+          setTotalCount(bodyTotal);
+        } else {
+          setTotalCount(safeList.length);
+        }
+
+        if (status === 'All' && !query.trim() && page === 1 && typeof setContextDoctors === 'function') {
+          setContextDoctors(safeList);
+        }
       } catch (err) {
         console.error('Error fetching doctors:', err);
-        
-          setErrorMsg('Failed to load doctors from server.');
-        
+        if (Array.isArray(contextDoctors) && contextDoctors.length > 0) {
+          setDoctorsList(contextDoctors);
+        } else {
+          setLocalErrorMsg('Could not load doctors list from server.');
+        }
       } finally {
-        
-          setLoading(false);
-        
+        setTableLoading(false);
       }
     },
-    [getAuthHeaders, navigate]
+    [currentPage, filterStatus, searchQuery, getToken, getAuthHeaders, setContextDoctors, contextDoctors]
   );
 
   useEffect(() => {
-    let isActive = true;
+    fetchDoctorsPaginated({ page: currentPage, status: filterStatus, query: searchQuery });
+  }, [fetchDoctorsPaginated, currentPage, filterStatus, searchQuery]);
 
-    const fetchDoctors = async () => {
-      await loadDoctors();
-    };
+  const sourceDoctors = useMemo(() => {
+    if (doctorsList.length > 0) return doctorsList;
+    return Array.isArray(contextDoctors) ? contextDoctors : [];
+  }, [doctorsList, contextDoctors]);
 
-    if (isActive) {
-      fetchDoctors();
-    }
+  const filteredDoctors = useMemo(() => {
+    return sourceDoctors.filter((doc) => {
+      const q = searchQuery.trim().toLowerCase();
+      const docName = getDoctorName(doc).toLowerCase();
+      const docSpecialty = getDoctorSpecialty(doc).toLowerCase();
+      const docNpi = String(getDoctorNpi(doc)).toLowerCase();
+      const docEmail = getDoctorEmail(doc).toLowerCase();
+      const normalizedStatus = normalizeDoctorStatus(doc.status);
 
-    return () => {
-      isActive = false;
-    };
-  }, [loadDoctors]);
-  const filteredDoctors = doctors.filter((doc) => {
-    const q = searchQuery.trim().toLowerCase();
-    const docName = String(doc.name || '').toLowerCase();
-const docSpecialty = String(
-  typeof doc.specialty === 'object' && doc.specialty !== null
-    ? doc.specialty.name || doc.specialty.title || ''
-    : doc.specialty || ''
-).toLowerCase();
-const docNpi = String(doc.npi || '').toLowerCase();
-const docEmail = String(doc.email || '').toLowerCase();
+      const matchesSearch =
+        !q ||
+        docName.includes(q) ||
+        docSpecialty.includes(q) ||
+        docNpi.includes(q) ||
+        docEmail.includes(q);
 
-    const matchesSearch =
-      !q ||
-      docName.includes(q) ||
-      docSpecialty.includes(q) ||
-      docNpi.includes(q) ||
-      docEmail.includes(q);
+      const matchesFilter =
+        filterStatus === 'All' ||
+        normalizedStatus.toLowerCase() === filterStatus.toLowerCase();
 
-    const matchesFilter =
-      filterStatus === 'All' ||
-      (doc.status || '').toLowerCase() === filterStatus.toLowerCase();
-
-    return matchesSearch && matchesFilter;
-  });
+      return matchesSearch && matchesFilter;
+    });
+  }, [sourceDoctors, searchQuery, filterStatus]);
 
   const handleAddDoctorSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    setErrorMsg('');
+    setLocalErrorMsg('');
     setStatusMsg('');
 
     try {
+      const payload = {
+        name: newDoctor.name.trim(),
+        full_name: newDoctor.name.trim(),
+        npi: newDoctor.npi.trim(),
+        license_number: newDoctor.npi.trim(),
+        specialty: newDoctor.specialty.trim(),
+        email: newDoctor.email.trim(),
+        experience: newDoctor.experience.trim(),
+        status: newDoctor.status,
+      };
+
       const res = await fetch(`${API_BASE_URL}/admin/doctors`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(newDoctor),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        throw new Error('Failed to add doctor on server');
+        const errText = await res.text();
+        throw new Error(errText || 'Failed to add doctor on server');
       }
 
       setIsAddModalOpen(false);
@@ -162,10 +276,13 @@ const docEmail = String(doc.email || '').toLowerCase();
         status: 'Pending Approval',
       });
       setStatusMsg('Doctor added successfully.');
-      await loadDoctors();
+      await fetchDoctorsPaginated({ page: currentPage, status: filterStatus, query: searchQuery });
+      if (typeof refreshDashboard === 'function') {
+        refreshDashboard({ silent: true });
+      }
     } catch (err) {
       console.error('Error adding doctor:', err);
-      setErrorMsg('Could not add doctor. Please check admin permissions or try again.');
+      setLocalErrorMsg('Could not add doctor. Please check admin permissions or try again.');
     } finally {
       setSubmitting(false);
     }
@@ -173,35 +290,80 @@ const docEmail = String(doc.email || '').toLowerCase();
 
   const handleOpenEdit = (doc) => {
     setSelectedDoctor(doc);
-    setEditStatus(doc.status || 'Active');
+    setEditStatus(normalizeDoctorStatus(doc.status));
     setIsEditModalOpen(true);
   };
 
   const handleUpdateDoctorStatus = async (nextStatus) => {
     if (!selectedDoctor) return;
-    const docId = selectedDoctor.id ?? selectedDoctor._id;
+    const docId = getDoctorId(selectedDoctor);
+    if (!docId) {
+      setLocalErrorMsg('Doctor ID is missing.');
+      return;
+    }
+
+    const normalizedNext = normalizeDoctorStatus(nextStatus);
+    const reviewPayload = {
+      status: normalizedNext,
+      decision:
+        normalizedNext === 'Active'
+          ? 'approve'
+          : normalizedNext === 'Rejected'
+          ? 'reject'
+          : normalizedNext.toLowerCase(),
+      action:
+        normalizedNext === 'Active'
+          ? 'approve'
+          : normalizedNext === 'Rejected'
+          ? 'reject'
+          : normalizedNext.toLowerCase(),
+    };
+
     setSubmitting(true);
-    setErrorMsg('');
+    setLocalErrorMsg('');
     setStatusMsg('');
 
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/doctors/${docId}`, {
-        method: 'PATCH',
+      let res = await fetch(`${API_BASE_URL}/admin/doctors/${docId}/review`, {
+        method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ status: nextStatus }),
+        body: JSON.stringify(reviewPayload),
       });
 
+      if (!res.ok && (res.status === 405 || res.status === 404)) {
+        res = await fetch(`${API_BASE_URL}/admin/doctors/${docId}/review`, {
+          method: 'PATCH',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(reviewPayload),
+        });
+      }
+
       if (!res.ok) {
-        throw new Error('Failed to update doctor status');
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody?.detail || errBody?.message || 'Failed to update doctor status');
+      }
+
+      const updateItem = (item) => {
+        if (String(getDoctorId(item)) !== String(docId)) return item;
+        return { ...item, status: normalizedNext };
+      };
+
+      setDoctorsList((prev) => prev.map(updateItem));
+      if (typeof setContextDoctors === 'function') {
+        setContextDoctors((prev) => (Array.isArray(prev) ? prev.map(updateItem) : prev));
       }
 
       setIsEditModalOpen(false);
       setSelectedDoctor(null);
-      setStatusMsg(`Doctor status updated to "${nextStatus}".`);
-      await loadDoctors();
+      setStatusMsg(`Doctor status updated to "${normalizedNext}".`);
+
+      await fetchDoctorsPaginated({ page: currentPage, status: filterStatus, query: searchQuery });
+      if (typeof refreshDashboard === 'function') {
+        refreshDashboard({ silent: true });
+      }
     } catch (err) {
       console.error('Error updating doctor:', err);
-      setErrorMsg('Could not update doctor status on server.');
+      setLocalErrorMsg(err?.message || 'Could not update doctor status on server.');
     } finally {
       setSubmitting(false);
     }
@@ -211,11 +373,17 @@ const docEmail = String(doc.email || '').toLowerCase();
     const csvContent =
       'data:text/csv;charset=utf-8,' +
       [
-        'Name,NPI,Specialty,Email,Experience,Status',
-        ...filteredDoctors.map(
-          (d) =>
-           `"${d.name || ''}","${d.npi || ''}","${typeof d.specialty === 'object' && d.specialty !== null ? (d.specialty.name || d.specialty.title || '') : (d.specialty || '')}","${d.email || ''}","${d.experience || ''}","${d.status || ''}"`,
-        ),
+        'Doctor ID,Name,NPI,Specialty,Email,Experience,Status',
+        ...filteredDoctors.map((d) => {
+          const id = getDoctorId(d);
+          const name = getDoctorName(d);
+          const npi = getDoctorNpi(d);
+          const specialty = getDoctorSpecialty(d);
+          const email = getDoctorEmail(d);
+          const exp = getDoctorExperience(d);
+          const st = normalizeDoctorStatus(d.status);
+          return `"${id}","${name}","${npi}","${specialty}","${email}","${exp}","${st}"`;
+        }),
       ].join('\n');
 
     const encodedUri = encodeURI(csvContent);
@@ -226,6 +394,10 @@ const docEmail = String(doc.email || '').toLowerCase();
     link.click();
     document.body.removeChild(link);
   };
+
+  const activeError = localErrorMsg || contextErrorMsg;
+  const isInitialLoading = (contextLoading || tableLoading) && filteredDoctors.length === 0;
+  const totalPages = Math.max(1, Math.ceil((totalCount || filteredDoctors.length) / PAGE_LIMIT));
   return (
     <div
       style={{
@@ -240,54 +412,6 @@ const docEmail = String(doc.email || '').toLowerCase();
       <Helmet>
         <title>Manage Doctors | Clinika</title>
       </Helmet>
-
-      {/* Top Status Strip */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '20px',
-          flexWrap: 'wrap',
-          gap: '12px',
-          backgroundColor: '#FFFFFF',
-          padding: '12px 20px',
-          borderRadius: '12px',
-          border: '1px solid #E2E8F0',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '14px', fontWeight: '700', color: '#0F172A' }}>
-            Clinika Platform Admin Network
-          </span>
-          <span style={{ color: '#CBD5E1' }}>•</span>
-          <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: '500' }}>
-            <i className="fa-solid fa-circle" style={{ fontSize: '8px', marginRight: '6px' }} aria-hidden="true" />
-            Operational: Online
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '12px', fontWeight: '600', color: '#0F172A' }}>
-            System Admin
-          </span>
-          <span
-            style={{
-              width: '30px',
-              height: '30px',
-              borderRadius: '9999px',
-              backgroundColor: '#1B68F6',
-              color: '#FFFFFF',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '12px',
-            }}
-          >
-            <i className="fa-solid fa-user-shield" aria-hidden="true" />
-          </span>
-        </div>
-      </div>
 
       {/* Page Header */}
       <div
@@ -354,7 +478,7 @@ const docEmail = String(doc.email || '').toLowerCase();
         </div>
       </div>
 
-      {errorMsg && (
+      {activeError && (
         <div
           style={{
             backgroundColor: '#FEF2F2',
@@ -370,7 +494,7 @@ const docEmail = String(doc.email || '').toLowerCase();
           }}
         >
           <i className="fa-solid fa-circle-exclamation" aria-hidden="true" />
-          <span>{errorMsg}</span>
+          <span>{activeError}</span>
         </div>
       )}
 
@@ -398,34 +522,43 @@ const docEmail = String(doc.email || '').toLowerCase();
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))',
           gap: '16px',
           marginBottom: '24px',
         }}
       >
         <div style={{ backgroundColor: '#FFFFFF', padding: '18px 20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
           <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>All Doctors</span>
-          <h2 style={{ fontSize: '24px', margin: '8px 0 0', color: '#0F172A' }}>{doctors.length}</h2>
+          <h2 style={{ fontSize: '24px', margin: '8px 0 0', color: '#0F172A' }}>
+            {totalCount || sourceDoctors.length}
+          </h2>
         </div>
 
         <div style={{ backgroundColor: '#FFFFFF', padding: '18px 20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
           <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>Active</span>
           <h2 style={{ fontSize: '24px', margin: '8px 0 0', color: '#1B68F6' }}>
-            {doctors.filter((d) => (d.status || '').toLowerCase() === 'active').length}
+            {sourceDoctors.filter((d) => normalizeDoctorStatus(d.status) === 'Active').length}
           </h2>
         </div>
 
         <div style={{ backgroundColor: '#FFFFFF', padding: '18px 20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
           <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>Pending Approval</span>
           <h2 style={{ fontSize: '24px', margin: '8px 0 0', color: '#D97706' }}>
-            {doctors.filter((d) => (d.status || '').toLowerCase() === 'pending approval').length}
+            {sourceDoctors.filter((d) => normalizeDoctorStatus(d.status) === 'Pending Approval').length}
+          </h2>
+        </div>
+
+        <div style={{ backgroundColor: '#FFFFFF', padding: '18px 20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
+          <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>Rejected</span>
+          <h2 style={{ fontSize: '24px', margin: '8px 0 0', color: '#DC2626' }}>
+            {sourceDoctors.filter((d) => normalizeDoctorStatus(d.status) === 'Rejected').length}
           </h2>
         </div>
 
         <div style={{ backgroundColor: '#FFFFFF', padding: '18px 20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
           <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>Inactive</span>
           <h2 style={{ fontSize: '24px', margin: '8px 0 0', color: '#64748B' }}>
-            {doctors.filter((d) => (d.status || '').toLowerCase() === 'inactive').length}
+            {sourceDoctors.filter((d) => normalizeDoctorStatus(d.status) === 'Inactive').length}
           </h2>
         </div>
       </div>
@@ -470,7 +603,10 @@ const docEmail = String(doc.email || '').toLowerCase();
               type="text"
               placeholder="Search by doctor name, specialty, NPI..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               style={{
                 padding: '9px 14px 9px 36px',
                 borderRadius: '8px',
@@ -493,11 +629,14 @@ const docEmail = String(doc.email || '').toLowerCase();
             flexWrap: 'wrap',
           }}
         >
-          {['All', 'Active', 'Pending Approval', 'Inactive'].map((status) => (
+          {['All', 'Active', 'Pending Approval', 'Rejected', 'Inactive'].map((status) => (
             <button
               key={status}
               type="button"
-              onClick={() => setFilterStatus(status)}
+              onClick={() => {
+                setFilterStatus(status);
+                setCurrentPage(1);
+              }}
               style={{
                 background: 'none',
                 border: 'none',
@@ -538,7 +677,7 @@ const docEmail = String(doc.email || '').toLowerCase();
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {isInitialLoading ? (
                 <tr>
                   <td colSpan="6" style={{ padding: '32px', textAlign: 'center', color: '#64748B' }}>
                     <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '8px' }} aria-hidden="true" />
@@ -547,12 +686,19 @@ const docEmail = String(doc.email || '').toLowerCase();
                 </tr>
               ) : filteredDoctors.length > 0 ? (
                 filteredDoctors.map((doc, index) => {
-                  const statusVal = doc.status || 'Pending Approval';
-                  const isActiveStatus = statusVal.toLowerCase() === 'active';
-                  const isPendingStatus = statusVal.toLowerCase() === 'pending approval';
+                  const docId = getDoctorId(doc);
+                  const docName = getDoctorName(doc) || 'Unnamed Doctor';
+                  const docNpi = getDoctorNpi(doc);
+                  const docSpecialty = getDoctorSpecialty(doc);
+                  const docEmail = getDoctorEmail(doc);
+                  const docExp = getDoctorExperience(doc);
+                  const statusVal = normalizeDoctorStatus(doc.status);
+                  const isActiveStatus = statusVal === 'Active';
+                  const isPendingStatus = statusVal === 'Pending Approval';
+                  const isRejectedStatus = statusVal === 'Rejected';
 
                   return (
-                    <tr key={doc.id ?? doc._id ?? index} style={{ borderBottom: '1px solid #E2E8F0' }}>
+                    <tr key={docId || index} style={{ borderBottom: '1px solid #E2E8F0' }}>
                       <td style={{ padding: '16px 24px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div
@@ -569,28 +715,26 @@ const docEmail = String(doc.email || '').toLowerCase();
                               flexShrink: 0,
                             }}
                           >
-                            {doc.name ? doc.name.replace(/^Dr\.\s*/i, '')[0]?.toUpperCase() : 'D'}
+                            {docName ? docName.replace(/^Dr\.?\s*/i, '')[0]?.toUpperCase() || 'D' : 'D'}
                           </div>
                           <div>
                             <div style={{ fontWeight: '600', color: '#0F172A', fontSize: '14px' }}>
-                              {doc.name}
+                              {docName}
                             </div>
                             <div style={{ fontSize: '12px', color: '#64748B' }}>
-                              NPI: {doc.npi || '—'}
+                              NPI: {docNpi || '—'} {docId ? `• ID: ${docId}` : ''}
                             </div>
                           </div>
                         </div>
                       </td>
                       <td style={{ padding: '16px 24px', fontSize: '14px', color: '#334155' }}>
-                        {typeof doc.specialty === 'object' && doc.specialty !== null
-                    ? doc.specialty.name || doc.specialty.title || '-'
-                    : doc.specialty || '-'}
+                        {docSpecialty || '-'}
                       </td>
                       <td style={{ padding: '16px 24px', fontSize: '14px', color: '#334155' }}>
-                        {doc.email || '—'}
+                        {docEmail || '—'}
                       </td>
                       <td style={{ padding: '16px 24px', fontSize: '14px', color: '#334155' }}>
-                        {doc.experience || '—'}
+                        {docExp || '—'}
                       </td>
                       <td style={{ padding: '16px 24px' }}>
                         <span
@@ -599,11 +743,15 @@ const docEmail = String(doc.email || '').toLowerCase();
                               ? '#EFF6FF'
                               : isPendingStatus
                               ? '#FFEDD5'
+                              : isRejectedStatus
+                              ? '#FEF2F2'
                               : '#F1F5F9',
                             color: isActiveStatus
                               ? '#1B68F6'
                               : isPendingStatus
                               ? '#EA580C'
+                              : isRejectedStatus
+                              ? '#DC2626'
                               : '#64748B',
                             padding: '5px 10px',
                             borderRadius: '6px',
@@ -654,6 +802,60 @@ const docEmail = String(doc.email || '').toLowerCase();
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Footer */}
+        <div
+          style={{
+            padding: '14px 24px',
+            borderTop: '1px solid #E2E8F0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '12px',
+            fontSize: '13px',
+            color: '#64748B',
+          }}
+        >
+          <span>
+            Showing {filteredDoctors.length} of {totalCount || filteredDoctors.length} doctors (limit={PAGE_LIMIT}, offset={(currentPage - 1) * PAGE_LIMIT})
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              disabled={currentPage <= 1 || tableLoading}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: '1px solid #CBD5E1',
+                backgroundColor: currentPage <= 1 ? '#F8FAFC' : '#FFFFFF',
+                color: '#0F172A',
+                cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Previous
+            </button>
+            <span style={{ fontWeight: '600', color: '#0F172A' }}>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={currentPage >= totalPages || tableLoading}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: '1px solid #CBD5E1',
+                backgroundColor: currentPage >= totalPages ? '#F8FAFC' : '#FFFFFF',
+                color: '#0F172A',
+                cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </div>
       {/* Bottom Cards */}
       <div
@@ -670,10 +872,10 @@ const docEmail = String(doc.email || '').toLowerCase();
           </div>
           <span style={{ fontSize: '12px', color: '#64748B' }}>NPI &amp; State Licenses</span>
           <div style={{ fontSize: '30px', fontWeight: 'bold', margin: '12px 0 6px', color: '#0F172A' }}>
-            {doctors.length > 0
+            {sourceDoctors.length > 0
               ? `${Math.round(
-                  (doctors.filter((d) => (d.status || '').toLowerCase() === 'active').length /
-                    doctors.length) *
+                  (sourceDoctors.filter((d) => normalizeDoctorStatus(d.status) === 'Active').length /
+                    sourceDoctors.length) *
                     100
                 )}%`
               : '0%'}
@@ -694,22 +896,14 @@ const docEmail = String(doc.email || '').toLowerCase();
               <i className="fa-solid fa-circle" style={{ color: '#1B68F6', fontSize: '8px', marginRight: '8px' }} aria-hidden="true" />
               Total Specialties:{' '}
               <strong>
-                {new Set(
-                  doctors
-                    .map((d) =>
-                      typeof d.specialty === 'object' && d.specialty !== null
-                        ? d.specialty.name || d.specialty.title || ''
-                        : d.specialty || ''
-                    )
-                    .filter(Boolean)
-                ).size}
+                {new Set(sourceDoctors.map((d) => getDoctorSpecialty(d)).filter(Boolean)).size}
               </strong>
             </div>
             <div>
               <i className="fa-solid fa-circle" style={{ color: '#16A34A', fontSize: '8px', marginRight: '8px' }} aria-hidden="true" />
               Active Doctors:{' '}
               <strong>
-                {doctors.filter((d) => (d.status || '').toLowerCase() === 'active').length}
+                {sourceDoctors.filter((d) => normalizeDoctorStatus(d.status) === 'Active').length}
               </strong>
             </div>
           </div>
@@ -889,10 +1083,13 @@ const docEmail = String(doc.email || '').toLowerCase();
             }}
           >
             <h3 style={{ margin: '0 0 12px', fontSize: '19px', color: '#0F172A' }}>
-              Review / Edit: {selectedDoctor.name}
+              Review / Edit: {getDoctorName(selectedDoctor) || 'Doctor'}
             </h3>
             <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>
-              Current Status: <strong style={{ color: '#1B68F6' }}>{selectedDoctor.status}</strong>
+              Current Status:{' '}
+              <strong style={{ color: '#1B68F6' }}>
+                {normalizeDoctorStatus(selectedDoctor.status)}
+              </strong>
             </p>
 
             <div style={{ marginBottom: '16px' }}>
@@ -904,6 +1101,7 @@ const docEmail = String(doc.email || '').toLowerCase();
               >
                 <option value="Active">Active</option>
                 <option value="Pending Approval">Pending Approval</option>
+                <option value="Rejected">Rejected</option>
                 <option value="Inactive">Inactive</option>
               </select>
             </div>
@@ -916,6 +1114,14 @@ const docEmail = String(doc.email || '').toLowerCase();
                 style={{ backgroundColor: '#16A34A', color: '#FFFFFF', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}
               >
                 Approve Doctor
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => handleUpdateDoctorStatus('Rejected')}
+                style={{ backgroundColor: '#DC2626', color: '#FFFFFF', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}
+              >
+                Reject Doctor
               </button>
               <button
                 type="button"
