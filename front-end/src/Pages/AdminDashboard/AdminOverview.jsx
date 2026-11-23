@@ -1,151 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDashboard } from '../../context/DashboardContext';
 
-const API_BASE_URL = 'https://clinika-backend.vercel.app';
 
 export default function AdminOverview() {
   const navigate = useNavigate();
 
-  const [stats, setStats] = useState({
-    totalDoctors: 0,
-    totalPatients: 0,
-    totalAppointments: 0,
-    pendingRequests: 0,
-  });
-
-  const [activities, setActivities] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState('');
-
-  const getToken = () =>
-    localStorage.getItem('token') || localStorage.getItem('access_token');
-
-  const loadOverviewData = useCallback(
-    async () => {
-      const token = getToken();
-
-      if (!token) {
-        
-          setLoading(false);
-          navigate('/login', { replace: true });
-    
-        return;
-      }
-
-      const headers = {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      };
-
-      try {
-       const [statsRes, activityRes, patientsRes, doctorsRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/admin/stats`, { headers }),
-          fetch(`${API_BASE_URL}/admin/activity?limit=10&offset=0`, { headers }),
-          fetch(`${API_BASE_URL}/admin/users?role=patient`, { headers }),
-          fetch(`${API_BASE_URL}/admin/doctors`, { headers }),
-        ]);
-        if (
-          statsRes.status === 401 ||
-          statsRes.status === 403 ||
-          activityRes.status === 401 ||
-          activityRes.status === 403
-        ) {
-          
-            setErrorMsg('You are not authorized to view admin data.');
-            setLoading(false);
-          
-          return;
-        }
-let patientsCountFromUsers = null;
-      if (patientsRes && patientsRes.ok) {
-        const patientsData = await patientsRes.json();
-        const pList = Array.isArray(patientsData)
-          ? patientsData
-          : patientsData?.items || patientsData?.users || patientsData?.patients || patientsData?.data || [];
-        if (Array.isArray(pList)) {
-          patientsCountFromUsers = pList.length;
-        }
-      }
-      let doctorsCountFromApi = null;
-        if (doctorsRes && doctorsRes.ok) {
-          const doctorsData = await doctorsRes.json();
-          const dList = Array.isArray(doctorsData)
-            ? doctorsData
-            : doctorsData?.items || doctorsData?.doctors || doctorsData?.users || doctorsData?.data || [];
-          if (Array.isArray(dList)) {
-            doctorsCountFromApi = dList.length;
-          }
-        }
-
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        if (statsData) {
-          const statsDoctors = statsData.totalDoctors ?? statsData.total_doctors ?? 0;
-          const statsPatients = statsData.totalPatients ?? statsData.total_patients ?? 0;
-          setStats({
-            totalDoctors:
-              doctorsCountFromApi !== null && Number(statsDoctors) === 0
-                ? doctorsCountFromApi
-                : statsDoctors,
-            totalPatients:
-              patientsCountFromUsers !== null && Number(statsPatients) === 0
-                ? patientsCountFromUsers
-                : statsPatients,
-            totalAppointments: statsData.totalAppointments ?? statsData.total_appointments ?? 0,
-            pendingRequests: statsData.pendingRequests ?? statsData.pending_requests ?? 0,
-          });
-        }
-      } else if (patientsCountFromUsers !== null || doctorsCountFromApi !== null) {
-            setStats((prev) => ({
-              ...prev,
-              ...(doctorsCountFromApi !== null ? { totalDoctors: doctorsCountFromApi } : {}),
-              ...(patientsCountFromUsers !== null ? { totalPatients: patientsCountFromUsers } : {}),
-            }));
-      }
-
-        if (activityRes.ok) {
-          const activityData = await activityRes.json();
-          const list = Array.isArray(activityData)
-            ? activityData
-            : activityData?.items ||
-              activityData?.activities ||
-              activityData?.data ||
-              [];
-
-          
-            setActivities(Array.isArray(list) ? list : []);
-          
-        }
-      } catch (err) {
-        console.error('Error fetching overview data:', err);
-       
-          setErrorMsg('Failed to load dashboard data from server.');
-        
-      } finally {
-        
-          setLoading(false);
-        
-      }
-    },
-    [navigate]
-  );
+  const { stats, activities, loading, errorMsg, getToken } = useDashboard();
 
   useEffect(() => {
-    let isActive = true;
-
-    const fetchData = async () => {
-      await loadOverviewData();
-    };
-
-    if (isActive) {
-      fetchData();
-    }
-
-    return () => {
-      isActive = false;
-    };
-  }, [loadOverviewData]);
+  if (!getToken()) {
+    navigate('/login', { replace: true });
+  }
+}, [getToken, navigate]);
   return (
     <div
       style={{
@@ -160,64 +28,7 @@ let patientsCountFromUsers = null;
         <title>Admin Overview | Clinika</title>
       </Helmet>
 
-      {/* Top Bar / Header */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '20px',
-          flexWrap: 'wrap',
-          gap: '12px',
-          backgroundColor: '#FFFFFF',
-          padding: '14px 20px',
-          borderRadius: '12px',
-          border: '1px solid #E2E8F0',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <span
-            style={{
-              fontSize: '15px',
-              fontWeight: 'bold',
-              color: '#0F172A',
-            }}
-          >
-            Clinika Platform Admin Network
-          </span>
-          <span style={{ color: '#CBD5E1' }}>•</span>
-          <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: '500' }}>
-            <i className="fa-solid fa-circle" style={{ fontSize: '8px', marginRight: '6px' }} aria-hidden="true" />
-            Operational: Online
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: '#0F172A' }}>
-              System Admin
-            </div>
-            <div style={{ fontSize: '11px', color: '#64748B' }}>
-              Platform Administrator
-            </div>
-          </div>
-          <span
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '9999px',
-              backgroundColor: '#1B68F6',
-              color: '#FFFFFF',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '13px',
-            }}
-          >
-            <i className="fa-solid fa-user-shield" aria-hidden="true" />
-          </span>
-        </div>
-      </div>
+     
 
       {/* Welcome Banner */}
       <div

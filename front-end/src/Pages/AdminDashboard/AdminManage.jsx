@@ -1,25 +1,52 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { useDashboard } from '../../context/DashboardContext';
 
 const API_BASE_URL = 'https://clinika-backend.vercel.app';
+const EGYPTIAN_PHONE_REGEX = /^(010|011|012|015)\d{8}$/;
+
+const normalizePhoneDigits = (rawPhone) => {
+  const digits = String(rawPhone || '').replace(/\D/g, '');
+  if (digits.startsWith('20') && digits.length === 12) {
+    return `0${digits.slice(2)}`;
+  }
+  return digits;
+};
+
+const validateEgyptianPhone = (rawPhone) => {
+  const normalized = normalizePhoneDigits(rawPhone);
+  if (!EGYPTIAN_PHONE_REGEX.test(normalized)) {
+    return 'Phone number must be 11 digits and start with 010, 011, 012, or 015.';
+  }
+  return '';
+};
 
 export default function AdminManage() {
   const navigate = useNavigate();
+  const {
+    users = [],
+    setUsers,
+    appointments = [],
+    setAppointments,
+    loading,
+    errorMsg: contextErrorMsg,
+    getToken,
+    refreshDashboard,
+  } = useDashboard();
 
   const [activeTab, setActiveTab] = useState('patients');
-  const [users, setUsers] = useState([]);
-  const [appointments, setAppointments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [showEmptyDemo, setShowEmptyDemo] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
+  const [localErrorMsg, setLocalErrorMsg] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const [showEmptyDemo, setShowEmptyDemo] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 3;
+  const rowsPerPage = 10;
 
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
@@ -42,105 +69,67 @@ export default function AdminManage() {
     status: 'confirmed',
   });
 
-  const getToken = () =>
-    localStorage.getItem('token') || localStorage.getItem('access_token');
-
   const getAuthHeaders = useCallback(() => {
     const token = getToken();
     return {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     };
-  }, []);
+  }, [getToken]);
 
-  const loadAdminData = useCallback(
-    async () => {
-      const token = getToken();
-      if (!token) {
-          setLoading(false);
-          navigate('/login', { replace: true });
-        return;
-      }
-
-
-        setLoading(true);
-        setErrorMsg('');
-
-      const headers = getAuthHeaders();
-
-      try {
-        const [usersRes, apptRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/admin/users?role=patient`, { headers }),
-          fetch(`${API_BASE_URL}/admin/reports/appointments`, { headers }),
-        ]);
-
-        if (usersRes.status === 401 || usersRes.status === 403 || apptRes.status === 401 || apptRes.status === 403) {
-          
-            setErrorMsg('You are not authorized to view users or appointments.');
-            setUsers([]);
-            setAppointments([]);
-          
-          return;
-        }
-
-        if (usersRes.ok) {
-          const usersData = await usersRes.json();
-          const uList = Array.isArray(usersData)
-            ? usersData
-            : usersData?.users || usersData?.items || usersData?.data || [];
-          
-            setUsers(Array.isArray(uList) ? uList : []);
-          
-        }
-
-        if (apptRes.ok) {
-          const apptData = await apptRes.json();
-          const aList = Array.isArray(apptData)
-            ? apptData
-            : apptData?.appointments || apptData?.items || apptData?.data || [];
-      
-            setAppointments(Array.isArray(aList) ? aList : []);
-          
-        }
-      } catch (err) {
-        console.error('Error loading admin users/appointments:', err);
-        
-          setErrorMsg('Failed to load users and appointments from server.');
-        
-      } finally {
-      
-          setLoading(false);
-      }
-    },
-    [getAuthHeaders, navigate]
-  );
-
- useEffect(() => {
-  
-  const fetchData = async () => {
-  
-    await loadAdminData();
-  };
-
-  fetchData();
-
-}, [loadAdminData]);
-
+  useEffect(() => {
+    if (!getToken()) {
+      navigate('/login', { replace: true });
+    }
+  }, [getToken, navigate]);
   const handleAddPatientSubmit = async (e) => {
     e.preventDefault();
-    setSubmitting(true);
-    setErrorMsg('');
+    setLocalErrorMsg('');
     setStatusMsg('');
+    setPhoneError('');
+
+    const phoneValidationMsg = validateEgyptianPhone(newPatient.phone);
+    if (phoneValidationMsg) {
+      setPhoneError(phoneValidationMsg);
+      return;
+    }
+
+    const cleanPhone = normalizePhoneDigits(newPatient.phone);
+    setSubmitting(true);
 
     try {
+      const payload = {
+        ...newPatient,
+        full_name: newPatient.full_name.trim(),
+        email: newPatient.email.trim(),
+        phone: cleanPhone,
+      };
+
       const res = await fetch(`${API_BASE_URL}/admin/patients`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(newPatient),
+        body: JSON.stringify(payload),
       });
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        throw new Error('Failed to add patient');
+        const backendDetail =
+          typeof data?.detail === 'string'
+            ? data.detail
+            : Array.isArray(data?.detail)
+            ? data.detail.map((d) => d?.msg || '').filter(Boolean).join(', ')
+            : data?.message || 'Failed to add patient';
+        throw new Error(backendDetail);
+      }
+
+      const createdPatient =
+        data && typeof data === 'object'
+          ? data.patient || data.user || data.data || payload
+          : payload;
+
+      if (typeof setUsers === 'function') {
+        setUsers((prev) => (Array.isArray(prev) ? [createdPatient, ...prev] : [createdPatient]));
       }
 
       setIsPatientModalOpen(false);
@@ -153,10 +142,14 @@ export default function AdminManage() {
         gender: 'male',
       });
       setStatusMsg('Patient added successfully.');
-      await loadAdminData();
+      if (typeof refreshDashboard === 'function') {
+        refreshDashboard({ silent: true });
+      }
     } catch (err) {
       console.error('Error adding patient:', err);
-      setErrorMsg('Could not add patient. Please check admin permissions or inputs.');
+      setLocalErrorMsg(
+        err?.message || 'Could not add patient. Please check admin permissions or inputs.'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -165,22 +158,44 @@ export default function AdminManage() {
   const handleAddAppointmentSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    setErrorMsg('');
+    setLocalErrorMsg('');
     setStatusMsg('');
 
     try {
+      const payload = {
+        ...newAppointment,
+        doctor_id: Number(newAppointment.doctor_id),
+        patient_id: Number(newAppointment.patient_id),
+        reason: newAppointment.reason.trim(),
+      };
+
       const res = await fetch(`${API_BASE_URL}/admin/appointments`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({
-          ...newAppointment,
-          doctor_id: Number(newAppointment.doctor_id),
-          patient_id: Number(newAppointment.patient_id),
-        }),
+        body: JSON.stringify(payload),
       });
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        throw new Error('Failed to create appointment');
+        const backendDetail =
+          typeof data?.detail === 'string'
+            ? data.detail
+            : Array.isArray(data?.detail)
+            ? data.detail.map((d) => d?.msg || '').filter(Boolean).join(', ')
+            : data?.message || 'Failed to create appointment';
+        throw new Error(backendDetail);
+      }
+
+      const createdAppointment =
+        data && typeof data === 'object'
+          ? data.appointment || data.data || payload
+          : payload;
+
+      if (typeof setAppointments === 'function') {
+        setAppointments((prev) =>
+          Array.isArray(prev) ? [createdAppointment, ...prev] : [createdAppointment]
+        );
       }
 
       setIsAppointmentModalOpen(false);
@@ -193,10 +208,14 @@ export default function AdminManage() {
         status: 'confirmed',
       });
       setStatusMsg('Appointment booked successfully.');
-      await loadAdminData();
+      if (typeof refreshDashboard === 'function') {
+        refreshDashboard({ silent: true });
+      }
     } catch (err) {
       console.error('Error booking appointment:', err);
-      setErrorMsg('Could not book appointment. Please check the IDs and permissions.');
+      setLocalErrorMsg(
+        err?.message || 'Could not book appointment. Please check the IDs and permissions.'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -205,10 +224,12 @@ export default function AdminManage() {
   const handleToggleStatus = async (userId, currentStatus) => {
     if (!userId) return;
     const isCurrentlyActive =
-      currentStatus === 'Active' || currentStatus === true || String(currentStatus).toLowerCase() === 'active';
+      currentStatus === 'Active' ||
+      currentStatus === true ||
+      String(currentStatus).toLowerCase() === 'active';
     const nextActiveState = !isCurrentlyActive;
 
-    setErrorMsg('');
+    setLocalErrorMsg('');
     setStatusMsg('');
 
     try {
@@ -218,28 +239,58 @@ export default function AdminManage() {
         body: JSON.stringify({ is_active: nextActiveState }),
       });
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        throw new Error('Failed to update user status');
+        const backendDetail =
+          typeof data?.detail === 'string'
+            ? data.detail
+            : data?.message || 'Failed to update user status';
+        throw new Error(backendDetail);
+      }
+
+      if (typeof setUsers === 'function') {
+        setUsers((prev) =>
+          Array.isArray(prev)
+            ? prev.map((u) => {
+                const id = u.id ?? u._id;
+                if (String(id) !== String(userId)) return u;
+                return {
+                  ...u,
+                  is_active: nextActiveState,
+                  status: nextActiveState ? 'Active' : 'Inactive',
+                };
+              })
+            : prev
+        );
       }
 
       setStatusMsg(`User status updated to ${nextActiveState ? 'Active' : 'Inactive'}.`);
-      await loadAdminData();
+      if (typeof refreshDashboard === 'function') {
+        refreshDashboard({ silent: true });
+      }
     } catch (err) {
       console.error('Error updating user status:', err);
-      setErrorMsg('Could not update user status on server.');
+      setLocalErrorMsg(err?.message || 'Could not update user status on server.');
     }
   };
 
   const getPatientStatusLabel = (pat) => {
-    if (pat.status === false || String(pat.status).toLowerCase() === 'inactive' || pat.is_active === false) {
+    if (
+      pat.status === false ||
+      String(pat.status).toLowerCase() === 'inactive' ||
+      pat.is_active === false
+    ) {
       return 'Inactive';
     }
     return 'Active';
   };
 
+  const errorMsg = localErrorMsg || contextErrorMsg;
+  const safeUsers = Array.isArray(users) ? users : [];
   const filteredPatients = showEmptyDemo
     ? []
-    : users.filter((p) => {
+    : safeUsers.filter((p) => {
         const name = (p.full_name || p.name || '').toLowerCase();
         const email = (p.email || '').toLowerCase();
         const phone = String(p.phone || '').toLowerCase();
@@ -258,8 +309,8 @@ export default function AdminManage() {
   const currentTableRows = filteredPatients.slice(indexOfFirstRow, indexOfLastRow);
   const totalPages = Math.max(1, Math.ceil(filteredPatients.length / rowsPerPage));
 
-  const activeCount = users.filter((p) => getPatientStatusLabel(p) === 'Active').length;
-  const inactiveCount = users.filter((p) => getPatientStatusLabel(p) === 'Inactive').length;
+  const activeCount = safeUsers.filter((p) => getPatientStatusLabel(p) === 'Active').length;
+  const inactiveCount = safeUsers.filter((p) => getPatientStatusLabel(p) === 'Inactive').length;
   return (
     <div
       style={{
@@ -274,81 +325,6 @@ export default function AdminManage() {
       <Helmet>
         <title>Manage Users &amp; Appointments | Clinika</title>
       </Helmet>
-
-      {/* Top Status Bar */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          borderBottom: '1px solid #E2E8F0',
-          paddingBottom: '14px',
-          marginBottom: '20px',
-          flexWrap: 'wrap',
-          gap: '12px',
-          backgroundColor: '#FFFFFF',
-          padding: '14px 20px',
-          borderRadius: '12px',
-        }}
-      >
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: '700', color: '#0F172A' }}>
-              Clinika Platform Admin Network
-            </span>
-            <span style={{ color: '#475569', fontSize: '12px' }}>
-              <i
-                className="fa-solid fa-circle"
-                style={{ color: '#16A34A', fontSize: '8px', marginRight: '6px' }}
-                aria-hidden="true"
-              />
-              System Status: <strong style={{ color: '#0F172A' }}>Operational / Online</strong>
-            </span>
-          </div>
-          <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '6px' }}>
-            Admin Portal &nbsp;&gt;&nbsp;{' '}
-            <span style={{ color: '#475569', fontWeight: '500' }}>
-              Manage Users &amp; Appointments
-            </span>
-          </div>
-        </div>
-
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
-            <div>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#0F172A' }}>
-                System Admin
-              </div>
-              <div style={{ fontSize: '10px', color: '#64748B' }}>
-                Platform Administrator
-              </div>
-            </div>
-            <div
-              style={{
-                width: '30px',
-                height: '30px',
-                borderRadius: '50%',
-                backgroundColor: '#1B68F6',
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '12px',
-              }}
-            >
-              <i className="fa-solid fa-user-shield" aria-hidden="true" />
-            </div>
-          </div>
-          <div style={{ fontSize: '10px', color: '#64748B', marginTop: '6px' }}>
-            <i
-              className="fa-solid fa-circle"
-              style={{ color: '#16A34A', fontSize: '7px', marginRight: '5px' }}
-              aria-hidden="true"
-            />
-            Registry Database Sync: <strong style={{ color: '#0F172A' }}>Real-time</strong>
-          </div>
-        </div>
-      </div>
 
       {/* Header Title & Admin Suite Actions Bar */}
       <div
@@ -388,7 +364,10 @@ export default function AdminManage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', flexWrap: 'wrap' }}>
           <button
             type="button"
-            onClick={() => setIsPatientModalOpen(true)}
+            onClick={() => {
+              setPhoneError('');
+              setIsPatientModalOpen(true);
+            }}
             style={{
               backgroundColor: '#FFFFFF',
               border: '1px solid #CBD5E1',
@@ -431,7 +410,7 @@ export default function AdminManage() {
             onClick={() => {
               const firstUser = users[0];
               if (!firstUser) {
-                setErrorMsg('No patient available to toggle status.');
+                setLocalErrorMsg('No patient available to toggle status.');
                 return;
               }
               handleToggleStatus(firstUser.id ?? firstUser._id, getPatientStatusLabel(firstUser));
@@ -566,7 +545,6 @@ export default function AdminManage() {
           <span>Live Backend Sync</span>
         </div>
       </div>
-
       {/* Tabs Switcher */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button
@@ -619,6 +597,7 @@ export default function AdminManage() {
           <span>Appointments ({appointments.length})</span>
         </button>
       </div>
+
       {/* Content Table Container */}
       <div
         style={{
@@ -755,7 +734,7 @@ export default function AdminManage() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {loading && currentTableRows.length === 0 ? (
                   <tr>
                     <td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: '#64748B' }}>
                       <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '8px' }} aria-hidden="true" />
@@ -867,7 +846,7 @@ export default function AdminManage() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {loading && appointments.length === 0 ? (
                   <tr>
                     <td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: '#64748B' }}>
                       <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '8px' }} aria-hidden="true" />
@@ -1058,17 +1037,37 @@ export default function AdminManage() {
                 <input
                   type="text"
                   required
-                  placeholder="+201000000000"
+                  placeholder="01012345678"
                   value={newPatient.phone}
-                  onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box', fontSize: '13px' }}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewPatient({ ...newPatient, phone: val });
+                    if (phoneError) setPhoneError('');
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    border: phoneError ? '1px solid #DC2626' : '1px solid #CBD5E1',
+                    marginTop: '4px',
+                    boxSizing: 'border-box',
+                    fontSize: '13px',
+                  }}
                 />
+                {phoneError && (
+                  <p style={{ color: '#DC2626', fontSize: '11px', margin: '4px 0 0' }}>
+                    {phoneError}
+                  </p>
+                )}
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
                 <button
                   type="button"
                   disabled={submitting}
-                  onClick={() => setIsPatientModalOpen(false)}
+                  onClick={() => {
+                    setPhoneError('');
+                    setIsPatientModalOpen(false);
+                  }}
                   style={{ backgroundColor: '#F1F5F9', color: '#475569', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
                 >
                   Cancel

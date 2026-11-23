@@ -1,10 +1,17 @@
 import { useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { DashboardProvider } from '../../context/DashboardContext';
 export default function AdminDashboard() {
   const navigate = useNavigate();
-
+const location = useLocation();
+const getCurrentPageTitle = () => {
+  const path = location.pathname;
+  if (path.includes('manage-doctors')) return 'Manage Doctors';
+  if (path.includes('manage-users-and-appointments')) return 'Manage Users & Appointments';
+  if (path.includes('my-profile')) return 'Admin Profile';
+  return 'Overview';
+};
   const token =
     localStorage.getItem('token') || localStorage.getItem('access_token');
 
@@ -52,6 +59,7 @@ export default function AdminDashboard() {
   ];
 
   return (
+    <DashboardProvider>
     <div
       style={{
         display: 'flex',
@@ -213,7 +221,7 @@ export default function AdminDashboard() {
         </div>
       </aside>
 
-      {/* Main Content Area via Outlet */}
+     {/* Main Content Area via Outlet */}
       <main
         style={{
           flex: 1,
@@ -223,9 +231,156 @@ export default function AdminDashboard() {
           minWidth: 0,
         }}
       >
+       {/* Unified Top Header */}
+<header
+  style={{
+    backgroundColor: '#FFFFFF',
+    borderBottom: '1px solid #E2E8F0',
+    padding: '12px 28px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+    flexWrap: 'wrap',
+  }}
+>
+ <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+        <div
+          style={{
+            fontSize: '18px',
+            fontWeight: '700',
+            color: '#0F172A',
+            letterSpacing: '-0.015em',
+            lineHeight: '1.25',
+          }}
+        >
+          Clinika Platform Admin Network
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '12px',
+            color: '#64748B',
+            fontWeight: '500',
+            lineHeight: '1.3',
+          }}
+        >
+          <span>Admin Portal</span>
+          <span style={{ color: '#94A3B8' }}>&gt;</span>
+          <span style={{ color: '#475569', fontWeight: '600' }}>
+            {getCurrentPageTitle()}
+          </span>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '22px',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+            gap: '2px',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#15803D',
+              lineHeight: '1.3',
+            }}
+          >
+            <span
+              style={{
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                backgroundColor: '#16A34A',
+                display: 'inline-block',
+                flexShrink: 0,
+              }}
+            />
+            <span>System Status: Operational / Online</span>
+          </div>
+          <div
+            style={{
+              fontSize: '11px',
+              fontWeight: '500',
+              color: '#64748B',
+              lineHeight: '1.3',
+            }}
+          >
+            Registry Database Sync: Real-time
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            paddingLeft: '18px',
+            borderLeft: '1px solid #E2E8F0',
+          }}
+        >
+          <div style={{ textAlign: 'right' }}>
+            <div
+              style={{
+                fontSize: '13px',
+                fontWeight: '700',
+                color: '#0F172A',
+                lineHeight: '1.25',
+              }}
+            >
+              System Admin
+            </div>
+            <div
+              style={{
+                fontSize: '11px',
+                fontWeight: '500',
+                color: '#64748B',
+                lineHeight: '1.25',
+              }}
+            >
+              Platform Administrator
+            </div>
+          </div>
+          <span
+            style={{
+              width: '34px',
+              height: '34px',
+              borderRadius: '10px',
+              backgroundColor: '#EFF6FF',
+              color: '#1B68F6',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '14px',
+              flexShrink: 0,
+            }}
+          >
+            <i className="fa-solid fa-user" aria-hidden="true" />
+          </span>
+        </div>
+      </div>
+</header>
+
         <Outlet />
       </main>
     </div>
+    </DashboardProvider>
   );
 }
 
