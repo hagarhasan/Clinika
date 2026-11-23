@@ -107,37 +107,12 @@ export default function DoctorAvailability() {
     }
   };
 
-  const timeBox = {
-    backgroundColor: C.low,
-    borderRadius: 12,
-    padding: '8px 12px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-  };
-  const selClean = {
-    border: 'none',
-    backgroundColor: 'transparent',
-    color: C.text,
-    fontSize: 13,
-    fontWeight: 700,
-    cursor: 'pointer',
-    outline: 'none',
-  };
-
-  return (
-    <div style={{ maxWidth: 1220, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <Helmet><title>Manage Availability | Clinika</title></Helmet>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>
-            Doctor Dashboard &gt; <span style={{ color: C.primary, fontWeight: 600 }}>Manage Availability</span>
-          </div>
-          <h1 style={{ margin: 0, fontSize: 30, fontWeight: 700, color: C.text }}>Manage Availability</h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: C.muted }}>
-            Configure your recurring consultation days, clinic shifts, and slot generation intervals.
-          </p>
+     return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      <Helmet><title>Doctor Availability | Clinika</title></Helmet>
+      <div>
+        <div style={{ fontSize: 12, color: C.m }}>
+          Doctor Dashboard <i className="fa-solid fa-chevron-right" style={{ fontSize: 9 }} /> <b style={{ color: C.p }}>Manage Availability</b>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={pill(C.primaryFixed, C.primary)}>
