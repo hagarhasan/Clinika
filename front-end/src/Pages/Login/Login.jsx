@@ -46,52 +46,48 @@ const [error, setError] = useState("");
   // Real login: the server checks the password and tells us the account role.
   // The role buttons above are only a hint - the account's own role decides the dashboard
   // (this is also how an admin signs in).
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSubmitting(true);
+  
+const handleLogin = async (e) => {
+  e.preventDefault();
+  setError("");
+  setSubmitting(true);
 
-    try {
-      const { data } = await axios.post(`${API_BASE_URL}/auth/login`, {
-        email: email.trim(),
-        password,
-        remember_me: rememberMe,
-      });
-      localStorage.setItem(TOKEN_KEY, data.access_token);
-      navigate(HOME_BY_ROLE[data.user?.role] || "/", { replace: true });
-    } catch (err) {
-      const detail = err?.response?.data?.detail;
-      setError(
-        !err?.response
-          ? "Cannot reach the server. Check your connection and try again."
-          : typeof detail === "string"
-          ? detail
-          : "Could not sign in. Please check your email and password."
-      );
-    } finally {
-      setSubmitting(false);
-    }
+  try {
+    const { data } = await axios.post(`${API_BASE_URL}/auth/login`, {
+      email: email.trim(),
+      password,
+      remember_me: rememberMe,
+    });
 
-   localStorage.setItem("token", token);
-localStorage.setItem("role", role);
+    localStorage.setItem(TOKEN_KEY, data.access_token);
 
-navigate(
-  role === "patient"
-    ? "/patient-dashboard"
-    : role === "doctor"
-    ? "/doctor-dashboard"
-    : "/admin-dashboard"
-);
-  } catch (err) {
-    setError(
-      err.response?.data?.detail ||
-      err.response?.data?.message ||
-      "Login failed. Please check your email and password."
+    const role = data.user?.role;
+
+    navigate(
+      role === "patient"
+        ? "/patient-dashboard"
+        : role === "doctor"
+        ? "/doctor-dashboard"
+        : "/admin-dashboard",
+      { replace: true }
     );
+
+  } catch (err) {
+    const detail = err?.response?.data?.detail;
+
+    setError(
+      !err?.response
+        ? "Cannot reach the server. Check your connection and try again."
+        : typeof detail === "string"
+        ? detail
+        : "Could not sign in. Please check your email and password."
+    );
+
   } finally {
-    setLoading(false);
+    setSubmitting(false);
   }
 };
+
 
   const handleDemo = (selectedRole) => {
     setRole(selectedRole);
