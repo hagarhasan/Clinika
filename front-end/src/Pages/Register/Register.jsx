@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../../api";
 import {
   ArrowLeft,
@@ -19,6 +19,7 @@ import {
 import "./Register.css";
 
 export default function Register() {
+  const navigate = useNavigate();
   const [accountType, setAccountType] = useState("patient");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -32,7 +33,21 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+useEffect(() => {
+  const token = localStorage.getItem("token");
 
+  if (token) {
+    const role = localStorage.getItem("role");
+
+    if (role === "doctor") {
+      navigate("/doctor-dashboard", { replace: true });
+    } else if (role === "admin") {
+      navigate("/admin-dashboard", { replace: true });
+    } else {
+      navigate("/patient-dashboard", { replace: true });
+    }
+  }
+}, [navigate]);
   const handleRegister = async (e) => {
     e.preventDefault();
 

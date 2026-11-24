@@ -1,9 +1,10 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API_BASE_URL, TOKEN_KEY } from "../../api/adminApi";
+
 import {
   Stethoscope,
   BadgeCheck,
@@ -16,9 +17,9 @@ import {
   Eye,
   EyeOff,
   Info,
-ArrowRight,
+  ArrowRight,
   ArrowLeft,
-    UserRound,
+  UserRound,
 } from "lucide-react";
 
 import "./Login.css";
@@ -106,9 +107,9 @@ const handleLogin = async (e) => {
         {/* LEFT SIDE */}
         <section className="clinika-login-left">
           <Link to="/" className="clinika-back-home">
-  <ArrowLeft size={16} />
-  <span>Back to Home</span>
-</Link>
+            <ArrowLeft size={16} />
+            <span>Back to Home</span>
+          </Link>
 
           <div className="clinika-access-badge">
             <span className="clinika-badge-dot"></span>
@@ -128,9 +129,7 @@ const handleLogin = async (e) => {
 
           {/* DOCTOR CARD */}
           <div className="clinika-doctor-card">
-
             <div className="clinika-doctor-top">
-
               <div className="clinika-doctor-avatar">
                 <Stethoscope size={25} />
               </div>
@@ -138,7 +137,10 @@ const handleLogin = async (e) => {
               <div className="clinika-doctor-details">
                 <h3>
                   Dr. Maya Lin, MD
-                  <BadgeCheck size={15} className="clinika-verified-icon" />
+                  <BadgeCheck
+                    size={15}
+                    className="clinika-verified-icon"
+                  />
                 </h3>
 
                 <p>
@@ -150,7 +152,6 @@ const handleLogin = async (e) => {
                 <Star size={12} fill="currentColor" />
                 <span>4.9</span>
               </div>
-
             </div>
 
             <p className="clinika-doctor-quote">
@@ -160,7 +161,6 @@ const handleLogin = async (e) => {
             </p>
 
             <div className="clinika-doctor-stats">
-
               <div>
                 <ShieldCheck size={13} />
                 <span>Identity Verified</span>
@@ -170,16 +170,12 @@ const handleLogin = async (e) => {
                 <CalendarCheck size={13} />
                 <span>1,420+ Visits Facilitated</span>
               </div>
-
             </div>
-
           </div>
 
           {/* SECURITY CARDS */}
           <div className="clinika-security-cards">
-
             <div className="clinika-security-card">
-
               <div className="clinika-security-icon">
                 <LockKeyhole size={19} />
               </div>
@@ -188,11 +184,9 @@ const handleLogin = async (e) => {
                 <h4>Standard TLS</h4>
                 <p>Encrypted connection</p>
               </div>
-
             </div>
 
             <div className="clinika-security-card">
-
               <div className="clinika-security-icon">
                 <ShieldCheck size={19} />
               </div>
@@ -201,21 +195,16 @@ const handleLogin = async (e) => {
                 <h4>Account Protected</h4>
                 <p>Privacy protected data</p>
               </div>
-
             </div>
-
           </div>
-
         </section>
 
         {/* RIGHT SIDE */}
         <section className="clinika-login-right">
-
           <div className="clinika-login-card">
 
             {/* HEADER */}
             <div className="clinika-card-header">
-
               <div>
                 <h2>Welcome Back</h2>
 
@@ -228,21 +217,20 @@ const handleLogin = async (e) => {
               <span className="clinika-secure-badge">
                 SECURE PORTAL
               </span>
-
             </div>
 
             {/* ROLE SELECTOR */}
             <div className="clinika-role-section">
-
               <label className="clinika-section-label">
                 Select Account Role
               </label>
 
               <div className="clinika-role-switch">
-
                 <button
                   type="button"
-                  className={role === "patient" ? "clinika-role-active" : ""}
+                  className={
+                    role === "patient" ? "clinika-role-active" : ""
+                  }
                   onClick={() => setRole("patient")}
                 >
                   <UserRound size={14} />
@@ -251,13 +239,14 @@ const handleLogin = async (e) => {
 
                 <button
                   type="button"
-                  className={role === "doctor" ? "clinika-role-active" : ""}
+                  className={
+                    role === "doctor" ? "clinika-role-active" : ""
+                  }
                   onClick={() => setRole("doctor")}
                 >
                   <Stethoscope size={14} />
                   Doctor
                 </button>
-
               </div>
 
               <div className="clinika-role-hint">
@@ -269,7 +258,6 @@ const handleLogin = async (e) => {
                     : "Doctor mode: Manage appointments, schedules & patient records."}
                 </span>
               </div>
-
             </div>
 
             {/* FORM */}
@@ -277,10 +265,8 @@ const handleLogin = async (e) => {
               className="clinika-login-form"
               onSubmit={handleLogin}
             >
-
               {/* EMAIL */}
               <div className="clinika-field">
-
                 <div className="clinika-field-header">
                   <label htmlFor="clinika-email">
                     Email Address
@@ -301,12 +287,10 @@ const handleLogin = async (e) => {
                     required
                   />
                 </div>
-
               </div>
 
               {/* PASSWORD */}
               <div className="clinika-field">
-
                 <div className="clinika-field-header">
                   <label htmlFor="clinika-password">
                     Password
@@ -346,14 +330,11 @@ const handleLogin = async (e) => {
                       </>
                     )}
                   </button>
-
                 </div>
-
               </div>
 
               {/* REMEMBER ME */}
               <label className="clinika-remember">
-
                 <input
                   type="checkbox"
                   checked={rememberMe}
@@ -361,11 +342,18 @@ const handleLogin = async (e) => {
                 />
 
                 <span>Remember this device for 30 days</span>
-
               </label>
 
               {error && (
-                <p role="alert" style={{ margin: "0 0 12px", color: "#b91c1c", fontSize: "14px", fontWeight: 500 }}>
+                <p
+                  role="alert"
+                  style={{
+                    margin: "0 0 12px",
+                    color: "#b91c1c",
+                    fontSize: "14px",
+                    fontWeight: 500,
+                  }}
+                >
                   {error}
                 </p>
               )}
@@ -376,19 +364,16 @@ const handleLogin = async (e) => {
                 className="clinika-submit-button"
                 disabled={submitting}
               >
-                <span>{submitting ? "Signing in…" : "Sign In to Clinika"}</span>
+                <span>
+                  {submitting ? "Signing in…" : "Sign In to Clinika"}
+                </span>
+
                 <ArrowRight size={17} />
               </button>
-
             </form>
-{error && (
-  <p className="login-error" role="alert">
-    {error}
-  </p>
-)}
+
             {/* DEMO */}
             <div className="clinika-demo-section">
-
               <span>Quick Fill:</span>
 
               <button
@@ -406,28 +391,22 @@ const handleLogin = async (e) => {
               >
                 Doctor Demo
               </button>
-
             </div>
 
             {/* REGISTER */}
             <div className="clinika-register">
-
               <span>Don't have a Clinika account?</span>
 
               <Link to="/register">
                 Create an Account
                 <ArrowRight size={12} />
               </Link>
-
             </div>
-
           </div>
-
         </section>
 
         {/* PRIVACY NOTICE */}
         <div className="clinika-privacy-notice">
-
           <div className="clinika-privacy-icon">
             <ShieldCheck size={17} />
           </div>
@@ -442,7 +421,6 @@ const handleLogin = async (e) => {
           </div>
 
           <div className="clinika-privacy-links">
-
             <Link to="/privacy-policy">
               Privacy Notice
             </Link>
@@ -452,20 +430,18 @@ const handleLogin = async (e) => {
             <Link to="/terms">
               Terms of Care
             </Link>
-
           </div>
-
         </div>
 
         {/* FOOTER */}
         <footer className="clinika-login-footer">
           © 2025 Clinika Health, Inc.
           <span>•</span>
+
           <Link to="/privacy-policy">
             Privacy &amp; Terms
           </Link>
         </footer>
-
       </main>
     </>
   );

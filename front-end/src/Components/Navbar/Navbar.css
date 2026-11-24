@@ -12,7 +12,7 @@
   top: 0;
   left: 0;
   width: 100%;
-  height: 76px;
+  height :76px;
   z-index: 10000;
   background: transparent;
   border-bottom: 1px solid transparent;
@@ -128,10 +128,151 @@
 .navbar-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 20px;
   margin-left: auto;
+  padding: 0 10px;
+}/* =====================================
+   ACCOUNT MENU
+===================================== */
+
+.account-menu-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 
+.account-dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 190px;
+  padding: 7px;
+  background: #ffffff;
+  border: 1px solid #edf0f5;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.12);
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+}
+
+.account-dropdown a,
+.account-dropdown button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #344054;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.account-dropdown a:hover {
+  background: #f0f5ff;
+  color: #2164f5;
+}
+
+.account-dropdown button {
+  color: #c65353;
+  border-top: 1px solid #f0f2f5;
+  border-radius: 0 0 8px 8px;
+}
+
+.account-dropdown button:hover {
+  background: #fff5f5;
+  color: #b83e3e;
+}
+/* =====================================
+   ACCOUNT MENU
+===================================== */
+
+.account-menu-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.account-menu-btn {
+  min-height: 40px;
+  padding: 0 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid #2164f5;
+  border-radius: 11px;
+  background: #2164f5;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.account-menu-btn:hover,
+.account-menu-btn.active {
+  background: #1854db;
+  border-color: #1854db;
+}
+
+.account-dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 190px;
+  padding: 7px;
+  background: #ffffff;
+  border: 1px solid #edf0f5;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.12);
+  z-index: 10001;
+  display: flex;
+  flex-direction: column;
+}
+
+.account-dropdown a,
+.account-dropdown button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #344054;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.account-dropdown a:hover {
+  background: #f0f5ff;
+  color: #2164f5;
+}
+
+.account-dropdown button {
+  color: #c65353;
+  border-top: 1px solid #f0f2f5;
+  border-radius: 0 0 8px 8px;
+}
+
+.account-dropdown button:hover {
+  background: #fff5f5;
+  color: #b83e3e;
+}
 /* Login */
 
 .login-link {
@@ -178,7 +319,7 @@
 ===================================== */
 
 .profile-btn {
-  width: 37px;
+  width: 37px; 
   height: 37px;
   display: flex;
   align-items: center;
@@ -296,13 +437,13 @@
     width: 100%;
     margin: 0;
   }
-
+.logout-btn {
+  display: flex;
+}
   /* Mobile Links */
 
   .nav-link,
-  .login-link,
-  .appointment-btn,
-  .profile-btn {
+  .login-link {
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -326,9 +467,7 @@
   }
 
   .nav-link:hover,
-  .login-link:hover,
-  .appointment-btn:hover,
-  .profile-btn:hover {
+  .login-link:hover {
     background: #f5f8ff;
     color: #2164f5;
   }
@@ -352,17 +491,9 @@
     background: #f0f5ff;
   }
 
-  .appointment-btn.active,
-  .profile-btn.active {
-    color: #2164f5;
-    background: #f0f5ff;
-  }
-
+ 
   /* Profile Text */
 
-  .profile-btn {
-    border-radius: 0;
-  }
 
   .profile-icon {
     display: none;
@@ -386,7 +517,68 @@
     transform: translateY(-7px) rotate(-45deg);
   }
 }
+/* Account Menu - Mobile */
 
+.account-menu-wrapper {
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.profile-btn {
+  width: 100%;
+  min-height: auto;
+  height: auto;
+  padding: 14px 5px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  background: transparent;
+  color: #344054;
+  border: none;
+  border-bottom: 1px solid #f0f2f5;
+  border-radius: 0;
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.profile-btn:hover,
+.profile-btn.active {
+  background: #f5f8ff;
+  color: #2164f5;
+}
+
+.profile-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+.profile-text {
+  display: inline;
+}
+
+.account-dropdown {
+  position: static;
+  width: 100%;
+  padding: 5px 0 5px 15px;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: #f8faff;
+}
+
+.account-dropdown a,
+.account-dropdown button {
+  min-height: 43px;
+  padding: 12px;
+  font-size: 14px;
+}
 /* =====================================
    SMALL MOBILE
 ===================================== */
@@ -431,5 +623,203 @@
 
   .navbar-content {
     padding: 10px 16px 18px;
+  }
+}
+/* LOG OUT BUTTON */
+
+.logout-btn {
+  display: none;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  padding: 14px 5px;
+  margin: 0;
+  border: none;
+  border-top: 1px solid #f0f2f5;
+  border-radius: 0;
+  background: transparent;
+  color: #c65353;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.logout-btn:hover {
+  background: #fff5f5;
+  color: #b83e3e;
+}@media (max-width: 900px) {
+  .logout-btn {
+    display: flex;
+  }
+}/* =====================================
+   LOGOUT CONFIRMATION MODAL
+===================================== */
+
+.logout-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(16, 24, 40, 0.45);
+  backdrop-filter: blur(4px);
+  animation: logoutOverlayShow 0.2s ease;
+}
+
+.logout-modal {
+  width: 100%;
+  max-width: 390px;
+  padding: 32px 28px 26px;
+  background: #ffffff;
+  border: 1px solid #edf0f5;
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(16, 24, 40, 0.16);
+  text-align: center;
+  animation: logoutModalShow 0.25s ease;
+}
+
+.logout-modal-icon {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2164f5;
+  background: #f0f5ff;
+  border-radius: 50%;
+}
+
+.logout-modal h3 {
+  margin: 0 0 10px;
+  color: #202938;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.logout-modal p {
+  margin: 0 auto 26px;
+  max-width: 290px;
+  color: #667085;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.logout-modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.logout-cancel-btn,
+.logout-confirm-btn {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.logout-cancel-btn {
+  color: #344054;
+  background: #ffffff;
+  border: 1px solid #d0d5dd;
+}
+
+.logout-cancel-btn:hover {
+  background: #f8faff;
+  border-color: #2164f5;
+  color: #2164f5;
+}
+
+.logout-confirm-btn {
+  color: #ffffff;
+  background: #c65353;
+  border: 1px solid #c65353;
+}
+
+.logout-confirm-btn:hover {
+  background: #b83e3e;
+  border-color: #b83e3e;
+}
+
+@keyframes logoutOverlayShow {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes logoutModalShow {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+/* =====================================
+   DESKTOP ACCOUNT & PROFILE ALIGNMENT
+===================================== */
+
+@media (min-width: 901px) {
+
+  .navbar-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+
+  .account-menu-wrapper {
+    position: relative;
+    width: auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .profile-btn {
+    width: 37px;
+    min-width: 37px;
+    height: 37px;
+    min-height: 37px;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #2164f5;
+    color: #ffffff;
+    border: none;
+    box-shadow: none;
+  }
+
+  .profile-icon {
+    display: block;
+  }
+
+  .profile-text {
+    display: none;
+  }
+
+  .account-dropdown {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    width: 190px;
   }
 }

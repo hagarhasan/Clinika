@@ -7,13 +7,14 @@ import {
   Star,
   Search,
   CalendarDays,
-   CircleCheck,
+  CircleCheck,
   ClipboardList,
   CalendarCheck,
   FileText,
   ArrowRight,
   LockKeyhole,
   ShieldCheck,
+  UserRound ,
 } from "lucide-react";
 import aboutImage from "../../assets/images/about.png";
 function SearchIcon() {
@@ -534,25 +535,36 @@ export default function Home() {
 
         <article className="home-doctor-card" key={doctor.id}>
 
-          <div className="home-doctor-image-wrapper">
+<div className="home-doctor-image-wrapper">
 
-            <img
-              src={
-                doctor.photo_url ||
-                "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=85"
-              }
-              alt={doctor.full_name}
-              className="home-doctor-image"
-            />
+  {doctor.photo_url && (
+    <img
+      src={doctor.photo_url}
+      alt={doctor.full_name}
+      className="home-doctor-image"
+      onError={(e) => {
+        e.currentTarget.style.display = "none";
+        e.currentTarget.nextElementSibling.style.display = "flex";
+      }}
+    />
+  )}
 
-            {doctor.is_verified && (
-              <span className="home-verified-badge">
-                Verified Doctor
-              </span>
-            )}
+ <div
+  className="home-doctor-image-placeholder"
+  style={{
+    display: doctor.photo_url ? "none" : "flex",
+  }}
+>
+  <UserRound size={56} strokeWidth={1.8} />
+</div>
 
-          </div>
+  {doctor.is_verified && (
+    <span className="home-verified-badge">
+      Verified Doctor
+    </span>
+  )}
 
+</div>
           <div className="home-doctor-info">
 
             <h3>{doctor.full_name}</h3>
