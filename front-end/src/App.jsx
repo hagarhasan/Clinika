@@ -1,5 +1,5 @@
 import Layout from './Components/Layout/Layout';
-import { BrowserRouter, RouterProvider, createBrowserRouter, createHashRouter } from 'react-router-dom';
+import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import Privacy from './Pages/Privacy/Privacy';
 import Terms from './Pages/Terms/Terms';
 import Accessibility from './Pages/Accessibility/Accessibility';
@@ -76,7 +76,7 @@ const router = createBrowserRouter([
     ]
   },
   {
-    // Only a logged-in user whose role is "admin" can open this area (checked with the server).
+
     path: 'admin-dashboard', element: <RequireAdmin><AdminDashboard /></RequireAdmin>, children: [
       { index: true, element: <AdminOverview /> },
       { path: "manage-doctors", element: <ManageDoctors /> },

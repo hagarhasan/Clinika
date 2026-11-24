@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import adminApi, { getErrorMessage } from '../../api/adminApi';
 import { useAdminUser } from '../../context/AdminUserContext';
-import { Avatar, Banner, formatShortDate, Modal, Pager, showingRange } from './adminUi';
+import { Avatar, Banner, formatShortDate, Modal, showingRange } from './adminUi';
 import useServerList from './useServerList';
 
 const PAGE_SIZE = 10;
