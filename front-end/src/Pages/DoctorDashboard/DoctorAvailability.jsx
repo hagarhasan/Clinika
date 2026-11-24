@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useDoctorData, api, errMsg, hhmm, toMin, to12, C, card, pill, btn } from './DoctorDashboard';
+import { useDoctorData, errMsg, hhmm, toMin, to12, C, card, pill, btn } from './DoctorDashboard';
+import { updateSchedules, updateDoctor } from '../../api/doctorsApi';
 import AvailabilitySummary from './AvailabilitySummary';
 
 const DAYS = [
@@ -115,8 +116,8 @@ export default function DoctorAvailability() {
           is_active: d.active,
           clinic_id: activeClinic?.id ?? null,
         }));
-        const { data } = await api.put(`/doctors/${docId}/schedules`, payload);
-        await api.put(`/doctors/${docId}`, { slot_duration_minutes: safeDuration }).catch(() => null);
+        const data = await updateSchedules(docId, payload);
+        await updateDoctor(docId, { slot_duration_minutes: safeDuration }).catch(() => null);
         if (Array.isArray(data)) setSchedules(data);
         await refresh();
       }

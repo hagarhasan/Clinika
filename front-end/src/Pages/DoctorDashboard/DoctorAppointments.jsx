@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { useDoctorData, api, errMsg, dayText, hhmm, to12, initials, C, card, pill, btn, STATUS_UI } from './DoctorDashboard';
+import { useDoctorData, errMsg, dayText, hhmm, to12, initials, C, card, pill, btn, STATUS_UI } from './DoctorDashboard';
+import { updateAppointmentStatus } from '../../api/appointmentsApi';
 
 export default function DoctorAppointments() {
   const { appointments, setAppointments, loading, refresh } = useDoctorData();
@@ -32,7 +33,7 @@ export default function DoctorAppointments() {
     setMsg(null);
     setBusyId(id);
     try {
-      await api.patch(`/appointments/${id}/status`, { status: nextStatus });
+      await updateAppointmentStatus(id, { status: nextStatus });
       setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: nextStatus } : a)));
       setMsg({ ok: true, text: `Appointment updated to ${nextStatus}.` });
       await refresh();

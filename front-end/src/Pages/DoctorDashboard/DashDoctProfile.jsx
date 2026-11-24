@@ -4,7 +4,10 @@ import PasswordCard from '../../Components/Patient/PasswordCard';
 import { getInitials } from '../../Components/Patient/dateFormat';
 import '../PatientDashboard/patient-dashboard.css';
 import '../PatientDashboard/patient-profile.css';
-import { useDoctorData, api, errMsg, drName } from './DoctorDashboard';
+import { useDoctorData, errMsg, drName } from './DoctorDashboard';
+import { uploadAvatar } from '../../api/uploadsApi';
+import { updateMe } from '../../api/authApi';
+import { updateDoctor } from '../../api/doctorsApi';
 
 const MAX_AVATAR_MB = 3;
 
@@ -59,9 +62,7 @@ export default function DashDoctProfile() {
     setAvatarBusy(true);
     setNotice({ type: '', text: '' });
     try {
-      const body = new FormData();
-      body.append('file', file);
-      await api.post('/uploads/avatar', body, { timeout: 90000 });
+      await uploadAvatar(file);
       await refresh();
       setNotice({ type: 'ok', text: 'Your photo was updated.' });
     } catch (err) {
@@ -76,12 +77,12 @@ export default function DashDoctProfile() {
     setSaving(true);
     setNotice({ type: '', text: '' });
     try {
-      await api.put('/auth/me', {
+      await updateMe({
         first_name: draft.first_name.trim(),
         last_name: draft.last_name.trim(),
         phone: draft.phone.trim() || null,
       });
-      await api.put(`/doctors/${profile.id}`, {
+      await updateDoctor(profile.id, {
         gender: draft.gender || null,
         title: draft.title.trim() || null,
         room: draft.room.trim() || null,

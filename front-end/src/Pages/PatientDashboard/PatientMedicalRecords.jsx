@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { PrescriptionCard, RecordCard } from '../../Components/Patient/RecordCards';
 import { EmptyState, ErrorState, LoadingState } from '../../Components/Patient/StateViews';
-import { fetchMedicalRecords, fetchPrescriptions, getErrorMessage, isUnauthorized } from './patientApi';
+import { fetchMedicalRecords } from '../../api/medicalRecordsApi';
+import { fetchPrescriptions } from '../../api/prescriptionsApi';
+import { getErrorMessage, isUnauthorized } from '../../api/client';
 import './patient-records.css';
 
 const TABS = [

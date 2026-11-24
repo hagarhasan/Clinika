@@ -1,22 +1,21 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import logoIcon from '../../assets/Logo.svg';
 
-export default function DashboardShell({
+export default function DashboardLayout({
   portalLabel,
   pageTitle,
-  navItems,
+  navItems = [],
   userName,
   userSubtitle,
   onLogout,
-  badge,
-  brandIcon,
+  badge = 0,
   children,
 }) {
   return (
     <div className="cl-pd-shell">
       <aside className="cl-pd-sidebar">
         <Link to="/" className="cl-pd-sidebar__brand" aria-label="Clinika home">
-          <img className="cl-pd-sidebar__brand-icon" src={brandIcon || logoIcon} alt="" />
+          <img className="cl-pd-sidebar__brand-icon" src={logoIcon} alt="" />
           <span>
             <strong>Clinika</strong>
             <small>{portalLabel}</small>
@@ -38,7 +37,9 @@ export default function DashboardShell({
               )}
               <span>{item.label}</span>
               {item.badge && badge > 0 && (
-                <span className="cl-pd-nav__badge" aria-label={`${badge} unread or new items`}>{badge > 99 ? '99+' : badge}</span>
+                <span className="cl-pd-nav__badge" aria-label={`${badge} unread or new items`}>
+                  {badge > 99 ? '99+' : badge}
+                </span>
               )}
             </NavLink>
           ))}
@@ -49,10 +50,12 @@ export default function DashboardShell({
             <span className="material-symbols-outlined" aria-hidden="true">arrow_back</span>
             <span>Back to site</span>
           </Link>
-          <button type="button" className="cl-pd-nav__link cl-pd-logout" onClick={onLogout}>
-            <span className="material-symbols-outlined" aria-hidden="true">logout</span>
-            <span>Log out</span>
-          </button>
+          {onLogout && (
+            <button type="button" className="cl-pd-nav__link cl-pd-logout" onClick={onLogout}>
+              <span className="material-symbols-outlined" aria-hidden="true">logout</span>
+              <span>Log out</span>
+            </button>
+          )}
         </div>
       </aside>
 

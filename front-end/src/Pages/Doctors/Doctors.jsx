@@ -1,7 +1,7 @@
 
 import  { useState,useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import api from "../../api";
+import { listDoctors } from "../../api/doctorsApi";
 import {
   Home,
   ChevronRight,
@@ -54,12 +54,10 @@ export default function Doctors() {
         setLoading(true);
         setApiError("");
 
-        const response = await api.get("/doctors", {
-          params: {
-            limit: 20,
-            offset: 0,
-            sort: "recommended",
-          },
+        const response = await listDoctors({
+          limit: 20,
+          offset: 0,
+          sort: "recommended",
         });
 
        

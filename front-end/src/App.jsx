@@ -1,4 +1,5 @@
 import Layout from './Components/Layout/Layout';
+import { lazy, Suspense } from 'react';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import Privacy from './Pages/Privacy/Privacy';
 import Terms from './Pages/Terms/Terms';
@@ -9,34 +10,41 @@ import Login from './Pages/Login/Login';
 import Register from './Pages/Register/Register';
 import ForgetPassword from './Pages/ForgetPassword/ForgetPassword';
 import PatientDashboard from './Pages/PatientDashboard/PatientDashboard';
-import PatientOverview from './Pages/PatientDashboard/PatientOverview';
-import PatientAppointments from './Pages/PatientDashboard/PatientAppointments';
-import PatientMedicalRecords from './Pages/PatientDashboard/PatientMedicalRecords';
-import PatientProfile from './Pages/PatientDashboard/PatientProfile';
-import PatientNotifications from './Pages/PatientDashboard/PatientNotifications';
 import DoctorDashboard from './Pages/DoctorDashboard/DoctorDashboard';
-import DoctorOverview from './Pages/DoctorDashboard/DoctorOverview';
-import DoctorAppointments from './Pages/DoctorDashboard/DoctorAppointments';
-import DoctorAvailability from './Pages/DoctorDashboard/DoctorAvailability';
-import DoctorDashboardProfile from './Pages/DoctorDashboard/DashDoctProfile';
 import AdminDashboard from './Pages/AdminDashboard/AdminDashboard';
-import AdminOverview from './Pages/AdminDashboard/AdminOverview';
-import ManageDoctors from './Pages/AdminDashboard/ManageDoctors';
-import AdminManage from './Pages/AdminDashboard/AdminManage';
-import AdminProfile from './Pages/AdminDashboard/AdminProfile';
 import Contact from './Pages/Contact/Contact';
 import About from './Pages/About/About';
 import Doctors from './Pages/Doctors/Doctors';
 import DoctorProfile from './Pages/Doctors/DoctorProfile';
 import BookAppointment from './Pages/Doctors/BookAppointment';
 import NotFound from './Pages/NotFound/NotFound';
-import ContactMessages from './Pages/AdminDashboard/ContactMessages';
-import CatalogManage from './Pages/AdminDashboard/CatalogManage';
-import Reports from './Pages/AdminDashboard/Reports';
-import AdminTeam from './Pages/AdminDashboard/AdminTeam';
 import RequireRole from './Components/RequireRole/RequireRole';
 
 import ToastNotification from './Components/Toast/ToastNotification';
+
+const PatientOverview = lazy(() => import('./Pages/PatientDashboard/PatientOverview'));
+const PatientAppointments = lazy(() => import('./Pages/PatientDashboard/PatientAppointments'));
+const PatientMedicalRecords = lazy(() => import('./Pages/PatientDashboard/PatientMedicalRecords'));
+const PatientProfile = lazy(() => import('./Pages/PatientDashboard/PatientProfile'));
+const PatientNotifications = lazy(() => import('./Pages/PatientDashboard/PatientNotifications'));
+const DoctorOverview = lazy(() => import('./Pages/DoctorDashboard/DoctorOverview'));
+const DoctorAppointments = lazy(() => import('./Pages/DoctorDashboard/DoctorAppointments'));
+const DoctorAvailability = lazy(() => import('./Pages/DoctorDashboard/DoctorAvailability'));
+const DoctorDashboardProfile = lazy(() => import('./Pages/DoctorDashboard/DashDoctProfile'));
+const AdminOverview = lazy(() => import('./Pages/AdminDashboard/AdminOverview'));
+const ManageDoctors = lazy(() => import('./Pages/AdminDashboard/ManageDoctors'));
+const AdminManage = lazy(() => import('./Pages/AdminDashboard/AdminManage'));
+const AdminProfile = lazy(() => import('./Pages/AdminDashboard/AdminProfile'));
+const ContactMessages = lazy(() => import('./Pages/AdminDashboard/ContactMessages'));
+const CatalogManage = lazy(() => import('./Pages/AdminDashboard/CatalogManage'));
+const Reports = lazy(() => import('./Pages/AdminDashboard/Reports'));
+const AdminTeam = lazy(() => import('./Pages/AdminDashboard/AdminTeam'));
+
+const LazyPage = ({ component: Component }) => (
+  <Suspense fallback={<div className="cl-pd-loading" aria-label="Loading">Loading...</div>}>
+    <Component />
+  </Suspense>
+);
 
 const basename = import.meta.env.BASE_URL === './'
   ? '/'
@@ -62,32 +70,31 @@ const router = createBrowserRouter([
   { path: "accessibility", element: <Accessibility /> },
   {
     path: "patient-dashboard", element: <RequireRole role="patient"><PatientDashboard /></RequireRole>, children: [
-      { index: true, element: <PatientOverview /> },
-      { path: "my-appointments", element: <PatientAppointments /> },
-      { path: "medical-records", element: <PatientMedicalRecords /> },
-      { path: "my-profile", element: <PatientProfile /> },
-      { path: "notifications", element: <PatientNotifications /> },
+      { index: true, element: <LazyPage component={PatientOverview} /> },
+      { path: "my-appointments", element: <LazyPage component={PatientAppointments} /> },
+      { path: "medical-records", element: <LazyPage component={PatientMedicalRecords} /> },
+      { path: "my-profile", element: <LazyPage component={PatientProfile} /> },
+      { path: "notifications", element: <LazyPage component={PatientNotifications} /> },
     ]
   },
   {
     path: 'doctor-dashboard', element: <RequireRole role="doctor"><DoctorDashboard /></RequireRole>, children: [
-      { index: true, element: <DoctorOverview /> },
-      { path: "manage-appointments", element: <DoctorAppointments /> },
-      { path: "manage-availability", element: <DoctorAvailability /> },
-      { path: "my-profile", element: <DoctorDashboardProfile /> },
+      { index: true, element: <LazyPage component={DoctorOverview} /> },
+      { path: "manage-appointments", element: <LazyPage component={DoctorAppointments} /> },
+      { path: "manage-availability", element: <LazyPage component={DoctorAvailability} /> },
+      { path: "my-profile", element: <LazyPage component={DoctorDashboardProfile} /> },
     ]
   },
   {
-
     path: 'admin-dashboard', element: <RequireRole role="admin"><AdminDashboard /></RequireRole>, children: [
-      { index: true, element: <AdminOverview /> },
-      { path: "manage-doctors", element: <ManageDoctors /> },
-      { path: "manage-users-and-appointments", element: <AdminManage /> },
-      { path: "messages", element: <ContactMessages /> },
-      { path: "catalog", element: <CatalogManage /> },
-      { path: "reports", element: <Reports /> },
-      { path: "team", element: <AdminTeam /> },
-      { path: "my-profile", element: <AdminProfile /> },
+      { index: true, element: <LazyPage component={AdminOverview} /> },
+      { path: "manage-doctors", element: <LazyPage component={ManageDoctors} /> },
+      { path: "manage-users-and-appointments", element: <LazyPage component={AdminManage} /> },
+      { path: "messages", element: <LazyPage component={ContactMessages} /> },
+      { path: "catalog", element: <LazyPage component={CatalogManage} /> },
+      { path: "reports", element: <LazyPage component={Reports} /> },
+      { path: "team", element: <LazyPage component={AdminTeam} /> },
+      { path: "my-profile", element: <LazyPage component={AdminProfile} /> },
     ]
   },
   { path: "*", element: <NotFound /> }

@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
-import { API_BASE_URL, TOKEN_KEY } from "../../api/adminApi";
+import { login as loginRequest } from "../../api/authApi";
+import { TOKEN_KEY } from "../../api/client";
 import { setPendingToast, showToast } from "../../Components/Toast/toastService";
 import { stripDoctorTitle } from "../../utils/nameUtils";
 
@@ -50,7 +50,7 @@ const handleLogin = async (e) => {
   setSubmitting(true);
 
   try {
-    const { data } = await axios.post(`${API_BASE_URL}/auth/login`, {
+    const data = await loginRequest({
       email: email.trim(),
       password,
       remember_me: rememberMe,
@@ -117,15 +117,15 @@ const handleLogin = async (e) => {
       { replace: true }
     );
   } catch (err) {
-    const detail = err?.response?.data?.detail;
-
-    setError(
-      !err?.response
-        ? "Cannot reach the server. Check your connection and try again."
-        : typeof detail === "string"
-        ? detail
-        : "Could not sign in. Please check your email and password."
-    );
+    if (err?.status === 0 || (!err?.status && err?.message?.includes("reach"))) {
+      setError("Cannot reach the server. Check your connection and try again.");
+      return;
+    }
+    if (err?.status === 401) {
+      setError(err.message || "Invalid email or password.");
+      return;
+    }
+    setError(err?.message || "Could not sign in. Please check your email and password.");
   } finally {
     setSubmitting(false);
   }

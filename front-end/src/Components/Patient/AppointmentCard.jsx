@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from './StateViews';
 import { formatDate, formatTime, getInitials } from './dateFormat';
-import { cancelAppointment, getErrorMessage } from '../../Pages/PatientDashboard/patientApi';
+import { cancelAppointment } from '../../api/appointmentsApi';
+import { getErrorMessage } from '../../api/client';
 
 const CANCELLABLE = ['pending', 'confirmed'];
 

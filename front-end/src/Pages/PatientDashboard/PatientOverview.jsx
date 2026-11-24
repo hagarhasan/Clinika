@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import AppointmentCard from '../../Components/Patient/AppointmentCard';
 import NotificationItem from '../../Components/Patient/NotificationItem';
 import { EmptyState, ErrorState, LoadingState } from '../../Components/Patient/StateViews';
-import { fetchNotifications, fetchStats, getErrorMessage, isUnauthorized } from './patientApi';
+import { useQueryClient } from '@tanstack/react-query';
+import { usePatientStats } from '../../hooks/usePatientStats';
+import { useNotifications } from '../../hooks/useNotifications';
+import { queryKeys } from '../../hooks/queryKeys';
 import './patient-pages.css';
 
 const STAT_CARDS = [
@@ -14,48 +17,22 @@ const STAT_CARDS = [
   { key: 'total', label: 'Total visits', icon: 'calendar_month' },
 ];
 
-const LOADING = { status: 'loading', stats: null, notifications: [], error: '', needsLogin: false };
-
 export default function PatientOverview() {
-  const [state, setState] = useState(LOADING);
-  const [attempt, setAttempt] = useState(0); // bump this number to reload
+  const statsQuery = usePatientStats();
+  const notificationsQuery = useNotifications({ limit: 3 });
+  const queryClient = useQueryClient();
   const [notice, setNotice] = useState('');
-
-  useEffect(() => {
-    let ignore = false;
-    // Notifications are a bonus here: if they fail, the rest of the page still shows.
-    Promise.all([fetchStats(), fetchNotifications(3).catch(() => [])])
-      .then(([stats, notifications]) => {
-        if (!ignore) setState({ status: 'ready', stats, notifications, error: '', needsLogin: false });
-      })
-      .catch((err) => {
-        if (!ignore) {
-          setState({
-            status: 'error',
-            stats: null,
-            notifications: [],
-            error: getErrorMessage(err),
-            needsLogin: isUnauthorized(err),
-          });
-        }
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [attempt]);
-
-  function retry() {
-    setState(LOADING);
-    setAttempt((value) => value + 1);
-  }
+  const stateStatus = statsQuery.isLoading ? 'loading' : statsQuery.isError ? 'error' : 'ready';
 
   // After a cancel from this page: show a message and reload quietly.
   function handleCancelled(message) {
     setNotice(message);
-    setAttempt((value) => value + 1);
+    queryClient.invalidateQueries({ queryKey: queryKeys.patients.stats });
+    queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all });
   }
 
-  const { stats, notifications } = state;
+  const stats = statsQuery.data || {};
+  const notifications = notificationsQuery.data?.data || [];
 
   return (
     <>
@@ -68,13 +45,13 @@ export default function PatientOverview() {
         <p className="cl-pd-muted">A quick look at your visits and latest updates.</p>
       </header>
 
-      {state.status === 'loading' && <LoadingState label="Loading your overview…" />}
+      {stateStatus === 'loading' && <LoadingState label="Loading your overview…" />}
 
-      {state.status === 'error' && (
-        <ErrorState message={state.error} onRetry={retry} needsLogin={state.needsLogin} />
+      {stateStatus === 'error' && (
+        <ErrorState message={statsQuery.error?.message || 'Could not load your overview.'} onRetry={() => statsQuery.refetch()} needsLogin={statsQuery.error?.status === 401} />
       )}
 
-      {state.status === 'ready' && (
+      {stateStatus === 'ready' && (
         <>
           {notice && (
             <div className="cl-pd-notice" role="status">

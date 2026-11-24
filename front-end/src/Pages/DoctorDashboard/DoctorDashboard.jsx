@@ -1,20 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Outlet, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import DashboardLayout from './DashboardLayout';
+import { getMe } from '../../api/authApi';
+import { getMyDoctorProfile, getDoctorStats, getSlots, getSchedules } from '../../api/doctorsApi';
+import { getTodayAppointments, listAppointments } from '../../api/appointmentsApi';
+import DashboardLayout from '../../Components/Dashboard/DashboardLayout';
+import { dashboardNavConfig } from '../../Components/Dashboard/navConfig';
 import { stripDoctorTitle } from '../../utils/nameUtils';
 import { showToast } from '../../Components/Toast/toastService';
 
 
 export const TOKEN_KEY = 'token';
-export const api = axios.create({ baseURL: 'https://clinika-backend.vercel.app' });
-api.interceptors.request.use((cfg) => {
-  const t = localStorage.getItem(TOKEN_KEY);
-  if (t) cfg.headers.Authorization = `Bearer ${t}`;
-  return cfg;
-});
-
 export const errMsg = (e) => {
   const d = e?.response?.data?.detail;
   if (typeof d === 'string') return d;
@@ -67,13 +63,6 @@ export const STATUS_UI = {
 const DoctorDataContext = createContext(null);
 export const useDoctorData = () => useContext(DoctorDataContext);
 
-const DOCTOR_LINKS = [
-  { to: '/doctor-dashboard', label: 'Overview', icon: 'fa-chart-line', end: true },
-  { to: '/doctor-dashboard/manage-appointments', label: 'Manage Appointments', icon: 'fa-calendar-check' },
-  { to: '/doctor-dashboard/manage-availability', label: 'Manage Availability', icon: 'fa-clock' },
-  { to: '/doctor-dashboard/my-profile', label: 'My Profile', icon: 'fa-user-doctor' },
-];
-
 export default function DoctorDashboard() {
   const navigate = useNavigate();
   const [state, setState] = useState({
@@ -102,7 +91,7 @@ export default function DoctorDashboard() {
     }
     if (isActive()) setState((p) => ({ ...p, loading: true, error: '' }));
     try {
-      const { data: me } = await api.get('/auth/me');
+      const me = await getMe();
       if (!isActive()) return;
       if (!me || me.role !== 'doctor') {
         localStorage.removeItem(TOKEN_KEY);
@@ -110,31 +99,31 @@ export default function DoctorDashboard() {
         return;
       }
 
-      const { data: prof } = await api.get('/doctors/me/profile');
+      const prof = await getMyDoctorProfile();
       if (!isActive()) return;
 
       const docId = Number(prof?.id);
       const validId = Number.isInteger(docId) && docId > 0;
       const [st, td, ap, sl, sc] = await Promise.all([
-        api.get('/doctors/me/stats').catch(() => ({ data: null })),
-        api.get('/appointments/today').catch(() => ({ data: [] })),
-        api.get('/appointments', { params: { limit: 100 } }).catch(() => ({ data: [] })),
-        validId ? api.get(`/doctors/${docId}/slots`, { params: { date: isoDate() } }).catch(() => ({ data: [] })) : { data: [] },
-        validId ? api.get(`/doctors/${docId}/schedules`).catch(() => ({ data: [] })) : { data: [] },
+        getDoctorStats().catch(() => null),
+        getTodayAppointments().catch(() => ({ data: [] })),
+        listAppointments({ limit: 100 }).catch(() => ({ data: [] })),
+        validId ? getSlots(docId, isoDate()).catch(() => []) : [],
+        validId ? getSchedules(docId).catch(() => []) : [],
       ]);
       if (!isActive()) return;
 
       setState({
-        user: me, profile: prof, stats: st?.data ?? null,
+        user: me, profile: prof, stats: st ?? null,
         today: Array.isArray(td?.data) ? td.data : [],
         appointments: Array.isArray(ap?.data) ? ap.data : [],
-        slots: Array.isArray(sl?.data) ? sl.data : [],
-        schedules: Array.isArray(sc?.data) ? sc.data : [],
+        slots: Array.isArray(sl) ? sl : [],
+        schedules: Array.isArray(sc) ? sc : [],
         loading: false, error: '',
       });
     } catch (e) {
       if (!isActive()) return;
-      const code = e?.response?.status;
+      const code = e?.status;
       if (code === 401 || code === 403) {
         localStorage.removeItem(TOKEN_KEY);
         setState((p) => ({ ...p, loading: false, error: '' }));
@@ -168,10 +157,10 @@ export default function DoctorDashboard() {
     <DoctorDataContext.Provider value={ctx}>
       <Helmet><title>Doctor Portal | Clinika</title></Helmet>
       <DashboardLayout
-        portalLabel="DOCTOR PORTAL"
+        portalLabel={dashboardNavConfig.doctor.portalLabel}
         userName={name}
-        subtitle={specialty}
-        links={DOCTOR_LINKS}
+        userSubtitle={specialty}
+        navItems={dashboardNavConfig.doctor.items}
         onLogout={logout}
       >
         {state.error && (

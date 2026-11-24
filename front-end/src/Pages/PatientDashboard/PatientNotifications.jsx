@@ -1,16 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import NotificationItem from '../../Components/Patient/NotificationItem';
 import { EmptyState, ErrorState, LoadingState } from '../../Components/Patient/StateViews';
-import {
-  deleteNotification,
-  fetchNotifications,
-  getErrorMessage,
-  isUnauthorized,
-  markAllNotificationsRead,
-  markNotificationRead,
-  refreshUnreadBadge,
-} from './patientApi';
+import { useNotifications, useNotificationActions } from '../../hooks/useNotifications';
+import { getErrorMessage } from '../../api/client';
 import './patient-pages.css';
 
 const TABS = [
@@ -18,44 +11,23 @@ const TABS = [
   { key: 'unread', label: 'Unread' },
 ];
 
-const LOADING = { status: 'loading', items: [], error: '', needsLogin: false };
-
 export default function PatientNotifications() {
   const [tab, setTab] = useState('all');
-  const [state, setState] = useState(LOADING);
-  const [attempt, setAttempt] = useState(0); // bump this number to reload the list
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState('');
-
-  useEffect(() => {
-    let ignore = false;
-    fetchNotifications()
-      .then((items) => {
-        if (!ignore) setState({ status: 'ready', items, error: '', needsLogin: false });
-      })
-      .catch((err) => {
-        if (!ignore) {
-          setState({ status: 'error', items: [], error: getErrorMessage(err), needsLogin: isUnauthorized(err) });
-        }
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [attempt]);
-
-  function retry() {
-    setState(LOADING);
-    setAttempt((value) => value + 1);
-  }
+  const notificationsQuery = useNotifications();
+  const actions = useNotificationActions();
+  const [items, setItems] = useState(null);
+  const fetchedItems = notificationsQuery.data?.data || notificationsQuery.data || [];
+  const visibleItems = items || fetchedItems;
 
   // Runs a server action, then updates the list on screen and refreshes the sidebar badge.
-  async function run(action, applyToItems) {
+  async function run(mutation, applyToItems) {
     setBusy(true);
     setActionError('');
     try {
-      await action();
-      setState((prev) => ({ ...prev, items: applyToItems(prev.items) }));
-      refreshUnreadBadge();
+      await mutation();
+      setItems((current) => applyToItems(current || fetchedItems));
     } catch (err) {
       setActionError(getErrorMessage(err));
     } finally {
@@ -64,14 +36,14 @@ export default function PatientNotifications() {
   }
 
   const handleRead = (id) =>
-    run(() => markNotificationRead(id), (items) => items.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
+    run(() => actions.markRead.mutateAsync(id), (items) => items.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
   const handleDelete = (id) =>
-    run(() => deleteNotification(id), (items) => items.filter((n) => n.id !== id));
+    run(() => actions.remove.mutateAsync(id), (items) => items.filter((n) => n.id !== id));
   const handleReadAll = () =>
-    run(markAllNotificationsRead, (items) => items.map((n) => ({ ...n, is_read: true })));
+    run(() => actions.markAllRead.mutateAsync(), (items) => items.map((n) => ({ ...n, is_read: true })));
 
-  const unreadCount = state.items.filter((n) => !n.is_read).length;
-  const visible = tab === 'unread' ? state.items.filter((n) => !n.is_read) : state.items;
+  const unreadCount = visibleItems.filter((n) => !n.is_read).length;
+  const visible = tab === 'unread' ? visibleItems.filter((n) => !n.is_read) : visibleItems;
 
   return (
     <>
@@ -115,13 +87,13 @@ export default function PatientNotifications() {
         </div>
       )}
 
-      {state.status === 'loading' && <LoadingState label="Loading your notifications…" />}
+      {notificationsQuery.isLoading && <LoadingState label="Loading your notifications…" />}
 
-      {state.status === 'error' && (
-        <ErrorState message={state.error} onRetry={retry} needsLogin={state.needsLogin} />
+      {notificationsQuery.isError && (
+        <ErrorState message={notificationsQuery.error?.message || 'Could not load notifications.'} onRetry={() => notificationsQuery.refetch()} needsLogin={notificationsQuery.error?.status === 401} />
       )}
 
-      {state.status === 'ready' && visible.length === 0 && (
+      {!notificationsQuery.isLoading && !notificationsQuery.isError && visible.length === 0 && (
         <EmptyState
           icon="notifications_off"
           title={tab === 'unread' ? 'You are all caught up' : 'No notifications yet'}
@@ -133,7 +105,7 @@ export default function PatientNotifications() {
         />
       )}
 
-      {state.status === 'ready' && visible.length > 0 && (
+      {!notificationsQuery.isLoading && !notificationsQuery.isError && visible.length > 0 && (
         <ul className="cl-pd-list cl-pd-list--plain">
           {visible.map((notification) => (
             <NotificationItem

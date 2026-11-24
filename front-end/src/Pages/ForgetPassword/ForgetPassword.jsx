@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import './ForgetPassword.css';
-import api from '../../api';
+import { forgotPassword } from '../../api/authApi';
 function ShieldIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -48,7 +48,7 @@ export default function ForgetPassword() {
   setError('');
 
   try {
-    await api.post('/auth/forgot-password', {
+    await forgotPassword({
       email,
     });
 

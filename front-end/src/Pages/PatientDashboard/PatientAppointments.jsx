@@ -1,55 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import AppointmentCard from '../../Components/Patient/AppointmentCard';
 import { EmptyState, ErrorState, LoadingState } from '../../Components/Patient/StateViews';
-import { fetchAppointments, getErrorMessage, isUnauthorized } from './patientApi';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAppointments } from '../../hooks/useAppointments';
+import { queryKeys } from '../../hooks/queryKeys';
 
 const TABS = [
   { key: 'upcoming', label: 'Upcoming' },
   { key: 'past', label: 'Past consultations' },
 ];
 
-const LOADING = { status: 'loading', items: [], error: '', needsLogin: false };
-
 export default function PatientAppointments() {
   const [tab, setTab] = useState('upcoming');
-  const [state, setState] = useState(LOADING);
-  const [attempt, setAttempt] = useState(0); // bump this number to reload the list
   const [notice, setNotice] = useState('');
-
-  // Load the list whenever the tab changes or we ask for a reload.
-  useEffect(() => {
-    let ignore = false;
-    fetchAppointments(tab === 'upcoming')
-      .then((items) => {
-        if (!ignore) setState({ status: 'ready', items, error: '', needsLogin: false });
-      })
-      .catch((err) => {
-        if (!ignore) {
-          setState({ status: 'error', items: [], error: getErrorMessage(err), needsLogin: isUnauthorized(err) });
-        }
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [tab, attempt]);
+  const queryClient = useQueryClient();
+  const appointmentsQuery = useAppointments({ upcoming: tab === 'upcoming', limit: 50 });
+  const items = appointmentsQuery.data?.data || [];
 
   function changeTab(next) {
     if (next === tab) return;
     setNotice('');
-    setState(LOADING);
     setTab(next);
-  }
-
-  function retry() {
-    setState(LOADING);
-    setAttempt((value) => value + 1);
   }
 
   // After a successful cancel: show a message and reload quietly (no spinner flash).
   function handleCancelled(message) {
     setNotice(message);
-    setAttempt((value) => value + 1);
+    queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all });
+    queryClient.invalidateQueries({ queryKey: queryKeys.patients.stats });
   }
 
   return (
@@ -84,13 +63,13 @@ export default function PatientAppointments() {
         </div>
       )}
 
-      {state.status === 'loading' && <LoadingState label="Loading your appointments…" />}
+      {appointmentsQuery.isLoading && <LoadingState label="Loading your appointments…" />}
 
-      {state.status === 'error' && (
-        <ErrorState message={state.error} onRetry={retry} needsLogin={state.needsLogin} />
+      {appointmentsQuery.isError && (
+        <ErrorState message={appointmentsQuery.error?.message || 'Could not load appointments.'} onRetry={() => appointmentsQuery.refetch()} needsLogin={appointmentsQuery.error?.status === 401} />
       )}
 
-      {state.status === 'ready' && state.items.length === 0 && (
+      {!appointmentsQuery.isLoading && !appointmentsQuery.isError && items.length === 0 && (
         <EmptyState
           title={tab === 'upcoming' ? 'No upcoming appointments' : 'No past consultations yet'}
           text={
@@ -103,9 +82,9 @@ export default function PatientAppointments() {
         />
       )}
 
-      {state.status === 'ready' && state.items.length > 0 && (
+      {!appointmentsQuery.isLoading && !appointmentsQuery.isError && items.length > 0 && (
         <div className="cl-pd-list">
-          {state.items.map((appointment) => (
+          {items.map((appointment) => (
             <AppointmentCard key={appointment.id} appointment={appointment} onCancelled={handleCancelled} />
           ))}
         </div>

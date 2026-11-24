@@ -1,7 +1,7 @@
 import  { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
-import api from "../../api";
+import { listDoctors } from "../../api/doctorsApi";
 import {
   Home,
   ChevronRight,
@@ -79,12 +79,10 @@ const [selectedDate, setSelectedDate] = useState(() =>
 
         setLoading(true);
 
-        const response = await api.get("/doctors", {
-          params: {
-            limit: 20,
-            offset: 0,
-            sort: "recommended",
-          },
+        const response = await listDoctors({
+          limit: 20,
+          offset: 0,
+          sort: "recommended",
         });
 
         const doctorFromApi = response.data.find(

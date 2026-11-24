@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { changePassword, getErrorMessage } from '../../Pages/PatientDashboard/patientApi';
+import { changePassword } from '../../api/authApi';
+import { getErrorMessage } from '../../api/client';
 
 const EMPTY = { current: '', next: '', confirm: '' };
 

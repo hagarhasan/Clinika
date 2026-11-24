@@ -1,6 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { useState } from 'react';
-import api from '../../api';
+import { submitContact } from '../../api/publicApi';
 import { 
   User, 
   Headset, 
@@ -34,7 +34,7 @@ export default function Contact() {
     setError("");
 
     try {
-      const response = await api.post("/contact", {
+      const response = await submitContact({
         name,
         email,
         subject,
@@ -42,7 +42,7 @@ export default function Contact() {
       });
 
       setSuccess(
-        response.data?.message ||
+        response?.message ||
         "Thanks! We received your message and will get back to you soon."
       );
 

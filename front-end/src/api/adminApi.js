@@ -1,46 +1,36 @@
-import axios from 'axios';
+import { request } from './client.js';
 
-// One place for the backend URL. Set VITE_API_URL in a .env file to point somewhere else.
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://clinika-backend.vercel.app';
+export { clearSession, getToken, TOKEN_KEY } from './client.js';
+export const isUnauthorized = (error) => error?.status === 401;
+export const isForbidden = (error) => error?.status === 403;
+export const getErrorMessage = (error, fallback = 'Something went wrong. Please try again.') => error?.message || fallback;
+export const totalFrom = (response, fallback = 0) => Number.isFinite(response?.total) ? response.total : fallback;
 
-export const TOKEN_KEY = 'token';
-
-export const getToken = () => localStorage.getItem(TOKEN_KEY) || localStorage.getItem('access_token') || '';
-
-export const clearSession = () => {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('user');
-};
-
-// Axios client used by every admin page. It attaches the login token to each request.
-const adminApi = axios.create({ baseURL: API_BASE_URL, timeout: 30000 });
-
-adminApi.interceptors.request.use((config) => {
-  const token = getToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-export const isUnauthorized = (error) => error?.response?.status === 401;
-export const isForbidden = (error) => error?.response?.status === 403;
-
-// Turns any axios error into one short sentence that is safe to show in the UI.
-export function getErrorMessage(error, fallback = 'Something went wrong. Please try again.') {
-  if (error?.code === 'ECONNABORTED') return 'The server took too long to answer. Please try again.';
-  if (!error?.response) return 'Cannot reach the server. Check your connection and try again.';
-  if (isUnauthorized(error)) return 'Your session has expired. Please log in again.';
-  if (isForbidden(error)) return error.response.data?.detail || 'You do not have permission to do this.';
-  const detail = error.response.data?.detail;
-  if (typeof detail === 'string') return detail;
-  if (Array.isArray(detail) && detail[0]?.msg) return String(detail[0].msg).replace(/^Value error,\s*/i, '');
-  return fallback;
-}
-
-// Reads the X-Total-Count header the backend sends on list endpoints.
-export const totalFrom = (response, fallback = 0) => {
-  const value = Number(response?.headers?.['x-total-count']);
-  return Number.isFinite(value) ? value : fallback;
+const adminApi = {
+  get: (path, options = {}) => request(path, { ...options, method: 'GET', params: options.params }),
+  post: (path, body, options = {}) => request(path, { ...options, method: 'POST', body }),
+  put: (path, body, options = {}) => request(path, { ...options, method: 'PUT', body }),
+  patch: (path, body, options = {}) => request(path, { ...options, method: 'PATCH', body }),
+  delete: (path, options = {}) => request(path, { ...options, method: 'DELETE' }),
 };
 
 export default adminApi;
+
+export const getAdminStats = (signal) => request('/admin/stats', { signal }).then((r) => r.data);
+export const getAppointmentReports = (params = {}, signal) => request('/admin/reports/appointments', { params, signal });
+export const listAdminUsers = (params = {}, signal) => request('/admin/users', { params, signal });
+export const createAdminUser = (body) => request('/admin/users', { method: 'POST', body }).then((r) => r.data);
+export const updateAdminUserStatus = (id, body) => request(`/admin/users/${id}/status`, { method: 'PATCH', body }).then((r) => r.data);
+export const listAuditLogs = (params = {}, signal) => request('/admin/audit-logs', { params, signal });
+export const listAdminDoctors = (params = {}, signal) => request('/admin/doctors', { params, signal });
+export const getAdminDoctorCounts = (signal) => request('/admin/doctors/counts', { signal }).then((r) => r.data);
+export const exportAdminDoctors = (params = {}) => request('/admin/doctors/export', { params });
+export const getAdminDoctor = (id, signal) => request(`/admin/doctors/${id}`, { signal }).then((r) => r.data);
+export const reviewAdminDoctor = (id, body) => request(`/admin/doctors/${id}/review`, { method: 'PATCH', body }).then((r) => r.data);
+export const verifyAdminDoctor = (id, body) => request(`/admin/doctors/${id}/verify`, { method: 'PATCH', body }).then((r) => r.data);
+export const createAdminPatient = (body) => request('/admin/patients', { method: 'POST', body }).then((r) => r.data);
+export const createAdminAppointment = (body) => request('/admin/appointments', { method: 'POST', body }).then((r) => r.data);
+export const getAdminActivity = (params = {}, signal) => request('/admin/activity', { params, signal }).then((r) => r.data);
+export const listContactMessages = (params = {}, signal) => request('/admin/contact-messages', { params, signal });
+export const updateContactMessage = (id, body) => request(`/admin/contact-messages/${id}`, { method: 'PATCH', body }).then((r) => r.data);

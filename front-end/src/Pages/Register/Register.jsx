@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
-import api from "../../api";
+import { register, registerDoctor } from "../../api/authApi";
 import {
   ArrowLeft,
   ArrowRight,
@@ -78,12 +78,8 @@ useEffect(() => {
     setLoading(true);
 
     try {
-      const endpoint =
-        accountType === "patient"
-          ? "/auth/register"
-          : "/auth/register/doctor";
-
-      await api.post(endpoint, data);
+      if (accountType === "patient") await register(data);
+      else await registerDoctor(data);
 
       setSuccess(
         accountType === "patient"

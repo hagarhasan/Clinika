@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useParams, useLocation } from "react-router-dom";
-import api from "../../api";
+import { createAppointment } from "../../api/appointmentsApi";
 import {
   Home,
   ShieldCheck,
@@ -95,7 +95,7 @@ const formattedTime = appointmentTime
   setLoading(true);
 
   try {
-    await api.post("/appointments", {
+    await createAppointment({
       doctor_id: Number(doctor.id),
       appointment_date: doctor.appointmentDate,
       start_time: doctor.startTime,

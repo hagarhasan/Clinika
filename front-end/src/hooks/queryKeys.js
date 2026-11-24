@@ -1,0 +1,46 @@
+export const queryKeys = {
+  auth: ['auth'],
+  doctors: {
+    all: ['doctors'],
+    list: (filters = {}) => ['doctors', 'list', filters],
+    detail: (id) => ['doctors', 'detail', id],
+    profile: ['doctors', 'profile'],
+    stats: ['doctors', 'stats'],
+    slots: (id, date) => ['doctors', 'slots', id, date],
+    schedules: (id) => ['doctors', 'schedules', id],
+    timeOff: (id) => ['doctors', 'time-off', id],
+    reviews: (id) => ['doctors', 'reviews', id],
+  },
+  patients: {
+    profile: ['patients', 'profile'],
+    stats: ['patients', 'stats'],
+  },
+  appointments: {
+    all: ['appointments'],
+    list: (filters = {}) => ['appointments', 'list', filters],
+    today: ['appointments', 'today'],
+  },
+  notifications: {
+    all: ['notifications'],
+    list: (filters = {}) => ['notifications', 'list', filters],
+    unread: ['notifications', 'unread'],
+  },
+  records: ['medical-records'],
+  prescriptions: ['prescriptions'],
+  specialties: ['specialties'],
+  clinics: ['clinics'],
+  public: {
+    stats: ['public', 'stats'],
+    locations: ['public', 'locations'],
+  },
+  admin: {
+    stats: ['admin', 'stats'],
+    activity: ['admin', 'activity'],
+    users: (filters = {}) => ['admin', 'users', filters],
+    doctors: (filters = {}) => ['admin', 'doctors', filters],
+    doctorCounts: ['admin', 'doctor-counts'],
+    reports: (filters = {}) => ['admin', 'reports', filters],
+    audit: (filters = {}) => ['admin', 'audit', filters],
+    messages: (filters = {}) => ['admin', 'messages', filters],
+  },
+};

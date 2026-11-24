@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
-import api from "../../api";
+import { useDoctors } from "../../hooks/useDoctors";
 import { Link } from "react-router-dom";
 import "./Home.css";
 import {
@@ -63,36 +62,10 @@ function ShieldIcon() {
 }
 
 export default function Home() {
-    const [doctors, setDoctors] = useState([]);
-  const [loadingDoctors, setLoadingDoctors] = useState(true);
-  const [doctorsError, setDoctorsError] = useState("");
-
-  useEffect(() => {
-    const fetchDoctors = async () => {
-      try {
-        const response = await api.get("/doctors", {
-          params: {
-            limit: 4,
-            offset: 0,
-            sort: "recommended",
-          },
-        });
-
-        setDoctors(
-  Array.isArray(response.data) ? response.data : []
-);
-      } catch (err) {
-        setDoctorsError(
-          err.response?.data?.detail ||
-          "Unable to load doctors."
-        );
-      } finally {
-        setLoadingDoctors(false);
-      }
-    };
-
-    fetchDoctors();
-  }, []);
+  const doctorsQuery = useDoctors({ limit: 4, offset: 0, sort: "recommended" });
+  const doctors = Array.isArray(doctorsQuery.data?.data) ? doctorsQuery.data.data : [];
+  const loadingDoctors = doctorsQuery.isLoading;
+  const doctorsError = doctorsQuery.error?.message || "";
   return (
     <>
       <Helmet>

@@ -8,7 +8,7 @@ import {
 } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import './ResetPassword.css';
-import api from '../../api';
+import { resetPassword, validateResetToken } from '../../api/authApi';
 
 export default function ResetPassword() {
  
@@ -46,9 +46,7 @@ export default function ResetPassword() {
       }
 
       try {
-        await api.get('/auth/reset-password/validate', {
-          params: { token }
-        });
+        await validateResetToken(token);
 
         if (active) {
           setTokenValid(true);
@@ -126,7 +124,7 @@ export default function ResetPassword() {
     setLoading(true);
 
     try {
-      await api.post('/auth/reset-password', {
+      await resetPassword({
         token,
         new_password: newPassword
       });

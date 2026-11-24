@@ -3,7 +3,9 @@ import { Helmet } from 'react-helmet-async';
 import PasswordCard from '../../Components/Patient/PasswordCard';
 import { formatDate, getInitials } from '../../Components/Patient/dateFormat';
 import { ErrorState, LoadingState } from '../../Components/Patient/StateViews';
-import { fetchProfile, getErrorMessage, isUnauthorized, updateProfile, uploadAvatar } from './patientApi';
+import { fetchProfile, updateProfile } from '../../api/patientsApi';
+import { uploadAvatar } from '../../api/uploadsApi';
+import { getErrorMessage, isUnauthorized } from '../../api/client';
 import './patient-profile.css';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
