@@ -1,5 +1,5 @@
 import Layout from './Components/Layout/Layout';
-import { RouterProvider, createBrowserRouter } from 'react-router-dom';
+import { BrowserRouter, RouterProvider, createBrowserRouter, createHashRouter } from 'react-router-dom';
 import Privacy from './Pages/Privacy/Privacy';
 import Terms from './Pages/Terms/Terms';
 import Accessibility from './Pages/Accessibility/Accessibility';
@@ -30,11 +30,15 @@ import Doctors from './Pages/Doctors/Doctors';
 import DoctorProfile from './Pages/Doctors/DoctorProfile';
 import BookAppointment from './Pages/Doctors/BookAppointment';
 import NotFound from './Pages/NotFound/NotFound';
+import ContactMessages from './Pages/AdminDashboard/ContactMessages';
+import CatalogManage from './Pages/AdminDashboard/CatalogManage';
+import Reports from './Pages/AdminDashboard/Reports';
+import AdminTeam from './Pages/AdminDashboard/AdminTeam';
+import RequireAdmin from './Components/RequireAdmin/RequireAdmin';
 
 const basename = import.meta.env.BASE_URL === './'
   ? '/'
-  : import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
-
+  : import.meta.env.BASE_URL.replace(/\$/, '') || '/';
 const router = createBrowserRouter([
   {
     path: "", element: <Layout />, children: [
@@ -72,10 +76,15 @@ const router = createBrowserRouter([
     ]
   },
   {
-    path: 'admin-dashboard', element: <AdminDashboard />, children: [
+    // Only a logged-in user whose role is "admin" can open this area (checked with the server).
+    path: 'admin-dashboard', element: <RequireAdmin><AdminDashboard /></RequireAdmin>, children: [
       { index: true, element: <AdminOverview /> },
       { path: "manage-doctors", element: <ManageDoctors /> },
       { path: "manage-users-and-appointments", element: <AdminManage /> },
+      { path: "messages", element: <ContactMessages /> },
+      { path: "catalog", element: <CatalogManage /> },
+      { path: "reports", element: <Reports /> },
+      { path: "team", element: <AdminTeam /> },
       { path: "my-profile", element: <AdminProfile /> },
     ]
   },

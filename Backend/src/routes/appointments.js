@@ -122,6 +122,9 @@ router.get('/', auth, ah(async (req, res) => {
     where.push(`a.appointment_date < ${p.add(today)}::date`);
   }
 
+  // العدد الكلي للـ pagination (الفرونت بيقراه من X-Total-Count)
+  const total = await scalar(`SELECT COUNT(*) FROM appointments a ${where.length ? `WHERE ${where.join(' AND ')}` : ''}`, p.list);
+  res.set('X-Total-Count', String(total || 0));
   const rows = await repo.loadAppointments(where.join(' AND '), p.list, `ORDER BY ${order}, a.id DESC LIMIT ${limit} OFFSET ${offset}`);
   res.json(await repo.appointmentsOut(rows));
 }));

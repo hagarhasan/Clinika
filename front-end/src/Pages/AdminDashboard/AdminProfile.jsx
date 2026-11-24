@@ -1,1446 +1,207 @@
-import { useState, useEffect, useCallback } from "react";
-import { Helmet } from "react-helmet-async";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { useDashboard } from "../../context/DashboardContext";
+import { useRef, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
+import adminApi, { getErrorMessage } from '../../api/adminApi';
+import PasswordCard from '../../Components/Patient/PasswordCard';
+import { getInitials } from '../../Components/Patient/dateFormat';
+import { useAdminUser } from '../../context/AdminUserContext';
+import { useDashboard } from '../../context/DashboardContext';
+import '../PatientDashboard/patient-dashboard.css';
+import '../PatientDashboard/patient-profile.css';
+import './admin.css';
+import { formatDateTime, formatShortDate } from './adminUi';
 
-const API_BASE_URL = "https://clinika-backend.vercel.app";
+const MAX_AVATAR_MB = 3;
 
-const INITIAL_ADMIN = {
-  fullName: "",
-  roleBadge: "ADMIN",
-  subtitle: "Clinika Platform Admin Network",
-  adminId: "",
-  lastLogin: "",
-  twoFactor: true,
-  sessionActive: true,
-  accountTrust: "100%",
-  trustStatus: "Verified Session",
-  email: "",
-  phone: "",
-  clearanceLevel: "ADMIN",
-  capabilities: [
-    {
-      id: "doc-mod",
-      title: "Doctor Directory Moderation",
-      desc: "Approve, audit, and suspend physician licenses",
-      active: true,
-    },
-    {
-      id: "appt-audit",
-      title: "Appointment Records Auditing",
-      desc: "Full booking oversight across branches",
-      active: true,
-    },
-    {
-      id: "master-data",
-      title: "Clinic Master Data Access",
-      desc: "Manage facility specialties & regional taxonomy",
-      active: true,
-    },
-  ],
-};
+// Same layout as the patient "My Profile" page (cl-pd-* classes), with the admin's own data.
+const FIELDS = [
+  { key: 'first_name', label: 'First name', required: true },
+  { key: 'last_name', label: 'Last name', required: true },
+  { key: 'phone', label: 'Phone', type: 'tel' },
+];
+
+const toForm = (user) => Object.fromEntries(FIELDS.map(({ key }) => [key, user[key] ?? '']));
 
 export default function AdminProfile() {
-  const navigate = useNavigate();
-  const { getToken, activities } = useDashboard();
-  const [adminData, setAdminData] = useState(INITIAL_ADMIN);
-  const [savedData, setSavedData] = useState(INITIAL_ADMIN);
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [isEditingPassword, setIsEditingPassword] = useState(false);
-  const [logs, setLogs] = useState([]);
-  const [loadingLogs, setLoadingLogs] = useState(true);
+  const { user, setUser } = useAdminUser();
+  const { activities, loading: activityLoading } = useDashboard();
+
+  const [form, setForm] = useState(null); // null = viewing, an object = editing
   const [saving, setSaving] = useState(false);
-  const [updatingPass, setUpdatingPass] = useState(false);
-  const [banner, setBanner] = useState(null);
-  const [showAllLogs, setShowAllLogs] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [notice, setNotice] = useState({ type: '', text: '' });
+  const fileInput = useRef(null);
 
-  const [passForm, setPassForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
+  if (!user) return null; // <RequireAdmin> guarantees a user, this only keeps hooks safe
 
-  const [showSecrets, setShowSecrets] = useState({
-    current: false,
-    newPass: false,
-    confirm: false,
-  });
-
-  const notify = useCallback((type, text) => {
-    setBanner({ type, text });
-    setTimeout(() => {
-      setBanner((prev) => (prev?.text === text ? null : prev));
-    }, 4500);
-  }, []);
-
-  const fetchAdminLogs = useCallback(async () => {
-    const token = getToken();
-    if (!token) {
-      setLoadingLogs(false);
-      navigate("/login", { replace: true });
+  async function handleSave(event) {
+    event.preventDefault();
+    if (!form.first_name.trim() || !form.last_name.trim()) {
+      setFormError('First name and last name are required.');
       return;
     }
-
-    setLoadingLogs(true);
-    if (Array.isArray(activities) && activities.length > 0) {
-      setLogs(
-        activities.map((row, idx) => ({
-          id: row.id ?? row._id ?? idx + 1,
-          title: row.action || row.title || row.event || "Activity log",
-          time: row.time || row.created_at || row.timestamp || "",
-          actor: row.actor || row.admin_name || row.user || "",
-          note: row.detail || row.details || "",
-        }))
-      );
-    }
-    const headers = { Authorization: `Bearer ${token}` };
-
-    try {
-      const res = await axios.get(`${API_BASE_URL}/admin/audit-logs`, {
-        headers,
-        timeout: 6000,
-      });
-      const list = Array.isArray(res.data)
-        ? res.data
-        : res.data?.data || res.data?.logs || res.data?.items || [];
-
-      setLogs(
-        Array.isArray(list)
-          ? list.map((row, idx) => ({
-              id: row.id ?? row._id ?? idx + 1,
-              title:
-                row.action ||
-                row.title ||
-                row.event ||
-                row.description ||
-                "Administrative action",
-              time: row.time || row.created_at || row.timestamp || "",
-              actor: row.actor || row.admin_name || row.user || "",
-              note: row.detail || row.details || "",
-            }))
-          : []
-      );
-    } catch (err) {
-      if (err?.response?.status === 401 || err?.response?.status === 403) {
-        setLogs([]);
-        notify("error", "You are not authorized to view admin audit logs.");
-        return;
-      }
-
-      try {
-        const fallbackRes = await axios.get(`${API_BASE_URL}/admin/activity`, {
-          headers,
-          timeout: 5000,
-        });
-        const actList = Array.isArray(fallbackRes.data)
-          ? fallbackRes.data
-          : fallbackRes.data?.data || fallbackRes.data?.items || [];
-
-        setLogs(
-          Array.isArray(actList)
-            ? actList.map((row, idx) => ({
-                id: row.id ?? row._id ?? idx + 1,
-                title: row.action || row.title || row.event || "Activity log",
-                time: row.time || row.created_at || "",
-                actor: row.actor || "",
-                note: row.detail || "",
-              }))
-            : []
-        );
-      } catch {
-        setLogs([]);
-      }
-    } finally {
-      setLoadingLogs(false);
-    }
-  }, [getToken, navigate, notify, activities]);
-  useEffect(() => {
-    let isActive = true;
-
-    const loadProfileAndLogs = async () => {
-      const token = getToken();
-      if (token) {
-        try {
-          const endpoints = [
-            `${API_BASE_URL}/admin/profile`,
-            `${API_BASE_URL}/auth/me`,
-            `${API_BASE_URL}/admin/me`,
-          ];
-          let profile = null;
-
-          for (const url of endpoints) {
-            const res = await axios.get(url, {
-              headers: { Authorization: `Bearer ${token}` },
-              timeout: 6000,
-              validateStatus: (status) => (status >= 200 && status < 300) || status === 404,
-            });
-            if (res.status === 404) continue;
-            const candidate = res?.data?.data || res?.data?.user || res?.data?.admin || res?.data;
-            if (candidate && typeof candidate === "object") {
-              profile = candidate;
-              break;
-            }
-          }
-
-          if (isActive && profile && typeof profile === "object") {
-            const nextProfile = {
-              fullName: profile.full_name ?? profile.fullName ?? profile.name ?? "",
-              email: profile.email ?? "",
-              phone: profile.phone ?? "",
-              adminId: profile.admin_id ?? profile.id ?? profile._id ?? "",
-            };
-            setAdminData((prev) => ({ ...prev, ...nextProfile }));
-            setSavedData((prev) => ({ ...prev, ...nextProfile }));
-          }
-        } catch (err) {
-          if (err?.response?.status !== 404) {
-            console.error("Error fetching admin profile:", err);
-          }
-        }
-      }
-
-      if (isActive) {
-        await fetchAdminLogs();
-      }
-    };
-
-    loadProfileAndLogs();
-
-    return () => {
-      isActive = false;
-    };
-  }, [getToken, fetchAdminLogs]);
-
-  const handleField = (key, value) => {
-    if (key === "email" || !isEditingProfile) return;
-    setAdminData((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const toggleCapability = (capId) => {
-    setAdminData((prev) => ({
-      ...prev,
-      capabilities: prev.capabilities.map((c) =>
-        c.id === capId ? { ...c, active: !c.active } : c
-      ),
-    }));
-  };
-
-  const handleStartProfileEdit = () => {
-    setIsEditingProfile(true);
-  };
-
-  const handleCancelProfileEdit = () => {
-    setAdminData((prev) => ({
-      ...prev,
-      fullName: savedData.fullName,
-      phone: savedData.phone,
-    }));
-    setIsEditingProfile(false);
-    notify("info", "Profile edits cancelled.");
-  };
-
-  const handleDiscard = () => {
-    setAdminData(savedData);
-    setIsEditingProfile(false);
-    setPassForm({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-    setIsEditingPassword(false);
-    notify("info", "Unsaved changes discarded.");
-  };
-
-  const handleSaveProfile = async () => {
-    if (!isEditingProfile) {
-      notify("info", "Click Edit first to modify profile information.");
-      return;
-    }
-
-    const trimmedName = adminData.fullName.trim();
-    const trimmedPhone = adminData.phone.trim();
-
-    if (!trimmedName) {
-      notify("error", "Full Name is required.");
-      return;
-    }
-
-    if (
-      trimmedName === savedData.fullName.trim() &&
-      trimmedPhone === savedData.phone.trim()
-    ) {
-      notify("info", "No changes made to save.");
-      return;
-    }
-
-    const token = getToken();
-    if (!token) {
-      notify("error", "Authentication required to save profile changes.");
-      return;
-    }
-
     setSaving(true);
+    setFormError('');
     try {
-      const payload = {
-        full_name: trimmedName,
-        phone: trimmedPhone,
-      };
-
-      const res = await axios.patch(`${API_BASE_URL}/admin/profile`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
-        timeout: 6000,
+      const { data } = await adminApi.put('/auth/me', {
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        phone: form.phone.trim() || null,
       });
-
-      const updatedFromServer =
-        res?.data?.data || res?.data?.user || res?.data?.admin || res?.data;
-
-      const updatedProfile = {
-        ...adminData,
-        fullName:
-          updatedFromServer?.full_name ??
-          updatedFromServer?.fullName ??
-          updatedFromServer?.name ??
-          trimmedName,
-        phone: updatedFromServer?.phone ?? trimmedPhone,
-        email: savedData.email || adminData.email,
-      };
-
-      setAdminData(updatedProfile);
-      setSavedData(updatedProfile);
-      setIsEditingProfile(false);
-      notify("success", "Profile information saved.");
-      await fetchAdminLogs();
+      setUser(data);
+      setForm(null);
+      setNotice({ type: 'ok', text: 'Your profile was updated.' });
     } catch (err) {
-      console.error("Error saving profile:", err);
-      const serverMsg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        "Failed to save profile information on server.";
-      notify("error", typeof serverMsg === "string" ? serverMsg : "Failed to save profile information on server.");
+      setFormError(getErrorMessage(err));
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const passValid = {
-    len: passForm.newPassword.length >= 12,
-    casing:
-      /[a-z]/.test(passForm.newPassword) && /[A-Z]/.test(passForm.newPassword),
-    special: /[\d\W_]/.test(passForm.newPassword),
-    match:
-      passForm.newPassword.length > 0 &&
-      passForm.newPassword === passForm.confirmPassword,
-  };
-
-  const handleStartPasswordEdit = () => {
-    setIsEditingPassword(true);
-  };
-
-  const handleCancelPasswordEdit = () => {
-    setPassForm({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-    setIsEditingPassword(false);
-    notify("info", "Password change cancelled.");
-  };
-
-  const handlePasswordSubmit = async (e) => {
-    e.preventDefault();
-    if (!isEditingPassword) {
-      notify("info", "Click Edit Password first to update your password.");
+  async function handleAvatar(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setNotice({ type: 'error', text: 'Please choose an image file.' });
       return;
     }
-
-    if (!passForm.currentPassword) {
-      notify("error", "Please enter your current password.");
+    if (file.size > MAX_AVATAR_MB * 1024 * 1024) {
+      setNotice({ type: 'error', text: `The image must be smaller than ${MAX_AVATAR_MB} MB.` });
       return;
     }
-    if (!passValid.len || !passValid.casing || !passValid.special) {
-      notify(
-        "error",
-        "New password must be 12+ chars with upper/lowercase and numbers or symbols."
-      );
-      return;
-    }
-    if (!passValid.match) {
-      notify("error", "New password and confirmation do not match.");
-      return;
-    }
-
-    const token = getToken();
-    if (!token) {
-      notify("error", "Authentication required to update password.");
-      return;
-    }
-
-    setUpdatingPass(true);
+    setAvatarBusy(true);
+    setNotice({ type: '', text: '' });
     try {
-      await axios.post(
-        `${API_BASE_URL}/auth/change-password`,
-        {
-          current_password: passForm.currentPassword,
-          new_password: passForm.newPassword,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 6000,
-        }
-      );
-
-      setPassForm({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      });
-      setIsEditingPassword(false);
-      notify("success", "Password updated successfully.");
-      await fetchAdminLogs();
+      const body = new FormData();
+      body.append('file', file);
+      const { data } = await adminApi.post('/uploads/avatar', body);
+      setUser(data);
+      setNotice({ type: 'ok', text: 'Your photo was updated.' });
     } catch (err) {
-      console.error("Error updating password:", err);
-      const serverMsg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        "Failed to update password on server.";
-      notify("error", typeof serverMsg === "string" ? serverMsg : "Failed to update password on server.");
+      setNotice({ type: 'error', text: getErrorMessage(err) });
     } finally {
-      setUpdatingPass(false);
+      setAvatarBusy(false);
     }
-  };
+  }
+
+  const rows = [
+    ...FIELDS.map((field) => [field.label, user[field.key] || '—']),
+    ['Email', user.email],
+    ['Role', 'Administrator'],
+    ['Member since', formatShortDate(user.created_at)],
+  ];
+
   return (
-    <div
-      style={{
-        backgroundColor: "#F8FAFC",
-        color: "#0F172A",
-        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-        padding: "24px",
-        boxSizing: "border-box",
-        width: "100%",
-      }}
-    >
+    <>
       <Helmet>
-        <title>Admin Profile | Clinika</title>
+        <title>My Profile | Clinika Admin</title>
       </Helmet>
 
-      {banner && (
-        <div
-          role="status"
-          style={{
-            marginBottom: "16px",
-            padding: "11px 16px",
-            borderRadius: "10px",
-            fontSize: "13px",
-            fontWeight: 500,
-            backgroundColor:
-              banner.type === "error"
-                ? "#FEF2F2"
-                : banner.type === "info"
-                  ? "#EFF6FF"
-                  : "#F0FDF4",
-            color:
-              banner.type === "error"
-                ? "#B91C1C"
-                : banner.type === "info"
-                  ? "#1B68F6"
-                  : "#15803D",
-            border:
-              banner.type === "error"
-                ? "1px solid #FECACA"
-                : banner.type === "info"
-                  ? "1px solid #BFDBFE"
-                  : "1px solid #BBF7D0",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
-        >
-          <i
-            className={
-              banner.type === "error"
-                ? "fa-solid fa-circle-exclamation"
-                : banner.type === "info"
-                  ? "fa-solid fa-circle-info"
-                  : "fa-solid fa-circle-check"
-            }
-            aria-hidden="true"
-          />
-          <span>{banner.text}</span>
+      <header className="cl-pd-page-head">
+        <h1>My Profile</h1>
+        <p className="cl-pd-muted">Manage your administrator account details and security.</p>
+      </header>
+
+      {notice.text && (
+        <div className={`cl-pd-notice ${notice.type === 'error' ? 'cl-pd-notice--error' : ''}`} role={notice.type === 'error' ? 'alert' : 'status'}>
+          {notice.text}
         </div>
       )}
 
-      {/* Page Title & Badges */}
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "flex-end",
-          justifyContent: "space-between",
-          gap: "12px",
-          marginBottom: "20px",
-        }}
-      >
+      <section className="cl-pd-card cl-pd-profile-head">
+        {user.avatar_url ? (
+          <img className="cl-pd-avatar cl-pd-avatar--lg" src={user.avatar_url} alt="" />
+        ) : (
+          <span className="cl-pd-avatar cl-pd-avatar--lg" aria-hidden="true">{getInitials(user.full_name)}</span>
+        )}
         <div>
-          <div
-            style={{
-              fontSize: "11px",
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              color: "#1B68F6",
-              marginBottom: "4px",
-            }}
-          >
-            ADMINISTRATIVE GOVERNANCE
-          </div>
-          <h1 style={{ margin: 0, fontSize: "26px", fontWeight: 700 }}>
-            Admin Profile
-          </h1>
-          <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#64748B" }}>
-            Manage your administrator account details, security credentials, and access logs.
-          </p>
-        </div>
-
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <span
-            style={{
-              fontSize: "12px",
-              fontWeight: 600,
-              color: "#16A34A",
-              backgroundColor: "#F0FDF4",
-              border: "1px solid #BBF7D0",
-              padding: "4px 10px",
-              borderRadius: "999px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            <i className="fa-solid fa-circle" style={{ fontSize: "7px" }} aria-hidden="true" />
-            <span>2FA Authenticated</span>
-          </span>
-          <span
-            style={{
-              fontSize: "12px",
-              fontWeight: 600,
-              color: "#334155",
-              backgroundColor: "#FFFFFF",
-              border: "1px solid #E2E8F0",
-              padding: "4px 10px",
-              borderRadius: "999px",
-            }}
-          >
-            SESSION: ACTIVE
-          </span>
-        </div>
-      </div>
-
-      {/* Profile Summary Card */}
-      <section
-        style={{
-          backgroundColor: "#FFFFFF",
-          border: "1px solid #E2E8F0",
-          borderRadius: "12px",
-          padding: "20px",
-          marginBottom: "20px",
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "16px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <div
-            style={{
-              width: "68px",
-              height: "68px",
-              borderRadius: "10px",
-              backgroundColor: "#EFF6FF",
-              color: "#1B68F6",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "24px",
-              flexShrink: 0,
-            }}
-          >
-            <i className="fa-solid fa-user-tie" aria-hidden="true" />
-          </div>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-              <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 700 }}>
-                {adminData.fullName || "System Admin"}
-              </h2>
-              <span
-                style={{
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  color: "#1B68F6",
-                  backgroundColor: "#EFF6FF",
-                  padding: "2px 8px",
-                  borderRadius: "6px",
-                }}
-              >
-                {adminData.roleBadge}
-              </span>
-            </div>
-            <div style={{ fontSize: "13px", color: "#475569", marginTop: "3px" }}>
-              {adminData.subtitle}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "14px",
-                fontSize: "12px",
-                color: "#64748B",
-                marginTop: "8px",
-              }}
-            >
-              {adminData.adminId && <span>ID: {adminData.adminId}</span>}
-              {adminData.lastLogin && <span>Last login: {adminData.lastLogin}</span>}
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            backgroundColor: "#F8FAFC",
-            border: "1px solid #E2E8F0",
-            borderRadius: "10px",
-            padding: "12px 16px",
-            textAlign: "right",
-          }}
-        >
-          <div style={{ fontSize: "10px", fontWeight: 700, color: "#64748B" }}>
-            ACCOUNT TRUST
-          </div>
-          <div
-            style={{
-              fontSize: "22px",
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-end",
-              gap: "8px",
-            }}
-          >
-            <span>{adminData.accountTrust}</span>
-            <i className="fa-solid fa-shield-halved" style={{ color: "#1B68F6", fontSize: "18px" }} aria-hidden="true" />
-          </div>
-          <div style={{ fontSize: "11px", color: "#16A34A", fontWeight: 500 }}>
-            {adminData.trustStatus}
-          </div>
+          <h2 className="cl-pd-profile-head__name">
+            {user.full_name}
+            <span className="cl-ad-role">ADMIN</span>
+          </h2>
+          <p className="cl-pd-muted">JPG, PNG or WebP, up to {MAX_AVATAR_MB} MB.</p>
+          <button type="button" className="cl-pd-btn" disabled={avatarBusy} onClick={() => fileInput.current?.click()}>
+            {avatarBusy ? 'Uploading…' : 'Change photo'}
+          </button>
+          <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={handleAvatar} />
         </div>
       </section>
 
-      {/* Two Columns Wrapper */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: "20px",
-          alignItems: "start",
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          {/* Account Information */}
-          <section
-            style={{
-              backgroundColor: "#FFFFFF",
-              border: "1px solid #E2E8F0",
-              borderRadius: "12px",
-              padding: "20px",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "14px",
+      <section className="cl-pd-card cl-pd-section-card" aria-labelledby="cl-ad-info-title">
+        <div className="cl-pd-section__head">
+          <h2 id="cl-ad-info-title">Personal information</h2>
+          {!form && (
+            <button
+              type="button"
+              className="cl-pd-btn"
+              onClick={() => {
+                setNotice({ type: '', text: '' });
+                setFormError('');
+                setForm(toForm(user));
               }}
             >
-              <div>
-                <h2 style={{ margin: 0, fontSize: "15px", fontWeight: 700 }}>
-                  Account Information
-                </h2>
-                <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#64748B" }}>
-                  Permitted personal details editable only
-                </p>
+              Edit profile
+            </button>
+          )}
+        </div>
+
+        {form ? (
+          <form className="cl-pd-form" onSubmit={handleSave}>
+            {FIELDS.map((field) => (
+              <div key={field.key} className="cl-pd-field">
+                <label htmlFor={`cl-ad-f-${field.key}`}>{field.label}</label>
+                <input
+                  id={`cl-ad-f-${field.key}`}
+                  type={field.type ?? 'text'}
+                  required={field.required}
+                  maxLength={field.key === 'phone' ? 30 : 70}
+                  value={form[field.key]}
+                  onChange={(event) => setForm((prev) => ({ ...prev, [field.key]: event.target.value }))}
+                />
               </div>
-              <span
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  color: "#1B68F6",
-                  backgroundColor: "#EFF6FF",
-                  padding: "3px 9px",
-                  borderRadius: "999px",
-                }}
-              >
-                Synced
-              </span>
+            ))}
+            <div className="cl-pd-field">
+              <label htmlFor="cl-ad-f-email">Email</label>
+              <input id="cl-ad-f-email" type="email" value={user.email} disabled />
             </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "12px",
-              }}
-            >
-              <div>
-                <label
-                  htmlFor="pf-name"
-                  style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "5px" }}
-                >
-                  Full Name
-                </label>
-                <input
-                  id="pf-name"
-                  type="text"
-                  placeholder="Administrator Name"
-                  value={adminData.fullName}
-                  disabled={!isEditingProfile}
-                  readOnly={!isEditingProfile}
-                  onChange={(e) => handleField("fullName", e.target.value)}
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    padding: "8px 10px",
-                    borderRadius: "8px",
-                    border: isEditingProfile ? "1px solid #CBD5E1" : "1px solid #E2E8F0",
-                    backgroundColor: isEditingProfile ? "#FFFFFF" : "#F8FAFC",
-                    color: isEditingProfile ? "#0F172A" : "#64748B",
-                    fontSize: "13px",
-                  }}
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="pf-id"
-                  style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "5px" }}
-                >
-                  Admin ID
-                </label>
-                <input
-                  id="pf-id"
-                  type="text"
-                  value={adminData.adminId}
-                  readOnly
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    padding: "8px 10px",
-                    borderRadius: "8px",
-                    border: "1px solid #E2E8F0",
-                    backgroundColor: "#F8FAFC",
-                    color: "#64748B",
-                    fontSize: "13px",
-                  }}
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="pf-email"
-                  style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "5px" }}
-                >
-                  Admin Email Address
-                </label>
-                <input
-                  id="pf-email"
-                  type="email"
-                  placeholder="admin@clinika.com"
-                  value={adminData.email}
-                  readOnly
-                  aria-readonly="true"
-                  title="Admin email cannot be changed"
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    padding: "8px 10px",
-                    borderRadius: "8px",
-                    border: "1px solid #E2E8F0",
-                    backgroundColor: "#F8FAFC",
-                    color: "#64748B",
-                    cursor: "not-allowed",
-                    fontSize: "13px",
-                  }}
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="pf-phone"
-                  style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "5px" }}
-                >
-                  Contact Phone Number
-                </label>
-                <input
-                  id="pf-phone"
-                  type="text"
-                  placeholder="+20 100 000 0000"
-                  value={adminData.phone}
-                  disabled={!isEditingProfile}
-                  readOnly={!isEditingProfile}
-                  onChange={(e) => handleField("phone", e.target.value)}
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    padding: "8px 10px",
-                    borderRadius: "8px",
-                    border: isEditingProfile ? "1px solid #CBD5E1" : "1px solid #E2E8F0",
-                    backgroundColor: isEditingProfile ? "#FFFFFF" : "#F8FAFC",
-                    color: isEditingProfile ? "#0F172A" : "#64748B",
-                    fontSize: "13px",
-                  }}
-                />
-              </div>
-            </div>
-
-            <div
-              style={{
-                marginTop: "14px",
-                padding: "10px 12px",
-                borderRadius: "8px",
-                backgroundColor: "#F8FAFC",
-                border: "1px solid #E2E8F0",
-                fontSize: "12px",
-                color: "#475569",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: "10px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: "1 1 220px" }}>
-                <i className="fa-solid fa-circle-info" style={{ color: "#1B68F6" }} aria-hidden="true" />
-                <span>
-                  To update administrative credentials, contact authorization is audited and changes trigger instant dual-factor alerts.
-                </span>
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                {!isEditingProfile ? (
-                  <button
-                    type="button"
-                    onClick={handleStartProfileEdit}
-                    style={{
-                      backgroundColor: "#16A34A",
-                      color: "#FFFFFF",
-                      border: "none",
-                      borderRadius: "8px",
-                      padding: "7px 14px",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
-                    <i className="fa-solid fa-pen" aria-hidden="true" />
-                    <span>Edit</span>
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={handleSaveProfile}
-                      style={{
-                        backgroundColor: "#16A34A",
-                        color: "#FFFFFF",
-                        border: "none",
-                        borderRadius: "8px",
-                        padding: "7px 14px",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        cursor: saving ? "not-allowed" : "pointer",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "6px",
-                      }}
-                    >
-                      <i className="fa-solid fa-check" aria-hidden="true" />
-                      <span>{saving ? "Saving..." : "Save"}</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={handleCancelProfileEdit}
-                      style={{
-                        backgroundColor: "#15803D",
-                        color: "#FFFFFF",
-                        border: "none",
-                        borderRadius: "8px",
-                        padding: "7px 14px",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        cursor: saving ? "not-allowed" : "pointer",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "6px",
-                      }}
-                    >
-                      <i className="fa-solid fa-xmark" aria-hidden="true" />
-                      <span>Cancel</span>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </section>
-          {/* Security & Password Management */}
-          <form
-            onSubmit={handlePasswordSubmit}
-            style={{
-              backgroundColor: "#FFFFFF",
-              border: "1px solid #E2E8F0",
-              borderRadius: "12px",
-              padding: "20px",
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: "15px", fontWeight: 700 }}>
-              Security &amp; Password Management
-            </h2>
-            <p style={{ margin: "2px 0 14px", fontSize: "12px", color: "#64748B" }}>
-              Enforce strong encryption for administrative privileges
-            </p>
-
-            <div style={{ marginBottom: "12px" }}>
-              <label
-                htmlFor="pf-curr-pass"
-                style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "5px" }}
-              >
-                Current Password
-              </label>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <input
-                  id="pf-curr-pass"
-                  type={showSecrets.current ? "text" : "password"}
-                  placeholder="Enter current passphrase"
-                  value={passForm.currentPassword}
-                  disabled={!isEditingPassword}
-                  readOnly={!isEditingPassword}
-                  onChange={(e) =>
-                    setPassForm((p) => ({
-                      ...p,
-                      currentPassword: e.target.value,
-                    }))
-                  }
-                  style={{
-                    flex: 1,
-                    padding: "8px 10px",
-                    borderRadius: "8px",
-                    border: isEditingPassword ? "1px solid #CBD5E1" : "1px solid #E2E8F0",
-                    backgroundColor: isEditingPassword ? "#FFFFFF" : "#F8FAFC",
-                    color: isEditingPassword ? "#0F172A" : "#64748B",
-                    fontSize: "13px",
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={!isEditingPassword}
-                  onClick={() =>
-                    setShowSecrets((s) => ({ ...s, current: !s.current }))
-                  }
-                  style={{
-                    padding: "0 12px",
-                    borderRadius: "8px",
-                    border: "1px solid #CBD5E1",
-                    backgroundColor: "#F8FAFC",
-                    fontSize: "12px",
-                    cursor: isEditingPassword ? "pointer" : "not-allowed",
-                    opacity: isEditingPassword ? 1 : 0.6,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                  }}
-                >
-                  <i
-                    className={showSecrets.current ? "fa-solid fa-eye-slash" : "fa-solid fa-eye"}
-                    aria-hidden="true"
-                  />
-                  <span>{showSecrets.current ? "Hide" : "Show"}</span>
-                </button>
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "12px",
-                marginBottom: "10px",
-              }}
-            >
-              <div>
-                <label
-                  htmlFor="pf-new-pass"
-                  style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "5px" }}
-                >
-                  New Password
-                </label>
-                <input
-                  id="pf-new-pass"
-                  type={showSecrets.newPass ? "text" : "password"}
-                  placeholder="Min. 12 characters"
-                  value={passForm.newPassword}
-                  disabled={!isEditingPassword}
-                  readOnly={!isEditingPassword}
-                  onChange={(e) =>
-                    setPassForm((p) => ({
-                      ...p,
-                      newPassword: e.target.value,
-                    }))
-                  }
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    padding: "8px 10px",
-                    borderRadius: "8px",
-                    border: isEditingPassword ? "1px solid #CBD5E1" : "1px solid #E2E8F0",
-                    backgroundColor: isEditingPassword ? "#FFFFFF" : "#F8FAFC",
-                    color: isEditingPassword ? "#0F172A" : "#64748B",
-                    fontSize: "13px",
-                  }}
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="pf-conf-pass"
-                  style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "5px" }}
-                >
-                  Confirm New Password
-                </label>
-                <input
-                  id="pf-conf-pass"
-                  type={showSecrets.confirm ? "text" : "password"}
-                  placeholder="Re-type new password"
-                  value={passForm.confirmPassword}
-                  disabled={!isEditingPassword}
-                  readOnly={!isEditingPassword}
-                  onChange={(e) =>
-                    setPassForm((p) => ({
-                      ...p,
-                      confirmPassword: e.target.value,
-                    }))
-                  }
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    padding: "8px 10px",
-                    borderRadius: "8px",
-                    border: isEditingPassword ? "1px solid #CBD5E1" : "1px solid #E2E8F0",
-                    backgroundColor: isEditingPassword ? "#FFFFFF" : "#F8FAFC",
-                    color: isEditingPassword ? "#0F172A" : "#64748B",
-                    fontSize: "13px",
-                  }}
-                />
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "12px",
-                fontSize: "11px",
-                marginBottom: "14px",
-              }}
-            >
-              <span style={{ color: passValid.len ? "#16A34A" : "#64748B" }}>
-                <i className="fa-solid fa-check" style={{ marginRight: "5px" }} aria-hidden="true" />
-                12+ characters
-              </span>
-              <span style={{ color: passValid.casing ? "#16A34A" : "#64748B" }}>
-                <i className="fa-solid fa-check" style={{ marginRight: "5px" }} aria-hidden="true" />
-                Uppercase &amp; Lowercase
-              </span>
-              <span style={{ color: passValid.special ? "#16A34A" : "#64748B" }}>
-                <i className="fa-solid fa-check" style={{ marginRight: "5px" }} aria-hidden="true" />
-                Numeric &amp; Special symbols
-              </span>
-              <span style={{ color: passValid.match ? "#16A34A" : "#64748B" }}>
-                <i className="fa-solid fa-check" style={{ marginRight: "5px" }} aria-hidden="true" />
-                Passwords match
-              </span>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-              {!isEditingPassword ? (
-                <button
-                  type="button"
-                  onClick={handleStartPasswordEdit}
-                  style={{
-                    backgroundColor: "#16A34A",
-                    color: "#FFFFFF",
-                    border: "none",
-                    borderRadius: "8px",
-                    padding: "9px 16px",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}
-                >
-                  <i className="fa-solid fa-key" aria-hidden="true" />
-                  <span>Edit Password</span>
-                </button>
-              ) : (
-                <>
-                  <button
-                    type="submit"
-                    disabled={updatingPass}
-                    style={{
-                      backgroundColor: "#16A34A",
-                      color: "#FFFFFF",
-                      border: "none",
-                      borderRadius: "8px",
-                      padding: "9px 16px",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      cursor: updatingPass ? "not-allowed" : "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                  >
-                    <i className="fa-solid fa-check" aria-hidden="true" />
-                    <span>{updatingPass ? "Saving..." : "Save"}</span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={updatingPass}
-                    onClick={handleCancelPasswordEdit}
-                    style={{
-                      backgroundColor: "#15803D",
-                      color: "#FFFFFF",
-                      border: "none",
-                      borderRadius: "8px",
-                      padding: "9px 16px",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      cursor: updatingPass ? "not-allowed" : "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                  >
-                    <i className="fa-solid fa-xmark" aria-hidden="true" />
-                    <span>Cancel</span>
-                  </button>
-                </>
-              )}
+            {formError && <p className="cl-pd-confirm__error cl-pd-field--wide" role="alert" style={{ color: 'var(--cl-error)' }}>{formError}</p>}
+            <div className="cl-pd-field--wide cl-pd-appt__actions" style={{ gap: '0.6rem' }}>
+              <button type="button" className="cl-pd-btn" disabled={saving} onClick={() => setForm(null)}>Cancel</button>
+              <button type="submit" className="cl-pd-btn cl-pd-btn--primary" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button>
             </div>
           </form>
-        </div>
-
-        {/* Right Column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          <section
-            style={{
-              backgroundColor: "#FFFFFF",
-              border: "1px solid #E2E8F0",
-              borderRadius: "12px",
-              padding: "20px",
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: "15px", fontWeight: 700 }}>
-              Assigned Capabilities
-            </h2>
-            <p style={{ margin: "2px 0 14px", fontSize: "12px", color: "#64748B" }}>
-              Verified Role-Based Access Controls
-            </p>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {adminData.capabilities.map((cap) => (
-                <div
-                  key={cap.id}
-                  style={{
-                    padding: "11px 12px",
-                    borderRadius: "8px",
-                    backgroundColor: "#F8FAFC",
-                    border: "1px solid #E2E8F0",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "10px",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: "13px", fontWeight: 700 }}>
-                      {cap.title}
-                    </div>
-                    <div style={{ fontSize: "12px", color: "#64748B" }}>
-                      {cap.desc}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => toggleCapability(cap.id)}
-                    style={{
-                      border: "none",
-                      borderRadius: "6px",
-                      padding: "4px 9px",
-                      fontSize: "10px",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      backgroundColor: cap.active ? "#DCFCE7" : "#F1F5F9",
-                      color: cap.active ? "#15803D" : "#475569",
-                    }}
-                  >
-                    {cap.active ? "ACTIVE" : "PAUSED"}
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div
-              style={{
-                marginTop: "12px",
-                paddingTop: "10px",
-                borderTop: "1px solid #E2E8F0",
-                display: "flex",
-                justifyContent: "space-between",
-                fontSize: "12px",
-              }}
-            >
-              <span style={{ color: "#64748B" }}>Security Clearance Level</span>
-              <span style={{ fontWeight: 700 }}>{adminData.clearanceLevel}</span>
-            </div>
-          </section>
-
-          <section
-            style={{
-              backgroundColor: "#FFFFFF",
-              border: "1px solid #E2E8F0",
-              borderRadius: "12px",
-              padding: "20px",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "12px",
-              }}
-            >
-              <h2 style={{ margin: 0, fontSize: "15px", fontWeight: 700 }}>
-                Audit &amp; Access Log
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowAllLogs(true)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#1B68F6",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Full Log
-              </button>
-            </div>
-
-            {loadingLogs ? (
-              <div style={{ fontSize: "12px", color: "#64748B" }}>
-                <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: "6px" }} aria-hidden="true" />
-                Loading logs...
+        ) : (
+          <dl className="cl-pd-info">
+            {rows.map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
               </div>
-            ) : logs.length === 0 ? (
-              <div style={{ fontSize: "12px", color: "#64748B" }}>
-                No audit logs available.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {logs.slice(0, 3).map((item) => (
-                  <div
-                    key={item.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: "10px",
-                      fontSize: "12px",
-                    }}
-                  >
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: "7px" }}>
-                      <i className="fa-solid fa-circle" style={{ fontSize: "6px", color: "#1B68F6" }} aria-hidden="true" />
-                      <span>{item.title}</span>
-                    </span>
-                    <span style={{ color: "#64748B", whiteSpace: "nowrap" }}>
-                      {item.time}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
-      </div>
-      {/* Bottom Action Bar */}
-      <footer
-        style={{
-          marginTop: "22px",
-          paddingTop: "16px",
-          borderTop: "1px solid #E2E8F0",
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "12px",
-        }}
-      >
-        <span style={{ fontSize: "12px", color: "#64748B", display: "inline-flex", alignItems: "center", gap: "7px" }}>
-          <i className="fa-solid fa-rotate" style={{ color: "#1B68F6" }} aria-hidden="true" />
-          <span>Changes will be logged in the administrative security journal.</span>
-        </span>
+            ))}
+          </dl>
+        )}
+      </section>
 
-        <div style={{ display: "flex", gap: "10px" }}>
-          <button
-            type="button"
-            onClick={handleDiscard}
-            style={{
-              backgroundColor: "#FFFFFF",
-              color: "#475569",
-              border: "1px solid #CBD5E1",
-              borderRadius: "8px",
-              padding: "9px 16px",
-              fontSize: "12px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Discard Changes
-          </button>
-          <button
-            type="button"
-            disabled={saving || !isEditingProfile}
-            onClick={handleSaveProfile}
-            style={{
-              backgroundColor: "#1B68F6",
-              color: "#FFFFFF",
-              border: "none",
-              borderRadius: "8px",
-              padding: "9px 18px",
-              fontSize: "12px",
-              fontWeight: 600,
-              cursor: saving || !isEditingProfile ? "not-allowed" : "pointer",
-              opacity: saving || !isEditingProfile ? 0.6 : 1,
-            }}
-          >
-            {saving ? "Saving..." : "Save Profile Information"}
-          </button>
-        </div>
-      </footer>
+      <PasswordCard />
 
-      {showAllLogs && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          style={{
-            position: "fixed",
-            inset: 0,
-            backgroundColor: "rgba(15, 23, 42, 0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "16px",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: "#FFFFFF",
-              borderRadius: "12px",
-              width: "100%",
-              maxWidth: "540px",
-              maxHeight: "75vh",
-              overflowY: "auto",
-              padding: "20px",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "14px",
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 700 }}>
-                Full Audit &amp; Access Log
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowAllLogs(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "16px",
-                  cursor: "pointer",
-                  color: "#475569",
-                }}
-              >
-                <i className="fa-solid fa-xmark" aria-hidden="true" />
-              </button>
-            </div>
-
-            {logs.length === 0 ? (
-              <p style={{ fontSize: "13px", color: "#64748B", margin: 0 }}>
-                No audit logs available.
-              </p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {logs.map((entry) => (
-                  <div
-                    key={entry.id}
-                    style={{
-                      padding: "10px 12px",
-                      borderRadius: "8px",
-                      backgroundColor: "#F8FAFC",
-                      border: "1px solid #E2E8F0",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "13px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <span>{entry.title}</span>
-                      <span style={{ fontSize: "11px", color: "#64748B" }}>
-                        {entry.time}
-                      </span>
-                    </div>
-                    {(entry.actor || entry.note) && (
-                      <div style={{ fontSize: "11px", color: "#64748B", marginTop: "3px" }}>
-                        {entry.actor ? `By ${entry.actor}` : ""}
-                        {entry.actor && entry.note ? " • " : ""}
-                        {entry.note || ""}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+      <section className="cl-pd-card cl-pd-section-card" aria-labelledby="cl-ad-activity-title">
+        <h2 id="cl-ad-activity-title">Recent platform activity</h2>
+        {activityLoading ? (
+          <p className="cl-pd-muted">Loading…</p>
+        ) : activities.length === 0 ? (
+          <p className="cl-pd-muted">No recent activity yet.</p>
+        ) : (
+          <ul className="cl-ad-timeline">
+            {activities.map((item) => (
+              <li key={item.id}>
+                <span>{item.description || item.action}{item.actor_name ? ` — ${item.actor_name}` : ''}</span>
+                <time dateTime={item.created_at}>{formatDateTime(item.created_at)}</time>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
   );
 }

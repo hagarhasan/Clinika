@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
+import { API_BASE_URL, TOKEN_KEY } from "../../api/adminApi";
 import {
   Stethoscope,
   BadgeCheck,
@@ -21,6 +23,13 @@ ArrowRight,
 
 import "./Login.css";
 
+// Where each role lands after a successful login.
+const HOME_BY_ROLE = {
+  patient: "/patient-dashboard",
+  doctor: "/doctor-dashboard",
+  admin: "/admin-dashboard",
+};
+
 export default function Login() {
   const [role, setRole] = useState("patient");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,15 +37,38 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  // Real login: the server checks the password and tells us the account role.
+  // The role buttons above are only a hint - the account's own role decides the dashboard
+  // (this is also how an admin signs in).
+  const handleLogin = async (e) => {
     e.preventDefault();
+    setError("");
+    setSubmitting(true);
 
-    if (role === "patient") {
-      navigate("/patient-dashboard");
-    } else {
-      navigate("/doctor-dashboard");
+    try {
+      const { data } = await axios.post(`${API_BASE_URL}/auth/login`, {
+        email: email.trim(),
+        password,
+        remember_me: rememberMe,
+      });
+      localStorage.setItem(TOKEN_KEY, data.access_token);
+      navigate(HOME_BY_ROLE[data.user?.role] || "/", { replace: true });
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setError(
+        !err?.response
+          ? "Cannot reach the server. Check your connection and try again."
+          : typeof detail === "string"
+          ? detail
+          : "Could not sign in. Please check your email and password."
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -321,12 +353,19 @@ export default function Login() {
 
               </label>
 
+              {error && (
+                <p role="alert" style={{ margin: "0 0 12px", color: "#b91c1c", fontSize: "14px", fontWeight: 500 }}>
+                  {error}
+                </p>
+              )}
+
               {/* BUTTON */}
               <button
                 type="submit"
                 className="clinika-submit-button"
+                disabled={submitting}
               >
-                <span>Sign In to Clinika</span>
+                <span>{submitting ? "Signing in…" : "Sign In to Clinika"}</span>
                 <ArrowRight size={17} />
               </button>
 
