@@ -14,7 +14,7 @@ export const clearSession = () => {
 };
 
 // Axios client used by every admin page. It attaches the login token to each request.
-const adminApi = axios.create({ baseURL: API_BASE_URL, timeout: 15000 });
+const adminApi = axios.create({ baseURL: API_BASE_URL, timeout: 30000 });
 
 adminApi.interceptors.request.use((config) => {
   const token = getToken();
@@ -27,6 +27,7 @@ export const isForbidden = (error) => error?.response?.status === 403;
 
 // Turns any axios error into one short sentence that is safe to show in the UI.
 export function getErrorMessage(error, fallback = 'Something went wrong. Please try again.') {
+  if (error?.code === 'ECONNABORTED') return 'The server took too long to answer. Please try again.';
   if (!error?.response) return 'Cannot reach the server. Check your connection and try again.';
   if (isUnauthorized(error)) return 'Your session has expired. Please log in again.';
   if (isForbidden(error)) return error.response.data?.detail || 'You do not have permission to do this.';

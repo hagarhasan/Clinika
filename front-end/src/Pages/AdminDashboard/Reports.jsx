@@ -44,9 +44,12 @@ function AppointmentsReport() {
   }, [key]);
 
   const loading = state.key !== key;
-  const { data } = state;
-  const daily = data?.daily ?? [];
-  const perDoctor = data?.per_doctor ?? [];
+  const data = state.data || null;
+  const daily = data && Array.isArray(data.daily) ? data.daily : [];
+  const perDoctor = data && Array.isArray(data.per_doctor) ? data.per_doctor : [];
+  // Read these once, up front, so nothing below touches `data.` while it is still null.
+  const dateFrom = data ? data.date_from : '';
+  const dateTo = data ? data.date_to : '';
   const max = Math.max(1, ...daily.map((d) => d.total));
 
   const apply = (event) => {
@@ -65,8 +68,8 @@ function AppointmentsReport() {
         <button
           type="button"
           className="cl-pd-btn cl-ad-btn-icon"
-          disabled={!daily.length}
-          onClick={() => downloadCsv(`appointments-${data.date_from}-to-${data.date_to}.csv`, ['Date', ...STATUS_KEYS.map((k) => STATUS_LABEL[k]), 'Total'], daily.map((d) => [d.date, ...STATUS_KEYS.map((k) => d[k] || 0), d.total]))}
+          disabled={!data || !daily.length}
+          onClick={() => downloadCsv(`appointments-${dateFrom}-to-${dateTo}.csv`, ['Date', ...STATUS_KEYS.map((k) => STATUS_LABEL[k]), 'Total'], daily.map((d) => [d.date, ...STATUS_KEYS.map((k) => d[k] || 0), d.total]))}
         >
           <span className="material-symbols-outlined" aria-hidden="true">download</span> Export CSV
         </button>
@@ -77,7 +80,7 @@ function AppointmentsReport() {
 
       {data && !loading && (
         <>
-          <p className="cl-pd-muted">Report period: {formatDate(data.date_from)} – {formatDate(data.date_to)}</p>
+          <p className="cl-pd-muted">Report period: {formatDate(dateFrom)} – {formatDate(dateTo)}</p>
           <div className="cl-ad-grid cl-ad-grid--4" style={{ marginBottom: '1.5rem' }}>
             {[['Total', sum(daily, 'total')], ...STATUS_KEYS.filter((k) => ['completed', 'cancelled', 'no_show'].includes(k)).map((k) => [STATUS_LABEL[k], sum(daily, k)])].map(([label, value]) => (
               <div key={label} className="cl-pd-card cl-ad-stat"><span><span className="cl-ad-stat__label">{label}</span><span className="cl-ad-stat__value">{value}</span></span></div>

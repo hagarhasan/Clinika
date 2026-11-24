@@ -19,7 +19,18 @@ const FIELDS = [
   { key: 'phone', label: 'Phone', type: 'tel' },
 ];
 
-const toForm = (user) => Object.fromEntries(FIELDS.map(({ key }) => [key, user[key] ?? '']));
+// Some accounts (for example the seeded admin) only have a full name, so split it when first/last are empty.
+function nameParts(user) {
+  const [first = '', ...rest] = String(user.full_name || '').trim().split(/\s+/);
+  return {
+    first_name: user.first_name || first,
+    last_name: user.last_name || rest.join(' '),
+  };
+}
+
+const valueOf = (user, key) => (key === 'phone' ? user.phone ?? '' : nameParts(user)[key]);
+
+const toForm = (user) => Object.fromEntries(FIELDS.map(({ key }) => [key, valueOf(user, key)]));
 
 export default function AdminProfile() {
   const { user, setUser } = useAdminUser();
@@ -75,7 +86,8 @@ export default function AdminProfile() {
     try {
       const body = new FormData();
       body.append('file', file);
-      const { data } = await adminApi.post('/uploads/avatar', body);
+      // Image upload goes through Cloudinary and can be slow on a cold start, so allow more time.
+      const { data } = await adminApi.post('/uploads/avatar', body, { timeout: 90000 });
       setUser(data);
       setNotice({ type: 'ok', text: 'Your photo was updated.' });
     } catch (err) {
@@ -86,7 +98,7 @@ export default function AdminProfile() {
   }
 
   const rows = [
-    ...FIELDS.map((field) => [field.label, user[field.key] || '—']),
+    ...FIELDS.map((field) => [field.label, valueOf(user, field.key) || '—']),
     ['Email', user.email],
     ['Role', 'Administrator'],
     ['Member since', formatShortDate(user.created_at)],
