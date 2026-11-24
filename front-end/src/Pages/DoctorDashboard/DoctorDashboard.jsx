@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { Outlet } from 'react-router-dom';
 import axios from 'axios';
 import DashboardLayout from './DashboardLayout';
-/* eslint-disable react-refresh/only-export-components */
+
 
 export const TOKEN_KEY = 'token';
 export const api = axios.create({ baseURL: 'https://clinika-backend.vercel.app' });
