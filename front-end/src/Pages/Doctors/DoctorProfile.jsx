@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import  { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import api from "../../api";
@@ -64,42 +64,10 @@ export default function DoctorProfile() {
           throw new Error("Doctor not found");
         }
 
-        const nextAvailable = doctorFromApi.next_available;
-const formattedDoctor = {
-  id: doctorFromApi.id,
-  clinicId: doctorFromApi.clinic?.id || nextAvailable?.clinic_id || null,
-  appointmentDate: nextAvailable?.appointment_date || "",
-  startTime: nextAvailable?.start_time || "",
-
-  name: doctorFromApi.full_name,
-  specialty: doctorFromApi.specialty?.name || "Medical Specialist",
-  clinic: doctorFromApi.clinic?.name || "Medical Center",
-  location: doctorFromApi.clinic?.city || "",
-  fee: doctorFromApi.consultation_fee ?? 0,
-  rating: doctorFromApi.rating_avg,
-  reviews: doctorFromApi.reviews_count ?? 0,
-  experience: doctorFromApi.years_of_experience ?? 0,
-  degree: doctorFromApi.title || "",
-  image: doctorFromApi.photo_url || "",
-  gender: doctorFromApi.gender || "",
-  about: doctorFromApi.bio || "",
-  time: nextAvailable?.start_time || "",
-  availability: nextAvailable?.appointment_date || "Unavailable",
-  clinicAddress: doctorFromApi.clinic?.address || "",
-  verified: doctorFromApi.is_verified ?? false,
-  languages: [],
-  focusAreas: [],
-  education: [],
-  availableDays: [],
-  availableSlots: [],
-};
-
-        setDoctor(formattedDoctor);
-      } catch (err) {
-        setError(
-          err.response?.data?.detail ||
-          "Unable to load doctor profile."
-        );
+        const data = await response.json();
+        setDoctor(data);
+      } catch {
+        setError("Unable to load doctor profile.");
       } finally {
         setLoading(false);
       }

@@ -1,559 +1,572 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import adminApi, { getErrorMessage } from '../../api/adminApi';
+import { formatDate, formatTime } from '../../Components/Patient/dateFormat';
+import { useDashboard } from '../../context/DashboardContext';
+import { Avatar, Banner, formatShortDate, Modal, Pager, showingRange, useDebounced } from './adminUi';
+import useServerList from './useServerList';
 
-const DEFAULT_PATIENTS = [
-  { id: 1, full_name: 'Sarah Jenkins', email: 'sarah.j@example.com', phone: '+1 (555) 234-5678', created_at: 'Jan 14, 2024', status: 'Active' },
-  { id: 2, full_name: 'Marcus Vance', email: 'marcus.v@example.com', phone: '+1 (555) 345-6789', created_at: 'Feb 22, 2024', status: 'Active' },
-  { id: 3, full_name: 'Aisha Rahman', email: 'aisha.r@example.com', phone: '+1 (555) 456-7890', created_at: 'Mar 05, 2024', status: 'Active' },
-  { id: 4, full_name: 'David Chen', email: 'david.c@example.com', phone: '+1 (555) 567-8901', created_at: 'Nov 18, 2023', status: 'Inactive' }
-];
+const PAGE_SIZE = 8;
+const APPT_STATUS = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  no_show: 'Missed',
+};
+const EMPTY_PATIENT = { first_name: '', last_name: '', email: '', phone: '', password: '' };
+const EMPTY_BOOKING = { patient_id: '', doctor_id: '', date: '', slot: null, consultation_type: 'in_person', reason: '' };
 
-const DEFAULT_APPOINTMENTS_LIST = [
-  { id: 1, patient: 'Sarah Jenkins', doctor: 'Dr. Maya Bennett', date: 'Nov 20, 2026', type: 'Cardiology Consultation', status: 'Confirmed' },
-  { id: 2, patient: 'Marcus Vance', doctor: 'Dr. Daniel Park', date: 'Nov 21, 2026', type: 'General Checkup', status: 'Pending' }
-];
+function TableState({ loading, error, empty, icon, title }) {
+  if (loading) {
+    return (
+      <div className="cl-ad-loading" role="status">
+        <span className="spinner-border spinner-border-sm" aria-hidden="true" /> Loading…
+      </div>
+    );
+  }
+  if (error) return <div className="cl-ad-banner cl-ad-banner--error" style={{ margin: '1rem' }} role="alert">{error}</div>;
+  if (empty) {
+    return (
+      <div className="cl-ad-empty">
+        <span className="material-symbols-outlined" aria-hidden="true">{icon}</span>
+        <h3>{title}</h3>
+        <p className="cl-pd-muted">Try a different search or filter.</p>
+      </div>
+    );
+  }
+  return null;
+}
 
 export default function AdminManage() {
-  const navigate = useNavigate();
+  const { stats, refreshDashboard } = useDashboard();
 
-  const [activeTab, setActiveTab] = useState('patients'); // 'patients' or 'appointments'
-  const [users, setUsers] = useState([]);
-  const [appointments, setAppointments] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [loading, setLoading] = useState(true);
-  const [showEmptyDemo, setShowEmptyDemo] = useState(false);
+  const [tab, setTab] = useState('patients');
+  const [banner, setBanner] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [patientCounts, setPatientCounts] = useState({ all: 0, active: 0, inactive: 0 });
 
-  // Pagination States
-  const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 3;
+  // Patients list state
+  const [pSearch, setPSearch] = useState('');
+  const pQuery = useDebounced(pSearch.trim());
+  const [pFilter, setPFilter] = useState('all');
+  const [pPage, setPPage] = useState(1);
 
-  // Modals States
-  const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
-  const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
+  // Appointments list state
+  const [aSearch, setASearch] = useState('');
+  const aQuery = useDebounced(aSearch.trim());
+  const [aStatus, setAStatus] = useState('');
+  const [aPage, setAPage] = useState(1);
 
-  // New Patient Form State
-  const [newPatient, setNewPatient] = useState({
-    full_name: '',
-    email: '',
-    password: '',
-    phone: '',
-    date_of_birth: '2000-01-01',
-    gender: 'male'
-  });
+  const [modal, setModal] = useState(null); // { type, ...data }
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [patientForm, setPatientForm] = useState(EMPTY_PATIENT);
+  const [cancelReason, setCancelReason] = useState('');
 
-  // New Appointment Form State
-  const [newAppointment, setNewAppointment] = useState({
-    doctor_id: '',
-    patient_id: '',
-    appointment_date: '',
-    reason: '',
-    consultation_type: 'in_person',
-    status: 'confirmed'
-  });
+  // Booking modal data
+  const [booking, setBooking] = useState(EMPTY_BOOKING);
+  const [options, setOptions] = useState({ patients: [], doctors: [] });
+  const [slots, setSlots] = useState({ key: '', list: [] });
 
-  const loadAdminData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const usersRes = await fetch('https://clinika-backend.vercel.app/admin/users?role=patient');
-      const usersData = await usersRes.json();
-      if (usersData && Array.isArray(usersData)) {
-        setUsers(usersData);
-      }
-    } catch (err) {
-      console.error('Error fetching users:', err);
-    } finally {
-      setLoading(false);
-    }
+  const patients = useServerList(
+    '/admin/patients',
+    {
+      limit: PAGE_SIZE,
+      offset: (pPage - 1) * PAGE_SIZE,
+      ...(pFilter !== 'all' && { is_active: pFilter === 'active' }),
+      ...(pQuery && { q: pQuery }),
+    },
+    reloadKey
+  );
 
-    try {
-      const apptRes = await fetch('https://clinika-backend.vercel.app/admin/reports/appointments');
-      const apptData = await apptRes.json();
-      if (apptData && Array.isArray(apptData)) {
-        setAppointments(apptData);
-      }
-    } catch (err) {
-      console.error('Error fetching appointments:', err);
-    }
-  }, []);
+  const appointments = useServerList(
+    '/appointments',
+    {
+      limit: PAGE_SIZE,
+      offset: (aPage - 1) * PAGE_SIZE,
+      ...(aStatus && { status: aStatus }),
+      ...(aQuery && { q: aQuery }),
+    },
+    reloadKey
+  );
 
   useEffect(() => {
-    let active = true;
-    Promise.resolve().then(() => {
-      if (active) {
-        loadAdminData();
-      }
-    });
+    let ignore = false;
+    adminApi
+      .get('/admin/patients/counts')
+      .then((res) => !ignore && setPatientCounts(res.data))
+      .catch(() => {});
     return () => {
-      active = false;
+      ignore = true;
     };
-  }, [loadAdminData]);
+  }, [reloadKey]);
 
-  const activePatients = users.length > 0 ? users : DEFAULT_PATIENTS;
-  const activeAppointments = appointments.length > 0 ? appointments : DEFAULT_APPOINTMENTS_LIST;
+  const notify = (type, text) => setBanner({ type, text });
+  const closeModal = useCallback(() => {
+    setModal(null);
+    setFormError('');
+    setCancelReason('');
+  }, []);
 
-  const handleAddPatientSubmit = (e) => {
-    e.preventDefault();
-    fetch('https://clinika-backend.vercel.app/admin/patients', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newPatient),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed');
-        return res.json().catch(() => ({}));
-      })
-      .then(() => {
-        alert('تم إضافة المريض بنجاح!');
-        setIsPatientModalOpen(false);
-        loadAdminData();
-      })
-      .catch(() => {
-        const fallback = {
-          id: activePatients.length + 1,
-          full_name: newPatient.full_name,
-          email: newPatient.email,
-          phone: newPatient.phone,
-          created_at: 'Today',
-          status: 'Active'
-        };
-        setUsers([fallback, ...activePatients]);
-        setIsPatientModalOpen(false);
-        alert('تم إضافة المريض محلياً بنجاح!');
-      });
+  async function run(action, message) {
+    setBusy(true);
+    setFormError('');
+    try {
+      await action();
+      notify('ok', message);
+      closeModal();
+      setReloadKey((n) => n + 1);
+      refreshDashboard();
+      return true;
+    } catch (err) {
+      setFormError(getErrorMessage(err));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ---- Patients ----
+  const setPatientActive = (patient, isActive) =>
+    run(
+      () => adminApi.patch(`/admin/users/${patient.user_id}/status`, { is_active: isActive }),
+      `${patient.full_name} was ${isActive ? 'activated' : 'deactivated'}.`
+    );
+
+  const addPatient = (event) => {
+    event.preventDefault();
+    const password = patientForm.password.trim();
+    run(
+      () =>
+        adminApi.post('/admin/patients', {
+          first_name: patientForm.first_name.trim(),
+          last_name: patientForm.last_name.trim(),
+          email: patientForm.email.trim(),
+          phone: patientForm.phone.trim() || null,
+          // No password = the patient gets an invitation email to set their own.
+          ...(password && { password }),
+        }),
+      password ? 'Patient added.' : 'Patient added. An invitation email was sent so they can set a password.'
+    ).then((ok) => ok && setPatientForm(EMPTY_PATIENT));
   };
 
-  const handleAddAppointmentSubmit = (e) => {
-    e.preventDefault();
-    fetch('https://clinika-backend.vercel.app/admin/appointments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newAppointment),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed');
-        return res.json().catch(() => ({}));
-      })
-      .then(() => {
-        alert('تم حجز الموعد بنجاح!');
-        setIsAppointmentModalOpen(false);
-        loadAdminData();
-      })
-      .catch(() => {
-        setIsAppointmentModalOpen(false);
-        alert('تم الحجز محلياً بنجاح!');
-      });
+  // ---- Appointments ----
+  const changeStatus = (appt, status) =>
+    run(() => adminApi.patch(`/appointments/${appt.id}/status`, { status }), `Appointment marked as ${APPT_STATUS[status].toLowerCase()}.`);
+
+  const cancelAppointment = (appt) =>
+    run(
+      () => adminApi.patch(`/appointments/${appt.id}/cancel`, cancelReason.trim() ? { reason: cancelReason.trim() } : {}),
+      'Appointment cancelled. The patient was notified.'
+    );
+
+  // ---- Book on behalf of a patient ----
+  async function openBooking() {
+    setBooking(EMPTY_BOOKING);
+    setSlots({ key: '', list: [] });
+    setModal({ type: 'book' });
+    try {
+      const [p, d] = await Promise.all([
+        adminApi.get('/admin/patients', { params: { limit: 100 } }),
+        adminApi.get('/admin/doctors', { params: { status: 'active', limit: 100 } }),
+      ]);
+      setOptions({ patients: p.data, doctors: d.data });
+    } catch (err) {
+      setFormError(getErrorMessage(err));
+    }
+  }
+
+  const slotKey = `${booking.doctor_id}|${booking.date}`;
+  const slotsLoading = Boolean(booking.doctor_id && booking.date) && slots.key !== slotKey;
+
+  useEffect(() => {
+    if (modal?.type !== 'book' || !booking.doctor_id || !booking.date) return undefined;
+    let ignore = false;
+    adminApi
+      .get(`/doctors/${booking.doctor_id}/slots`, { params: { date: booking.date } })
+      .then((res) => !ignore && setSlots({ key: slotKey, list: res.data }))
+      .catch(() => !ignore && setSlots({ key: slotKey, list: [] }));
+    return () => {
+      ignore = true;
+    };
+  }, [modal?.type, booking.doctor_id, booking.date, slotKey]);
+
+  const submitBooking = (event) => {
+    event.preventDefault();
+    if (!booking.slot) {
+      setFormError('Pick a time slot first.');
+      return;
+    }
+    run(
+      () =>
+        adminApi.post('/admin/appointments', {
+          patient_id: Number(booking.patient_id),
+          doctor_id: Number(booking.doctor_id),
+          appointment_date: booking.date,
+          start_time: booking.slot.start_time,
+          clinic_id: booking.slot.clinic_id ?? null,
+          consultation_type: booking.consultation_type,
+          reason: booking.reason.trim() || null,
+          status: 'confirmed',
+        }),
+      'Appointment booked and confirmed.'
+    );
   };
 
-  const handleToggleStatus = (userId, currentStatus) => {
-    const newActiveState = currentStatus !== 'Active';
-    fetch(`https://clinika-backend.vercel.app/admin/users/${userId}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: newActiveState }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed');
-        return res.json().catch(() => ({}));
-      })
-      .then(() => {
-        loadAdminData();
-      })
-      .catch(() => {
-        const baseList = users.length > 0 ? users : DEFAULT_PATIENTS;
-        setUsers(baseList.map((u) => (u.id === userId ? { ...u, status: newActiveState ? 'Active' : 'Inactive' } : u)));
-      });
-  };
+  const [pFrom, pTo] = showingRange(pPage, PAGE_SIZE, patients.total, patients.items.length);
+  const [aFrom, aTo] = showingRange(aPage, PAGE_SIZE, appointments.total, appointments.items.length);
 
-  const filteredPatients = showEmptyDemo
-    ? []
-    : activePatients.filter((p) => {
-        const name = p.full_name || p.name || '';
-        const email = p.email || '';
-        const phone = p.phone || '';
-        const q = searchQuery.toLowerCase();
-        const matchesSearch = name.toLowerCase().includes(q) || email.toLowerCase().includes(q) || phone.toLowerCase().includes(q);
-        const matchesStatus = statusFilter === 'All' || p.status === statusFilter;
-        return matchesSearch && matchesStatus;
-      });
-
-  const indexOfLastRow = currentPage * rowsPerPage;
-  const indexOfFirstRow = indexOfLastRow - rowsPerPage;
-  const currentTableRows = filteredPatients.slice(indexOfFirstRow, indexOfLastRow);
-  const totalPages = Math.ceil(filteredPatients.length / rowsPerPage) || 1;
-
-  const activeCount = activePatients.filter((p) => p.status === 'Active' || p.status === true).length;
-  const inactiveCount = activePatients.filter((p) => p.status === 'Inactive' || p.status === false).length;
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F8FAFC', fontFamily: 'Inter, sans-serif', color: '#0F172A' }}>
+    <>
       <Helmet>
-        <title>Manage Users & Appointments | Clinika</title>
+        <title>Manage Users &amp; Appointments | Clinika</title>
       </Helmet>
 
-      {/* Sidebar */}
-      <aside style={{ width: '240px', backgroundColor: '#FFFFFF', borderRight: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', padding: '24px 16px', position: 'fixed', height: '100vh', top: 0, left: 0, boxSizing: 'border-box' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px', paddingLeft: '8px' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#1B68F6', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '16px' }}>
-            +
-          </div>
-          <div>
-            <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#0F172A', margin: 0, lineHeight: '1.2' }}>Clinika</h2>
-            <span style={{ fontSize: '10px', fontWeight: '600', color: '#64748B', letterSpacing: '0.05em' }}>ADMIN PORTAL</span>
-          </div>
-        </div>
-
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
-          <button
-            onClick={() => navigate('/admin-dashboard')}
-            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', borderRadius: '8px', border: 'none', backgroundColor: 'transparent', color: '#64748B', fontWeight: '500', fontSize: '13px', cursor: 'pointer', textAlign: 'left', width: '100%' }}
-          >
-            <span>📊</span> Overview
-          </button>
-          <button
-            onClick={() => navigate('/admin-dashboard/manage-doctors')}
-            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', borderRadius: '8px', border: 'none', backgroundColor: 'transparent', color: '#64748B', fontWeight: '500', fontSize: '13px', cursor: 'pointer', textAlign: 'left', width: '100%' }}
-          >
-            <span>🩺</span> Manage Doctors
-          </button>
-          <button
-            onClick={() => navigate('/admin-dashboard/manage-users-and-appointments')}
-            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', borderRadius: '8px', border: 'none', backgroundColor: '#1B68F6', color: '#FFFFFF', fontWeight: '600', fontSize: '13px', cursor: 'pointer', textAlign: 'left', width: '100%' }}
-          >
-            <span>📅</span> Manage Users & Appointments
-          </button>
-        </nav>
-
-        <div style={{ paddingTop: '16px' }}>
-          <button
-            onClick={() => navigate('/login')}
-            style={{ background: 'none', border: 'none', color: '#EF4444', fontWeight: '500', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px' }}
-          >
-            <span>🚪</span> Logout
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main style={{ marginLeft: '240px', flex: 1, padding: '20px 36px', boxSizing: 'border-box' }}>
-        {/* Top Status Bar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #E2E8F0', paddingBottom: '14px', marginBottom: '20px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '13px' }}>
-              <span style={{ fontWeight: '700', color: '#0F172A' }}>Clinika Platform Admin Network</span>
-              <span style={{ color: '#475569', fontSize: '12px' }}>
-                <span style={{ color: '#16A34A', marginRight: '5px' }}>●</span>
-                System Status: <strong style={{ color: '#0F172A' }}>Operational / Online</strong>
-              </span>
-            </div>
-            <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '6px' }}>
-              Admin Portal &nbsp;&gt;&nbsp; <span style={{ color: '#475569', fontWeight: '500' }}>Manage Users & Appointments</span>
-            </div>
-          </div>
-
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
-              <div>
-                <div style={{ fontSize: '12px', fontWeight: '700', color: '#0F172A' }}>System Admin</div>
-                <div style={{ fontSize: '10px', color: '#64748B' }}>Platform Administrator</div>
-              </div>
-              <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#1E293B', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>
-                👤
-              </div>
-            </div>
-            <div style={{ fontSize: '10px', color: '#64748B', marginTop: '6px' }}>
-              <span style={{ color: '#16A34A', marginRight: '4px' }}>●</span>
-              Registry Database Sync: <strong style={{ color: '#0F172A' }}>Real-time</strong>
-            </div>
+      <section className="cl-pd-card cl-ad-head" style={{ padding: '1.5rem' }}>
+        <div>
+          <h1>
+            Manage Users &amp; Appointments <span className="cl-ad-tag">Admin Suite</span>
+          </h1>
+          <p>Manage patient accounts and monitor appointments across the platform.</p>
+          <div className="cl-ad-meta">
+            <span><b>{patientCounts.all}</b> Registered Patients</span>
+            <span><b>{stats.totalAppointments}</b> Total Bookings</span>
+            <span><b>{stats.todayAppointments}</b> Booked for Today</span>
           </div>
         </div>
-
-        {/* Header Title & Admin Suite Actions Bar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <h1 style={{ fontSize: '26px', fontWeight: 'bold', color: '#0F172A', margin: 0 }}>Manage Users & Appointments</h1>
-              <span style={{ backgroundColor: '#E2E8F0', color: '#334155', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', letterSpacing: '0.05em' }}>
-                ADMIN SUITE
-              </span>
-            </div>
-            <p style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>
-              Manage patient accounts and monitor appointments across the platform with zero clinical intrusion.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: '#64748B' }}>
-            <button
-              onClick={() => setIsPatientModalOpen(true)}
-              style={{ background: 'none', border: 'none', color: '#1B68F6', cursor: 'pointer', fontWeight: '600', padding: 0 }}
-            >
-              + Patient Modal
-            </button>
-            <button
-              onClick={() => setIsAppointmentModalOpen(true)}
-              style={{ background: 'none', border: 'none', color: '#1B68F6', cursor: 'pointer', fontWeight: '600', padding: 0 }}
-            >
-              Appointment Modal
-            </button>
-            <button
-              onClick={() => {
-                const targetId = activePatients[0]?.id || 1;
-                const targetStatus = activePatients[0]?.status === 'Active' ? 'Inactive' : 'Active';
-                handleToggleStatus(targetId, targetStatus === 'Active' ? 'Inactive' : 'Active');
-                alert('تم تجربة Status Dialog بنجاح وتحديث حالة أول مريض!');
-              }}
-              style={{ background: 'none', border: 'none', color: '#1B68F6', cursor: 'pointer', fontWeight: '600', padding: 0 }}
-            >
-              Status Dialog
-            </button>
-            <button
-              onClick={() => setActiveTab(activeTab === 'patients' ? 'appointments' : 'patients')}
-              style={{ background: 'none', border: 'none', color: '#1B68F6', cursor: 'pointer', fontWeight: '600', padding: 0 }}
-            >
-              Toggle Tab
-            </button>
-            <button
-              onClick={() => setShowEmptyDemo(!showEmptyDemo)}
-              style={{ background: 'none', border: 'none', color: showEmptyDemo ? '#EF4444' : '#1B68F6', cursor: 'pointer', fontWeight: '600', padding: 0 }}
-            >
-              {showEmptyDemo ? 'Restore State' : 'Empty State'}
-            </button>
-          </div>
-        </div>
-        {/* Metrics Banner */}
-        <div style={{ display: 'flex', gap: '24px', marginBottom: '24px', fontSize: '13px', color: '#475569', backgroundColor: '#FFFFFF', padding: '16px 20px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-          <div>👤 <strong>{activePatients.length}</strong> Registered Patients</div>
-          <div>📅 <strong>{activeAppointments.length}</strong> Total Bookings</div>
-          <div>⚡ <strong>99.2%</strong> Platform Uptime</div>
-        </div>
-
-        {/* Tabs Switcher */}
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-          <button
-            onClick={() => { setActiveTab('patients'); setCurrentPage(1); }}
-            style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '13px', backgroundColor: activeTab === 'patients' ? '#1B68F6' : '#FFFFFF', color: activeTab === 'patients' ? '#FFFFFF' : '#64748B', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-          >
-            Patients ({activePatients.length})
+        <div className="cl-ad-actions">
+          <button type="button" className="cl-pd-btn cl-ad-btn-icon" onClick={() => setModal({ type: 'addPatient' })}>
+            <span className="material-symbols-outlined" aria-hidden="true">person_add</span> Add Patient
           </button>
-          <button
-            onClick={() => { setActiveTab('appointments'); setCurrentPage(1); }}
-            style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '13px', backgroundColor: activeTab === 'appointments' ? '#1B68F6' : '#FFFFFF', color: activeTab === 'appointments' ? '#FFFFFF' : '#64748B', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-          >
-            Appointments ({activeAppointments.length})
+          <button type="button" className="cl-pd-btn cl-pd-btn--primary cl-ad-btn-icon" onClick={openBooking}>
+            <span className="material-symbols-outlined" aria-hidden="true">event_available</span> Book Appointment
           </button>
         </div>
+      </section>
 
-        {/* Content Table Container */}
-        <div style={{ backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px solid #E2E8F0', overflow: 'hidden', marginBottom: '24px' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            {activeTab === 'patients' ? (
+      <Banner banner={banner} onClose={() => setBanner(null)} />
+
+      <div className="cl-ad-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected={tab === 'patients'} className={`cl-ad-tab ${tab === 'patients' ? 'is-active' : ''}`} onClick={() => setTab('patients')}>
+          <span className="material-symbols-outlined" aria-hidden="true">groups</span> Patients ({patientCounts.all})
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'appointments'} className={`cl-ad-tab ${tab === 'appointments' ? 'is-active' : ''}`} onClick={() => setTab('appointments')}>
+          <span className="material-symbols-outlined" aria-hidden="true">event_note</span> Appointments ({stats.totalAppointments})
+        </button>
+      </div>
+
+      {tab === 'patients' && (
+        <>
+          <section className="cl-pd-card cl-ad-toolbar">
+            <label className="cl-ad-search">
+              <span className="material-symbols-outlined" aria-hidden="true">search</span>
               <input
-                type="text"
-                placeholder="Search by patient name, email, or phone number..."
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', width: '320px', fontSize: '13px', outline: 'none' }}
+                type="search"
+                placeholder="Search by patient name, email, or phone number…"
+                value={pSearch}
+                aria-label="Search patients"
+                onChange={(e) => {
+                  setPSearch(e.target.value);
+                  setPPage(1);
+                }}
               />
-            ) : (
-              <span style={{ fontWeight: '600', fontSize: '14px' }}>Appointments Schedule</span>
-            )}
-
-            <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#64748B' }}>
-              <span style={{ cursor: 'pointer', fontWeight: statusFilter === 'All' ? 'bold' : 'normal', color: statusFilter === 'All' ? '#1B68F6' : '#64748B' }} onClick={() => { setStatusFilter('All'); setCurrentPage(1); }}>
-                All ({activePatients.length})
-              </span>
-              <span style={{ cursor: 'pointer', fontWeight: statusFilter === 'Active' ? 'bold' : 'normal', color: statusFilter === 'Active' ? '#1B68F6' : '#64748B' }} onClick={() => { setStatusFilter('Active'); setCurrentPage(1); }}>
-                Active ({activeCount})
-              </span>
-              <span style={{ cursor: 'pointer', fontWeight: statusFilter === 'Inactive' ? 'bold' : 'normal', color: statusFilter === 'Inactive' ? '#1B68F6' : '#64748B' }} onClick={() => { setStatusFilter('Inactive'); setCurrentPage(1); }}>
-                Inactive ({inactiveCount})
-              </span>
-            </div>
-          </div>
-
-          {/* Patients Table */}
-          {activeTab === 'patients' ? (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#64748B', fontSize: '11px', textTransform: 'uppercase' }}>
-                  <th style={{ padding: '12px 20px' }}>Patient Name & Avatar</th>
-                  <th style={{ padding: '12px 20px' }}>Contact Phone</th>
-                  <th style={{ padding: '12px 20px' }}>Registration Date</th>
-                  <th style={{ padding: '12px 20px' }}>Status</th>
-                  <th style={{ padding: '12px 20px', textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: '#64748B' }}>Loading data...</td></tr>
-                ) : currentTableRows.length > 0 ? (
-                  currentTableRows.map((pat, idx) => (
-                    <tr key={pat.id || idx} style={{ borderBottom: '1px solid #E2E8F0', fontSize: '13px' }}>
-                      <td style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#E0EDFD', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1B68F6', fontWeight: '600', fontSize: '12px' }}>
-                          {(pat.full_name || pat.name || 'P')[0]}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: '600', color: '#0F172A' }}>{pat.full_name || pat.name}</div>
-                          <div style={{ fontSize: '11px', color: '#64748B' }}>{pat.email}</div>
-                        </div>
-                      </td>
-                      <td style={{ padding: '14px 20px', color: '#334155' }}>{pat.phone || '+1 (555) 234-5678'}</td>
-                      <td style={{ padding: '14px 20px', color: '#334155' }}>{pat.created_at || pat.date || 'Jan 14, 2024'}</td>
-                      <td style={{ padding: '14px 20px' }}>
-                        <span style={{ color: (pat.status === 'Active' || pat.status === true) ? '#16A34A' : '#D97706', fontSize: '12px', fontWeight: '500' }}>
-                          ● {pat.status === false ? 'Inactive' : (pat.status || 'Active')}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                        <button onClick={() => alert(`View details for ${pat.full_name || pat.name}`)} style={{ background: 'none', border: 'none', color: '#1B68F6', cursor: 'pointer', fontSize: '13px', marginRight: '12px' }}>View Details</button>
-                        <button onClick={() => handleToggleStatus(pat.id, pat.status)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: '13px' }}>
-                          {pat.status === 'Active' ? 'Deactivate' : 'Activate'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="5" style={{ padding: '40px', textAlign: 'center', color: '#64748B', fontSize: '13px' }}>
-                      {showEmptyDemo ? 'No patients registered in the directory (Empty State Demo).' : 'No patients match your search criteria.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          ) : (
-            /* Appointments Table */
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#64748B', fontSize: '11px', textTransform: 'uppercase' }}>
-                  <th style={{ padding: '12px 20px' }}>Patient</th>
-                  <th style={{ padding: '12px 20px' }}>Doctor</th>
-                  <th style={{ padding: '12px 20px' }}>Date & Time</th>
-                  <th style={{ padding: '12px 20px' }}>Type</th>
-                  <th style={{ padding: '12px 20px' }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activeAppointments.map((app, idx) => (
-                  <tr key={app.id || idx} style={{ borderBottom: '1px solid #E2E8F0', fontSize: '13px' }}>
-                    <td style={{ padding: '14px 20px', fontWeight: '600', color: '#0F172A' }}>{app.patient || 'Sarah Jenkins'}</td>
-                    <td style={{ padding: '14px 20px', color: '#334155' }}>{app.doctor || 'Dr. Maya Bennett'}</td>
-                    <td style={{ padding: '14px 20px', color: '#334155' }}>{app.date || app.appointment_date || 'Nov 20, 2026'}</td>
-                    <td style={{ padding: '14px 20px', color: '#334155' }}>{app.type || app.reason || 'Consultation'}</td>
-                    <td style={{ padding: '14px 20px' }}>
-                      <span style={{ color: '#0369A1', fontSize: '12px', fontWeight: '500' }}>● {app.status || 'Confirmed'}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {/* Table Footer / Pagination */}
-          <div style={{ padding: '12px 20px', backgroundColor: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#64748B' }}>
-            <div>
-              Showing {filteredPatients.length > 0 ? indexOfFirstRow + 1 : 0}–{Math.min(indexOfLastRow, filteredPatients.length)} of {filteredPatients.length} patients
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #CBD5E1', backgroundColor: '#FFFFFF', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', opacity: currentPage === 1 ? 0.5 : 1 }}
-              >
-                Previous
-              </button>
-
-              {Array.from({ length: totalPages }, (_, index) => (
+            </label>
+            <div className="cl-ad-filters">
+              {[['all', `All (${patientCounts.all})`], ['active', `Active (${patientCounts.active})`], ['inactive', `Inactive (${patientCounts.inactive})`]].map(([value, label]) => (
                 <button
-                  key={index + 1}
-                  onClick={() => setCurrentPage(index + 1)}
-                  style={{
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    border: currentPage === index + 1 ? 'none' : '1px solid #CBD5E1',
-                    backgroundColor: currentPage === index + 1 ? '#1B68F6' : '#FFFFFF',
-                    color: currentPage === index + 1 ? '#FFFFFF' : '#64748B',
-                    fontWeight: currentPage === index + 1 ? 'bold' : 'normal',
-                    cursor: 'pointer'
+                  key={value}
+                  type="button"
+                  className={`cl-ad-filter ${pFilter === value ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setPFilter(value);
+                    setPPage(1);
                   }}
                 >
-                  {index + 1}
+                  {label}
                 </button>
               ))}
-
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #CBD5E1', backgroundColor: '#FFFFFF', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', opacity: currentPage === totalPages ? 0.5 : 1 }}
-              >
-                Next
-              </button>
             </div>
-          </div>
-        </div>
-      </main>
-      {/* Patient Modal */}
-      {isPatientModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ backgroundColor: '#FFFFFF', padding: '24px', borderRadius: '10px', width: '400px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: '18px', color: '#0F172A' }}>Add New Patient</h3>
-            <form onSubmit={handleAddPatientSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '500', color: '#64748B' }}>Full Name</label>
-                <input type="text" required placeholder="John Doe" value={newPatient.full_name} onChange={(e) => setNewPatient({...newPatient, full_name: e.target.value})} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box', fontSize: '13px' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '500', color: '#64748B' }}>Email</label>
-                <input type="email" required placeholder="patient@example.com" value={newPatient.email} onChange={(e) => setNewPatient({...newPatient, email: e.target.value})} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box', fontSize: '13px' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '500', color: '#64748B' }}>Password</label>
-                <input type="password" required placeholder="******" value={newPatient.password} onChange={(e) => setNewPatient({...newPatient, password: e.target.value})} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box', fontSize: '13px' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '500', color: '#64748B' }}>Phone</label>
-                <input type="text" required placeholder="+1555000000" value={newPatient.phone} onChange={(e) => setNewPatient({...newPatient, phone: e.target.value})} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box', fontSize: '13px' }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
-                <button type="button" onClick={() => setIsPatientModalOpen(false)} style={{ backgroundColor: '#F1F5F9', color: '#475569', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
-                <button type="submit" style={{ backgroundColor: '#1B68F6', color: '#FFFFFF', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>Save</button>
-              </div>
-            </form>
-          </div>
-        </div>
+          </section>
+
+          <section className="cl-pd-card cl-ad-table-card" aria-label="Patients">
+            <div className="cl-ad-table-scroll">
+              <table className="cl-ad-table">
+                <thead>
+                  <tr>
+                    <th>Patient Name &amp; Avatar</th>
+                    <th>Contact Phone</th>
+                    <th>Registration Date</th>
+                    <th>Status</th>
+                    <th className="is-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {patients.items.map((patient) => (
+                    <tr key={patient.id}>
+                      <td>
+                        <div className="cl-ad-person">
+                          <Avatar name={patient.full_name} src={patient.avatar_url} />
+                          <div>
+                            <strong>{patient.full_name}</strong>
+                            <small>{patient.email}</small>
+                          </div>
+                        </div>
+                      </td>
+                      <td>{patient.phone || '—'}</td>
+                      <td>{formatShortDate(patient.created_at)}</td>
+                      <td>
+                        <span className={`cl-ad-pill cl-ad-pill--${patient.is_active ? 'active' : 'inactive'}`}>
+                          {patient.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="cl-ad-row-actions">
+                          <button type="button" className="cl-ad-link-btn" onClick={() => setModal({ type: 'patient', patient })}>View Details</button>
+                          {patient.is_active ? (
+                            <button type="button" className="cl-ad-link-btn cl-ad-link-btn--plain" onClick={() => setModal({ type: 'deactivate', patient })}>Deactivate</button>
+                          ) : (
+                            <button type="button" className="cl-ad-link-btn cl-ad-link-btn--green" disabled={busy} onClick={() => setPatientActive(patient, true)}>Activate</button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <TableState loading={patients.loading} error={patients.error} empty={!patients.items.length} icon="person_search" title="No patients found" />
+            <div className="cl-ad-foot">
+              <span>Showing <b>{pFrom} - {pTo}</b> of <b>{patients.total}</b> patients</span>
+              <Pager page={pPage} pageSize={PAGE_SIZE} total={patients.total} onChange={setPPage} />
+            </div>
+          </section>
+        </>
       )}
 
-      {/* Appointment Modal */}
-      {isAppointmentModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ backgroundColor: '#FFFFFF', padding: '24px', borderRadius: '10px', width: '400px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: '18px', color: '#0F172A' }}>Book New Appointment</h3>
-            <form onSubmit={handleAddAppointmentSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '500', color: '#64748B' }}>Doctor ID</label>
-                <input type="number" required placeholder="1" value={newAppointment.doctor_id} onChange={(e) => setNewAppointment({...newAppointment, doctor_id: e.target.value})} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box', fontSize: '13px' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '500', color: '#64748B' }}>Patient ID</label>
-                <input type="number" required placeholder="1" value={newAppointment.patient_id} onChange={(e) => setNewAppointment({...newAppointment, patient_id: e.target.value})} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box', fontSize: '13px' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '500', color: '#64748B' }}>Appointment Date</label>
-                <input type="date" required value={newAppointment.appointment_date} onChange={(e) => setNewAppointment({...newAppointment, appointment_date: e.target.value})} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box', fontSize: '13px' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '500', color: '#64748B' }}>Reason</label>
-                <input type="text" required placeholder="General Checkup" value={newAppointment.reason} onChange={(e) => setNewAppointment({...newAppointment, reason: e.target.value})} style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box', fontSize: '13px' }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
-                <button type="button" onClick={() => setIsAppointmentModalOpen(false)} style={{ backgroundColor: '#F1F5F9', color: '#475569', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>Cancel</button>
-                <button type="submit" style={{ backgroundColor: '#1B68F6', color: '#FFFFFF', border: 'none', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>Confirm</button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {tab === 'appointments' && (
+        <>
+          <section className="cl-pd-card cl-ad-toolbar">
+            <label className="cl-ad-search">
+              <span className="material-symbols-outlined" aria-hidden="true">search</span>
+              <input
+                type="search"
+                placeholder="Search by reference, patient, or doctor…"
+                value={aSearch}
+                aria-label="Search appointments"
+                onChange={(e) => {
+                  setASearch(e.target.value);
+                  setAPage(1);
+                }}
+              />
+            </label>
+            <div className="cl-ad-filters">
+              {[['', 'All'], ...Object.entries(APPT_STATUS)].map(([value, label]) => (
+                <button
+                  key={value || 'all'}
+                  type="button"
+                  className={`cl-ad-filter ${aStatus === value ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setAStatus(value);
+                    setAPage(1);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="cl-pd-card cl-ad-table-card" aria-label="Appointments">
+            <div className="cl-ad-table-scroll">
+              <table className="cl-ad-table">
+                <thead>
+                  <tr>
+                    <th>Reference</th>
+                    <th>Patient</th>
+                    <th>Doctor</th>
+                    <th>Date &amp; Time</th>
+                    <th>Status</th>
+                    <th className="is-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {appointments.items.map((appt) => (
+                    <tr key={appt.id}>
+                      <td>
+                        <span className="cl-ad-cell-title">{appt.reference_number || `#${appt.id}`}</span>
+                        <span className="cl-ad-cell-sub">{appt.consultation_type === 'online' ? 'Online visit' : 'In-person visit'}</span>
+                      </td>
+                      <td>
+                        <div className="cl-ad-person">
+                          <Avatar name={appt.patient.full_name} src={appt.patient.avatar_url} />
+                          <div><strong>{appt.patient.full_name}</strong><small>{appt.patient.phone || ''}</small></div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="cl-ad-cell-title">Dr. {appt.doctor.full_name}</span>
+                        <span className="cl-ad-cell-sub">{appt.doctor.specialty_name || ''}</span>
+                      </td>
+                      <td>
+                        <span className="cl-ad-cell-title">{formatDate(appt.appointment_date)}</span>
+                        <span className="cl-ad-cell-sub">{formatTime(appt.start_time)}</span>
+                      </td>
+                      <td><span className={`cl-ad-pill cl-ad-pill--${appt.status}`}>{APPT_STATUS[appt.status] ?? appt.status}</span></td>
+                      <td>
+                        <div className="cl-ad-row-actions">
+                          {appt.status === 'pending' && (
+                            <button type="button" className="cl-ad-link-btn cl-ad-link-btn--green" disabled={busy} onClick={() => changeStatus(appt, 'confirmed')}>Confirm</button>
+                          )}
+                          {appt.status === 'confirmed' && (
+                            <>
+                              <button type="button" className="cl-ad-link-btn" disabled={busy} onClick={() => changeStatus(appt, 'completed')}>Complete</button>
+                              <button type="button" className="cl-ad-link-btn cl-ad-link-btn--plain" disabled={busy} onClick={() => changeStatus(appt, 'no_show')}>No-show</button>
+                            </>
+                          )}
+                          {['pending', 'confirmed'].includes(appt.status) && (
+                            <button type="button" className="cl-ad-link-btn cl-ad-link-btn--red" onClick={() => setModal({ type: 'cancel', appt })}>Cancel</button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <TableState loading={appointments.loading} error={appointments.error} empty={!appointments.items.length} icon="event_busy" title="No appointments found" />
+            <div className="cl-ad-foot">
+              <span>Showing <b>{aFrom} - {aTo}</b> of <b>{appointments.total}</b> appointments</span>
+              <Pager page={aPage} pageSize={PAGE_SIZE} total={appointments.total} onChange={setAPage} />
+            </div>
+          </section>
+        </>
       )}
-    </div>
+
+      {/* ---------- Modals ---------- */}
+      {modal?.type === 'patient' && (
+        <Modal title={modal.patient.full_name} subtitle={modal.patient.email} onClose={closeModal}>
+          <dl className="cl-ad-detail">
+            <div><dt>Phone</dt><dd>{modal.patient.phone || '—'}</dd></div>
+            <div><dt>Registered</dt><dd>{formatShortDate(modal.patient.created_at)}</dd></div>
+            <div><dt>Date of birth</dt><dd>{modal.patient.date_of_birth ? formatDate(modal.patient.date_of_birth) : '—'}</dd></div>
+            <div><dt>Gender</dt><dd style={{ textTransform: 'capitalize' }}>{modal.patient.gender || '—'}</dd></div>
+            <div><dt>Blood type</dt><dd>{modal.patient.blood_type || '—'}</dd></div>
+            <div><dt>Status</dt><dd>{modal.patient.is_active ? 'Active' : 'Inactive'}</dd></div>
+            <div className="is-wide"><dt>Address</dt><dd>{modal.patient.address || '—'}</dd></div>
+            <div><dt>Emergency contact</dt><dd>{modal.patient.emergency_contact_name || '—'}</dd></div>
+            <div><dt>Emergency phone</dt><dd>{modal.patient.emergency_contact_phone || '—'}</dd></div>
+            <div className="is-wide"><dt>Allergies</dt><dd>{modal.patient.allergies || '—'}</dd></div>
+            <div className="is-wide"><dt>Chronic conditions</dt><dd>{modal.patient.chronic_conditions || '—'}</dd></div>
+          </dl>
+          <div className="cl-ad-modal__actions"><button type="button" className="cl-pd-btn" onClick={closeModal}>Close</button></div>
+        </Modal>
+      )}
+
+      {modal?.type === 'deactivate' && (
+        <Modal title="Deactivate patient?" subtitle={`${modal.patient.full_name} will not be able to sign in until you activate the account again.`} onClose={closeModal}>
+          {formError && <p className="cl-ad-error" role="alert">{formError}</p>}
+          <div className="cl-ad-modal__actions">
+            <button type="button" className="cl-pd-btn" onClick={closeModal} disabled={busy}>Keep active</button>
+            <button type="button" className="cl-pd-btn cl-pd-btn--danger" disabled={busy} onClick={() => setPatientActive(modal.patient, false)}>Deactivate</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === 'cancel' && (
+        <Modal title="Cancel appointment?" subtitle={`${modal.appt.patient.full_name} with Dr. ${modal.appt.doctor.full_name} on ${formatDate(modal.appt.appointment_date)} at ${formatTime(modal.appt.start_time)}. The patient is notified.`} onClose={closeModal}>
+          <div className="cl-pd-field">
+            <label htmlFor="ad-cancel">Reason (optional)</label>
+            <textarea id="ad-cancel" rows={2} maxLength={500} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+          </div>
+          {formError && <p className="cl-ad-error" role="alert">{formError}</p>}
+          <div className="cl-ad-modal__actions">
+            <button type="button" className="cl-pd-btn" onClick={closeModal} disabled={busy}>Keep it</button>
+            <button type="button" className="cl-pd-btn cl-pd-btn--danger" disabled={busy} onClick={() => cancelAppointment(modal.appt)}>Cancel appointment</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === 'addPatient' && (
+        <Modal title="Add Patient" subtitle="Leave the password empty to send the patient an email invitation." onClose={closeModal}>
+          <form className="cl-pd-form" onSubmit={addPatient}>
+            <div className="cl-pd-field"><label htmlFor="np-fn">First name</label><input id="np-fn" required value={patientForm.first_name} onChange={(e) => setPatientForm({ ...patientForm, first_name: e.target.value })} /></div>
+            <div className="cl-pd-field"><label htmlFor="np-ln">Last name</label><input id="np-ln" required value={patientForm.last_name} onChange={(e) => setPatientForm({ ...patientForm, last_name: e.target.value })} /></div>
+            <div className="cl-pd-field"><label htmlFor="np-email">Email</label><input id="np-email" type="email" required value={patientForm.email} onChange={(e) => setPatientForm({ ...patientForm, email: e.target.value })} /></div>
+            <div className="cl-pd-field"><label htmlFor="np-phone">Phone</label><input id="np-phone" type="tel" value={patientForm.phone} onChange={(e) => setPatientForm({ ...patientForm, phone: e.target.value })} /></div>
+            <div className="cl-pd-field cl-pd-field--wide"><label htmlFor="np-pass">Password (optional)</label><input id="np-pass" type="password" minLength={8} maxLength={72} autoComplete="new-password" value={patientForm.password} onChange={(e) => setPatientForm({ ...patientForm, password: e.target.value })} /></div>
+            {formError && <p className="cl-ad-error" role="alert">{formError}</p>}
+            <div className="cl-ad-modal__actions">
+              <button type="button" className="cl-pd-btn" onClick={closeModal} disabled={busy}>Cancel</button>
+              <button type="submit" className="cl-pd-btn cl-pd-btn--primary" disabled={busy}>{busy ? 'Saving…' : 'Add patient'}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {modal?.type === 'book' && (
+        <Modal title="Book Appointment" subtitle="Books a confirmed visit on behalf of a patient." onClose={closeModal}>
+          <form className="cl-pd-form" onSubmit={submitBooking}>
+            <div className="cl-pd-field cl-pd-field--wide">
+              <label htmlFor="bk-patient">Patient</label>
+              <select id="bk-patient" required value={booking.patient_id} onChange={(e) => setBooking({ ...booking, patient_id: e.target.value })}>
+                <option value="">Select a patient…</option>
+                {options.patients.filter((p) => p.is_active).map((p) => <option key={p.id} value={p.id}>{p.full_name} — {p.email}</option>)}
+              </select>
+            </div>
+            <div className="cl-pd-field">
+              <label htmlFor="bk-doctor">Doctor</label>
+              <select id="bk-doctor" required value={booking.doctor_id} onChange={(e) => setBooking({ ...booking, doctor_id: e.target.value, slot: null })}>
+                <option value="">Select a doctor…</option>
+                {options.doctors.map((d) => <option key={d.id} value={d.id}>Dr. {d.full_name}{d.specialty?.name ? ` (${d.specialty.name})` : ''}</option>)}
+              </select>
+            </div>
+            <div className="cl-pd-field">
+              <label htmlFor="bk-date">Date</label>
+              <input id="bk-date" type="date" required value={booking.date} onChange={(e) => setBooking({ ...booking, date: e.target.value, slot: null })} />
+            </div>
+            <div className="cl-pd-field cl-pd-field--wide">
+              <label>Time slot</label>
+              {!booking.doctor_id || !booking.date ? (
+                <p className="cl-pd-muted">Choose a doctor and a date to see free slots.</p>
+              ) : slotsLoading ? (
+                <p className="cl-pd-muted">Loading slots…</p>
+              ) : slots.list.length === 0 ? (
+                <p className="cl-pd-muted">No slots on this date.</p>
+              ) : (
+                <div className="cl-ad-slots">
+                  {slots.list.map((slot) => (
+                    <button
+                      key={`${slot.start_time}-${slot.clinic_id}`}
+                      type="button"
+                      disabled={!slot.is_available}
+                      className={`cl-ad-slot ${booking.slot?.start_time === slot.start_time ? 'is-active' : ''}`}
+                      onClick={() => setBooking({ ...booking, slot })}
+                    >
+                      {formatTime(slot.start_time)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="cl-pd-field">
+              <label htmlFor="bk-type">Visit type</label>
+              <select id="bk-type" value={booking.consultation_type} onChange={(e) => setBooking({ ...booking, consultation_type: e.target.value })}>
+                <option value="in_person">In person</option>
+                <option value="online">Online</option>
+              </select>
+            </div>
+            <div className="cl-pd-field">
+              <label htmlFor="bk-reason">Reason (optional)</label>
+              <input id="bk-reason" maxLength={1000} value={booking.reason} onChange={(e) => setBooking({ ...booking, reason: e.target.value })} />
+            </div>
+            {formError && <p className="cl-ad-error" role="alert">{formError}</p>}
+            <div className="cl-ad-modal__actions">
+              <button type="button" className="cl-pd-btn" onClick={closeModal} disabled={busy}>Cancel</button>
+              <button type="submit" className="cl-pd-btn cl-pd-btn--primary" disabled={busy}>{busy ? 'Booking…' : 'Book appointment'}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
   );
 }

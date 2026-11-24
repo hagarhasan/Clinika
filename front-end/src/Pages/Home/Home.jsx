@@ -61,14 +61,6 @@ function ShieldIcon() {
   );
 }
 
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="m5 12 4 4L19 6" />
-    </svg>
-  );
-}
-
 export default function Home() {
     const [doctors, setDoctors] = useState([]);
   const [loadingDoctors, setLoadingDoctors] = useState(true);

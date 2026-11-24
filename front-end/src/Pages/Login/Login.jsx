@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
-import api from "../../api";
+import axios from "axios";
+import { API_BASE_URL, TOKEN_KEY } from "../../api/adminApi";
 import {
   Stethoscope,
   BadgeCheck,
@@ -22,6 +23,13 @@ ArrowRight,
 
 import "./Login.css";
 
+// Where each role lands after a successful login.
+const HOME_BY_ROLE = {
+  patient: "/patient-dashboard",
+  doctor: "/doctor-dashboard",
+  admin: "/admin-dashboard",
+};
+
 export default function Login() {
   const [loading, setLoading] = useState(false);
 const [error, setError] = useState("");
@@ -31,25 +39,38 @@ const [error, setError] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
   const navigate = useNavigate();
 
- const handleLogin = async (e) => {
-  e.preventDefault();
+  // Real login: the server checks the password and tells us the account role.
+  // The role buttons above are only a hint - the account's own role decides the dashboard
+  // (this is also how an admin signs in).
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSubmitting(true);
 
-  setLoading(true);
-  setError("");
-
-  try {
-    const response = await api.post("/auth/login", {
-  email,
-  password,
-  remember_me: rememberMe,
-});
-
-    const token = response.data.access_token;
-
-    if (!token) {
-      throw new Error("Login succeeded but no access token was returned.");
+    try {
+      const { data } = await axios.post(`${API_BASE_URL}/auth/login`, {
+        email: email.trim(),
+        password,
+        remember_me: rememberMe,
+      });
+      localStorage.setItem(TOKEN_KEY, data.access_token);
+      navigate(HOME_BY_ROLE[data.user?.role] || "/", { replace: true });
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setError(
+        !err?.response
+          ? "Cannot reach the server. Check your connection and try again."
+          : typeof detail === "string"
+          ? detail
+          : "Could not sign in. Please check your email and password."
+      );
+    } finally {
+      setSubmitting(false);
     }
 
    localStorage.setItem("token", token);
@@ -354,15 +375,21 @@ navigate(
 
               </label>
 
+              {error && (
+                <p role="alert" style={{ margin: "0 0 12px", color: "#b91c1c", fontSize: "14px", fontWeight: 500 }}>
+                  {error}
+                </p>
+              )}
+
               {/* BUTTON */}
               <button
-  type="submit"
-  className="clinika-submit-button"
-  disabled={loading}
->
-  <span>{loading ? "Signing In..." : "Sign In to Clinika"}</span>
-  <ArrowRight size={17} />
-</button>
+                type="submit"
+                className="clinika-submit-button"
+                disabled={submitting}
+              >
+                <span>{submitting ? "Signing in…" : "Sign In to Clinika"}</span>
+                <ArrowRight size={17} />
+              </button>
 
             </form>
 {error && (

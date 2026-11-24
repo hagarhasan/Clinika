@@ -213,6 +213,7 @@ router.get('/doctors/counts', ah(async (_req, res) => {
   const counts = zero(DOCTOR_STATUSES);
   for (const r of await dbq('SELECT status, COUNT(id) AS c FROM doctors GROUP BY status')) counts[r.status] = r.c;
   counts.all = Object.values(counts).reduce((a, b) => a + b, 0);
+  counts.verified = (await scalar(`SELECT COUNT(id) FROM doctors WHERE is_verified = true AND status = 'active'`)) || 0;
   res.json(counts);
 }));
 
@@ -281,6 +282,46 @@ router.patch('/doctors/:doctor_id/verify', ah(async (req, res) => {
     await logActivity(c, req.user.id, p.is_verified ? 'doctor_verified' : 'doctor_unverified', 'doctor', id, `Dr. ${doctor.full_name} ${p.is_verified ? 'verified' : 'unverified'}`);
   });
   res.json(repo.doctorOut(await repo.loadDoctor(id), await repo.ratingsFor([id])));
+}));
+
+// ======================= Patients directory =======================
+const PATIENT_ADMIN_COLS = `p.id, p.user_id, p.date_of_birth, p.gender, p.blood_type, p.address, p.emergency_contact_name,
+  p.emergency_contact_phone, p.allergies, p.chronic_conditions,
+  u.first_name, u.last_name, u.full_name, u.phone, u.avatar_url, u.email, u.is_active, u.created_at`;
+
+router.get('/patients/counts', ah(async (_req, res) => {
+  const rows = await dbq('SELECT u.is_active, COUNT(p.id) AS c FROM patients p JOIN users u ON u.id = p.user_id GROUP BY u.is_active');
+  const counts = { all: 0, active: 0, inactive: 0 };
+  for (const r of rows) {
+    counts[r.is_active ? 'active' : 'inactive'] = r.c;
+    counts.all += r.c;
+  }
+  res.json(counts);
+}));
+
+router.get('/patients', ah(async (req, res) => {
+  const q = query(req);
+  const search = q.str('q');
+  const isActive = q.bool('is_active');
+  const limit = q.int('limit', { def: 20, ge: 1, le: 100 });
+  const offset = q.int('offset', { def: 0, ge: 0 });
+  q.done();
+  const p = new Params();
+  const where = [];
+  if (isActive !== null) where.push(`u.is_active = ${p.add(isActive)}`);
+  if (search) {
+    const t = p.add(`%${search}%`);
+    where.push(`(u.full_name ILIKE ${t} OR u.email ILIKE ${t} OR u.phone ILIKE ${t})`);
+  }
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const total = await scalar(`SELECT COUNT(*) FROM patients p JOIN users u ON u.id = p.user_id ${whereSql}`, p.list);
+  res.set('X-Total-Count', String(total || 0));
+  const rows = await dbq(
+    `SELECT ${PATIENT_ADMIN_COLS} FROM patients p JOIN users u ON u.id = p.user_id ${whereSql}
+     ORDER BY u.created_at DESC, p.id DESC LIMIT ${limit} OFFSET ${offset}`,
+    p.list
+  );
+  res.json(rows.map((r) => ({ ...repo.patientOut(r), email: r.email, is_active: r.is_active, created_at: r.created_at })));
 }));
 
 // ======================= Add patient / book on behalf =======================

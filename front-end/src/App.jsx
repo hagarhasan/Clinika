@@ -1,5 +1,5 @@
 import Layout from './Components/Layout/Layout';
-import { RouterProvider, createHashRouter } from 'react-router-dom';
+import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import Privacy from './Pages/Privacy/Privacy';
 import Terms from './Pages/Terms/Terms';
 import Accessibility from './Pages/Accessibility/Accessibility';
@@ -18,7 +18,7 @@ import DoctorDashboard from './Pages/DoctorDashboard/DoctorDashboard';
 import DoctorOverview from './Pages/DoctorDashboard/DoctorOverview';
 import DoctorAppointments from './Pages/DoctorDashboard/DoctorAppointments';
 import DoctorAvailability from './Pages/DoctorDashboard/DoctorAvailability';
-import DoctorDashboardProfile from './Pages/DoctorDashboard/DoctorProfile';
+import DoctorDashboardProfile from './Pages/DoctorDashboard/DashDoctProfile';
 import AdminDashboard from './Pages/AdminDashboard/AdminDashboard';
 import AdminOverview from './Pages/AdminDashboard/AdminOverview';
 import ManageDoctors from './Pages/AdminDashboard/ManageDoctors';
@@ -30,8 +30,16 @@ import Doctors from './Pages/Doctors/Doctors';
 import DoctorProfile from './Pages/Doctors/DoctorProfile';
 import BookAppointment from './Pages/Doctors/BookAppointment';
 import NotFound from './Pages/NotFound/NotFound';
+import ContactMessages from './Pages/AdminDashboard/ContactMessages';
+import CatalogManage from './Pages/AdminDashboard/CatalogManage';
+import Reports from './Pages/AdminDashboard/Reports';
+import AdminTeam from './Pages/AdminDashboard/AdminTeam';
+import RequireAdmin from './Components/RequireAdmin/RequireAdmin';
 
-const router = createHashRouter([
+const basename = import.meta.env.BASE_URL === './'
+  ? '/'
+  : import.meta.env.BASE_URL.replace(/\$/, '') || '/';
+const router = createBrowserRouter([
   {
     path: "", element: <Layout />, children: [
       { index: true, element: <Home /> },
@@ -68,15 +76,20 @@ const router = createHashRouter([
     ]
   },
   {
-    path: 'admin-dashboard', element: <AdminDashboard />, children: [
+
+    path: 'admin-dashboard', element: <RequireAdmin><AdminDashboard /></RequireAdmin>, children: [
       { index: true, element: <AdminOverview /> },
       { path: "manage-doctors", element: <ManageDoctors /> },
       { path: "manage-users-and-appointments", element: <AdminManage /> },
+      { path: "messages", element: <ContactMessages /> },
+      { path: "catalog", element: <CatalogManage /> },
+      { path: "reports", element: <Reports /> },
+      { path: "team", element: <AdminTeam /> },
       { path: "my-profile", element: <AdminProfile /> },
     ]
   },
   { path: "*", element: <NotFound /> }
-])
+], { basename })
 
 export default function App() {
   return (

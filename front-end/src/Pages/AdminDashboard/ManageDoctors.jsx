@@ -1,406 +1,607 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import adminApi, { getErrorMessage, totalFrom } from '../../api/adminApi';
+import { useDashboard } from '../../context/DashboardContext';
+import { Avatar, Banner, Modal, Pager, showingRange, useDebounced } from './adminUi';
 
-const DEFAULT_DOCTORS = [
-  { id: 1, name: 'Dr. Maya Bennett', npi: '94819204', specialty: 'Family Medicine', email: 'maya.bennett@clinika.com', experience: '12 years', status: 'Active' },
-  { id: 2, name: 'Dr. Daniel Park', npi: '78491023', specialty: 'Cardiology', email: 'daniel.park@clinika.com', experience: '15 years', status: 'Active' },
-  { id: 3, name: 'Dr. Sarah Al-Mansoor', npi: '38291048', specialty: 'Cardiology & Care', email: 'sarah.mansoor@clinika.com', experience: '7 years', status: 'Pending Approval' },
-  { id: 4, name: 'Dr. Elena Rossi', npi: '58491032', specialty: 'Dermatology', email: 'elena.rossi@clinika.com', experience: '9 years', status: 'Inactive' }
-];
+// Directory page size. The design needs at least 5 doctors visible at once.
+const PAGE_SIZE = 8;
 
-export default function AdminDashboard() {
-  const navigate = useNavigate();
-  const location = useLocation();
+const STATUS_LABEL = { active: 'Active', pending: 'Pending Approval', inactive: 'Inactive', rejected: 'Rejected' };
 
-  const [doctors, setDoctors] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('All');
-  const [loading, setLoading] = useState(true);
+const EMPTY_FORM = {
+  first_name: '',
+  last_name: '',
+  email: '',
+  password: '',
+  phone: '',
+  specialty_id: '',
+  license_number: '',
+  years_of_experience: '',
+  consultation_fee: '',
+};
 
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedDoctor, setSelectedDoctor] = useState(null);
+export default function ManageDoctors() {
+  const { stats, refreshDashboard } = useDashboard();
 
-  const [newDoctor, setNewDoctor] = useState({
-    name: '',
-    npi: '',
-    specialty: '',
-    email: '',
-    experience: '',
-    status: 'Active'
-  });
-  const loadDoctors = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('https://clinika-backend.vercel.app/admin/doctors');
-      const data = await res.json();
-      if (data && Array.isArray(data)) {
-        setDoctors(data);
-      }
-    } catch (err) {
-      console.error('Error fetching doctors:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [filter, setFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounced(search.trim());
+  const [reloadKey, setReloadKey] = useState(0);
 
+  const [result, setResult] = useState({ key: '', doctors: [], total: 0, error: '' });
+  const [counts, setCounts] = useState({ all: 0, active: 0, pending: 0, inactive: 0, rejected: 0, verified: 0 });
+  const [specialties, setSpecialties] = useState([]);
+  const [banner, setBanner] = useState(null);
+
+  const [modal, setModal] = useState(null); // { type: 'add' | 'review' | 'manage', doctor? }
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [rejectReason, setRejectReason] = useState('');
+  const [clinics, setClinics] = useState([]);
+  const [editForm, setEditForm] = useState({});
+
+  const requestKey = `${page}|${filter}|${debouncedSearch}|${reloadKey}`;
+  const loading = result.key !== requestKey;
+  const reload = useCallback(() => setReloadKey((n) => n + 1), []);
+
+  // Doctors list (server side filter, search and pagination)
   useEffect(() => {
-    let active = true;
-    Promise.resolve().then(() => {
-      if (active) {
-        loadDoctors();
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, [loadDoctors]);
-
-  const activeList = doctors.length > 0 ? doctors : DEFAULT_DOCTORS;
-
-  const filteredDoctors = activeList.filter((doc) => {
-    const matchesSearch =
-      doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.specialty.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.npi.includes(searchQuery);
-
-    const matchesFilter = filterStatus === 'All' || doc.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
-
-  const handleAddDoctorSubmit = (e) => {
-    e.preventDefault();
-
-    fetch('https://clinika-backend.vercel.app/admin/doctors', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(newDoctor),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to add doctor on backend');
-        return res.json().catch(() => ({}));
+    let ignore = false;
+    adminApi
+      .get('/admin/doctors', {
+        params: {
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE,
+          ...(filter !== 'all' && { status: filter }),
+          ...(debouncedSearch && { q: debouncedSearch }),
+        },
       })
-      .then(() => {
-        alert('تم إضافة الدكتور بنجاح على السيرفر!');
-        setIsAddModalOpen(false);
-        setNewDoctor({ name: '', npi: '', specialty: '', email: '', experience: '', status: 'Active' });
-        loadDoctors();
+      .then((res) => {
+        if (!ignore) setResult({ key: requestKey, doctors: res.data, total: totalFrom(res, res.data.length), error: '' });
       })
       .catch((err) => {
-        console.error('Error adding doctor:', err);
-        const fallbackObj = { id: activeList.length + 1, ...newDoctor };
-        setDoctors([fallbackObj, ...activeList]);
-        setIsAddModalOpen(false);
-        setNewDoctor({ name: '', npi: '', specialty: '', email: '', experience: '', status: 'Active' });
-        alert('تم إضافة الدكتور محلياً (Local Fallback) بنجاح!');
+        if (!ignore) setResult({ key: requestKey, doctors: [], total: 0, error: getErrorMessage(err, 'Could not load doctors.') });
       });
+    return () => {
+      ignore = true;
+    };
+  }, [page, filter, debouncedSearch, requestKey]);
+
+  // Tab counts + verified count
+  useEffect(() => {
+    let ignore = false;
+    adminApi
+      .get('/admin/doctors/counts')
+      .then((res) => !ignore && setCounts((prev) => ({ ...prev, ...res.data })))
+      .catch(() => {});
+    return () => {
+      ignore = true;
+    };
+  }, [reloadKey]);
+
+  // Specialties for the "Add doctor" form
+  useEffect(() => {
+    let ignore = false;
+    adminApi
+      .get('/specialties')
+      .then((res) => !ignore && setSpecialties(res.data))
+      .catch(() => {});
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  // Clinics for the "Edit doctor" form
+  useEffect(() => {
+    let ignore = false;
+    adminApi
+      .get('/clinics', { params: { limit: 100 } })
+      .then((res) => !ignore && setClinics(res.data))
+      .catch(() => {});
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const notify = (type, text) => setBanner({ type, text });
+
+  const closeModal = useCallback(() => {
+    setModal(null);
+    setFormError('');
+    setRejectReason('');
+  }, []);
+
+  const afterChange = (message) => {
+    notify('ok', message);
+    closeModal();
+    reload();
+    refreshDashboard();
   };
 
-  const handleExportRoster = () => {
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [
-        'Name,NPI,Specialty,Email,Experience,Status',
-        ...filteredDoctors.map(
-          (d) => `"${d.name}","${d.npi}","${d.specialty}","${d.email}","${d.experience}","${d.status}"`
-        ),
-      ].join('\n');
+  // Runs one admin action. Returns true when it worked, so callers can clear their forms.
+  async function run(action, successMessage) {
+    setBusy(true);
+    setFormError('');
+    try {
+      await action();
+      afterChange(successMessage);
+      return true;
+    } catch (err) {
+      setFormError(getErrorMessage(err));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'clinika_doctors_roster.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleAdd = (event) => {
+    event.preventDefault();
+    run(
+      () =>
+        adminApi.post('/doctors', {
+          first_name: form.first_name.trim(),
+          last_name: form.last_name.trim(),
+          email: form.email.trim(),
+          password: form.password,
+          phone: form.phone.trim() || null,
+          specialty_id: Number(form.specialty_id),
+          license_number: form.license_number.trim() || null,
+          years_of_experience: Number(form.years_of_experience || 0),
+          consultation_fee: Number(form.consultation_fee || 0),
+        }),
+      'Doctor added. The account is active and can sign in.'
+    ).then((ok) => ok && setForm(EMPTY_FORM));
   };
 
-  const handleOpenEdit = (doc) => {
-    setSelectedDoctor(doc);
-    setIsEditModalOpen(true);
+  const handleReview = (doctor, action) =>
+    run(
+      () =>
+        adminApi.patch(`/admin/doctors/${doctor.id}/review`, {
+          action,
+          ...(action === 'reject' && rejectReason.trim() && { reason: rejectReason.trim() }),
+        }),
+      action === 'approve' ? `Dr. ${doctor.full_name} was approved.` : `Dr. ${doctor.full_name} was rejected.`
+    );
+
+  const handleActive = (doctor, isActive) =>
+    run(
+      () => adminApi.patch(`/admin/users/${doctor.user_id}/status`, { is_active: isActive }),
+      `Dr. ${doctor.full_name} is now ${isActive ? 'active' : 'inactive'}.`
+    );
+
+  const handleVerify = (doctor) =>
+    run(
+      () => adminApi.patch(`/admin/doctors/${doctor.id}/verify`, { is_verified: !doctor.is_verified }),
+      doctor.is_verified ? 'Verification badge removed.' : 'Doctor verified.'
+    );
+
+  const openEdit = (doctor) => {
+    setEditForm({
+      specialty_id: doctor.specialty?.id ?? '',
+      clinic_id: doctor.clinic?.id ?? '',
+      license_number: doctor.license_number ?? '',
+      years_of_experience: doctor.years_of_experience ?? 0,
+      consultation_fee: doctor.consultation_fee ?? 0,
+      bio: doctor.bio ?? '',
+    });
+    setModal({ type: 'edit', doctor });
   };
 
-  const isManageDoctorsPage = location.pathname.includes('manage-doctors');
+  const handleEdit = (event) => {
+    event.preventDefault();
+    run(
+      () =>
+        adminApi.put(`/doctors/${modal.doctor.id}`, {
+          ...(editForm.specialty_id && { specialty_id: Number(editForm.specialty_id) }),
+          clinic_id: editForm.clinic_id ? Number(editForm.clinic_id) : null,
+          license_number: editForm.license_number.trim() || null,
+          years_of_experience: Number(editForm.years_of_experience || 0),
+          consultation_fee: Number(editForm.consultation_fee || 0),
+          bio: editForm.bio.trim() || null,
+        }),
+      `Dr. ${modal.doctor.full_name} was updated.`
+    );
+  };
+
+  // Backend DELETE deactivates the doctor and the account (nothing is erased).
+  const handleRemove = (doctor) =>
+    run(() => adminApi.delete(`/doctors/${doctor.id}`), `Dr. ${doctor.full_name} was removed from the directory (account deactivated).`);
+
+  async function handleExport() {
+    try {
+      const res = await adminApi.get('/admin/doctors/export', {
+        params: filter !== 'all' ? { status: filter } : undefined,
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(res.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'clinika-doctors.csv';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      notify('error', getErrorMessage(err, 'Could not export the roster.'));
+    }
+  }
+
+  const { doctors, total, error } = result;
+  const [from, to] = showingRange(page, PAGE_SIZE, total, doctors.length);
+  const verifiedPct = counts.active ? Math.min(100, Math.round((counts.verified / counts.active) * 100)) : 0;
+  const activePct = counts.all ? Math.round((counts.active / counts.all) * 1000) / 10 : 0;
+
+  const tabs = [
+    ['all', `All (${counts.all})`],
+    ['active', `Active (${counts.active})`],
+    ['pending', `Pending Approval (${counts.pending})`],
+    ['inactive', `Inactive (${counts.inactive})`],
+    ...(counts.rejected > 0 ? [['rejected', `Rejected (${counts.rejected})`]] : []),
+  ];
+
+  // Donut: appointments by the top specialties (from /admin/stats)
+  const donut = useMemo(() => {
+    const list = stats.topSpecialties.slice(0, 2);
+    const sum = stats.topSpecialties.reduce((acc, s) => acc + s.appointments, 0);
+    if (!sum) return null;
+    const colors = ['#1b68f6', '#53606d', '#d7e4f4'];
+    const parts = list.map((s, i) => ({ name: s.name, value: s.appointments, color: colors[i] }));
+    const rest = sum - parts.reduce((acc, p) => acc + p.value, 0);
+    if (rest > 0) parts.push({ name: 'Other Specialties', value: rest, color: colors[2] });
+    let acc = 0;
+    const gradient = parts
+      .map((p) => {
+        const start = (acc / sum) * 100;
+        acc += p.value;
+        return `${p.color} ${start}% ${(acc / sum) * 100}%`;
+      })
+      .join(', ');
+    return { parts, sum, gradient };
+  }, [stats.topSpecialties]);
+
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F8FAFC', fontFamily: 'Inter, sans-serif', color: '#0F172A' }}>
+    <>
       <Helmet>
-        <title>Admin Dashboard | Clinika</title>
+        <title>Manage Doctors | Clinika</title>
       </Helmet>
 
-      {/* Sidebar الثابت */}
-      <aside style={{ width: '260px', backgroundColor: '#FFFFFF', borderRight: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', padding: '24px 16px', position: 'fixed', height: '100vh', top: 0, left: 0 }}>
-        <div style={{ marginBottom: '32px', paddingLeft: '12px' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1B68F6', margin: 0 }}>Clinika Admin</h2>
-          <span style={{ fontSize: '12px', color: '#64748B' }}>Platform Admin Network</span>
-        </div>
-
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-          <button
-            onClick={() => navigate('/admin-dashboard')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '8px', border: 'none',
-              backgroundColor: location.pathname === '/admin-dashboard' || location.pathname === '/admin-dashboard/' ? '#E0EDFD' : 'transparent',
-              color: location.pathname === '/admin-dashboard' || location.pathname === '/admin-dashboard/' ? '#1B68F6' : '#64748B',
-              fontWeight: '600', fontSize: '14px', cursor: 'pointer', textAlign: 'left', width: '100%'
-            }}
-          >
-            📊 Overview
-          </button>
-
-          <button
-            onClick={() => navigate('/admin-dashboard/manage-doctors')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '8px', border: 'none',
-              backgroundColor: location.pathname.includes('manage-doctors') ? '#1B68F6' : 'transparent',
-              color: location.pathname.includes('manage-doctors') ? '#FFFFFF' : '#64748B',
-              fontWeight: '600', fontSize: '14px', cursor: 'pointer', textAlign: 'left', width: '100%'
-            }}
-          >
-            👨‍⚕️ Manage Doctors
-          </button>
-
-          <button
-            onClick={() => navigate('/admin-dashboard/manage-users-and-appointments')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderRadius: '8px', border: 'none',
-              backgroundColor: location.pathname.includes('manage-users') ? '#E0EDFD' : 'transparent',
-              color: location.pathname.includes('manage-users') ? '#1B68F6' : '#64748B',
-              fontWeight: '500', fontSize: '14px', cursor: 'pointer', textAlign: 'left', width: '100%'
-            }}
-          >
-            📅 Manage Users & Appointments
-          </button>
-        </nav>
-
-        <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '16px' }}>
-          <button
-            onClick={() => navigate('/login')}
-            style={{ background: 'none', border: 'none', color: '#EF4444', fontWeight: '500', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}
-          >
-            🚪 Logout
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main style={{ marginLeft: '260px', flex: 1, padding: '32px', boxSizing: 'border-box' }}>
-        {isManageDoctorsPage ? (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-              <div>
-                <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#0F172A', margin: 0 }}>Manage Doctors</h1>
-                <p style={{ fontSize: '14px', color: '#64748B', marginTop: '6px' }}>
-                  View, verify, and orchestrate licensed medical practitioner credentials across Clinika networks.
-                </p>
-              </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button
-                  onClick={handleExportRoster}
-                  style={{ backgroundColor: '#FFFFFF', color: '#0F172A', border: '1px solid #CBD5E1', padding: '10px 18px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}
-                >
-                  Export Roster
-                </button>
-                <button
-                  onClick={() => setIsAddModalOpen(true)}
-                  style={{ backgroundColor: '#1B68F6', color: '#FFFFFF', border: 'none', padding: '10px 18px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}
-                >
-                  + Add Doctor
-                </button>
-              </div>
-            </div>
-
-            {/* Metrics Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
-              <div style={{ backgroundColor: '#FFFFFF', padding: '20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>All Doctors</span>
-                <h3 style={{ fontSize: '24px', margin: '8px 0 0', color: '#0F172A' }}>{activeList.length}</h3>
-              </div>
-              <div style={{ backgroundColor: '#FFFFFF', padding: '20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>Active</span>
-                <h3 style={{ fontSize: '24px', margin: '8px 0 0', color: '#1B68F6' }}>{activeList.filter((d) => d.status === 'Active').length}</h3>
-              </div>
-              <div style={{ backgroundColor: '#FFFFFF', padding: '20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>Pending Approval</span>
-                <h3 style={{ fontSize: '24px', margin: '8px 0 0', color: '#D97706' }}>{activeList.filter((d) => d.status === 'Pending Approval').length}</h3>
-              </div>
-              <div style={{ backgroundColor: '#FFFFFF', padding: '20px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>Inactive</span>
-                <h3 style={{ fontSize: '24px', margin: '8px 0 0', color: '#64748B' }}>{activeList.filter((d) => d.status === 'Inactive').length}</h3>
-              </div>
-            </div>
-            {/* Directory Table */}
-            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden', marginBottom: '32px' }}>
-              <div style={{ padding: '20px 24px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: '600', fontSize: '16px' }}>Directory</span>
-                <input
-                  type="text"
-                  placeholder="Search by doctor name, specialty, NPI..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', width: '350px', fontSize: '14px', outline: 'none' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '24px', padding: '0 24px', borderBottom: '1px solid #F1F5F9' }}>
-                {['All', 'Active', 'Pending Approval', 'Inactive'].map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setFilterStatus(status)}
-                    style={{
-                      background: 'none', border: 'none', padding: '12px 0', cursor: 'pointer',
-                      fontWeight: filterStatus === status ? '600' : '400',
-                      color: filterStatus === status ? '#1B68F6' : '#64748B',
-                      borderBottom: filterStatus === status ? '2px solid #1B68F6' : '2px solid transparent',
-                      fontSize: '14px'
-                    }}
-                  >
-                    {status}
-                  </button>
-                ))}
-              </div>
-
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#64748B', fontSize: '12px', textTransform: 'uppercase' }}>
-                    <th style={{ padding: '14px 24px' }}>Doctor & Credentials</th>
-                    <th style={{ padding: '14px 24px' }}>Specialty</th>
-                    <th style={{ padding: '14px 24px' }}>Contact Email</th>
-                    <th style={{ padding: '14px 24px' }}>Experience</th>
-                    <th style={{ padding: '14px 24px' }}>System Status</th>
-                    <th style={{ padding: '14px 24px', textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan="6" style={{ padding: '32px', textAlign: 'center', color: '#64748B' }}>Loading network data...</td></tr>
-                  ) : filteredDoctors.length > 0 ? (
-                    filteredDoctors.map((doc, index) => (
-                      <tr key={doc.id || index} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                        <td style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#E0EDFD', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1B68F6', fontWeight: '600' }}>
-                            {doc.name ? doc.name.replace('Dr. ', '')[0] : 'D'}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: '600', color: '#0F172A', fontSize: '14px' }}>{doc.name}</div>
-                            <div style={{ fontSize: '12px', color: '#64748B' }}>NPI: {doc.npi} | Verified</div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '16px 24px', fontSize: '14px', color: '#334155' }}>{doc.specialty}</td>
-                        <td style={{ padding: '16px 24px', fontSize: '14px', color: '#334155' }}>{doc.email}</td>
-                        <td style={{ padding: '16px 24px', fontSize: '14px', color: '#334155' }}>{doc.experience}</td>
-                        <td style={{ padding: '16px 24px' }}>
-                          <span style={{
-                            backgroundColor: doc.status === 'Active' ? '#E0F2FE' : '#FEF3C7',
-                            color: doc.status === 'Active' ? '#0369A1' : '#D97706',
-                            padding: '5px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500'
-                          }}>
-                            {doc.status}
-                          </span>
-                        </td>
-                        <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                          <button
-                            onClick={() => handleOpenEdit(doc)}
-                            style={{ background: 'none', border: 'none', color: '#1B68F6', cursor: 'pointer', fontWeight: '500', fontSize: '14px' }}
-                          >
-                            {doc.status === 'Pending Approval' ? 'Review' : 'Edit'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr><td colSpan="6" style={{ padding: '32px', textAlign: 'center', color: '#64748B' }}>No doctors found.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {/* Bottom Analytics */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
-              <div style={{ backgroundColor: '#FFFFFF', padding: '24px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                <h4 style={{ margin: '0 0 8px', fontSize: '15px' }}>Regulatory Review</h4>
-                <span style={{ fontSize: '12px', color: '#64748B' }}>NPI & State Licenses</span>
-                <div style={{ fontSize: '32px', fontWeight: 'bold', margin: '12px 0 8px' }}>97.8%</div>
-                <span style={{ fontSize: '12px', color: '#16A34A', fontWeight: '500' }}>+1.25% vs. prior quarter</span>
-              </div>
-              <div style={{ backgroundColor: '#FFFFFF', padding: '24px', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                <h4 style={{ margin: '0 0 8px', fontSize: '15px' }}>Specialty Breakdown</h4>
-                <span style={{ fontSize: '12px', color: '#64748B' }}>Network Capacity</span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px', fontSize: '13px' }}>
-                  <div>● Primary Care: <strong>42%</strong></div>
-                  <div>● Cardiology: <strong>33%</strong></div>
-                  <div>● Other Specialties: <strong>25%</strong></div>
-                </div>
-              </div>
-              <div style={{ backgroundColor: '#1B68F6', color: '#FFFFFF', padding: '24px', borderRadius: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <div>
-                  <h4 style={{ margin: '0 0 8px', fontSize: '16px' }}>Fast Onboarding</h4>
-                  <h3 style={{ margin: '0 0 12px', fontSize: '18px' }}>Hospital EHR Integration</h3>
-                </div>
-                <button
-                  onClick={() => alert('Provider sync configuration launched successfully!')}
-                  style={{ backgroundColor: '#FFFFFF', color: '#1B68F6', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}
-                >
-                  Configure Provider Sync
-                </button>
-              </div>
-            </div>
+      <header className="cl-ad-head">
+        <div>
+          <h1>
+            Manage Doctors <span className="cl-ad-tag">Directory</span>
+          </h1>
+          <p>View, verify, and orchestrate licensed medical practitioner credentials across Clinika networks.</p>
+          <div className="cl-ad-meta">
+            <span><i className="cl-ad-dot cl-ad-dot--blue" /> <b>{counts.all}</b> Doctors Registered</span>
+            <span><i className="cl-ad-dot cl-ad-dot--amber" /> <b>{counts.pending}</b> Pending Credential Review</span>
+            <span><i className="cl-ad-dot cl-ad-dot--green" /> <b>{activePct}%</b> Active Roster Capacity</span>
           </div>
-        ) : (
-          <Outlet />
+        </div>
+        <div className="cl-ad-actions">
+          <button type="button" className="cl-pd-btn cl-ad-btn-icon" onClick={handleExport}>
+            <span className="material-symbols-outlined" aria-hidden="true">download</span> Export Roster
+          </button>
+          <button type="button" className="cl-pd-btn cl-pd-btn--primary cl-ad-btn-icon" onClick={() => setModal({ type: 'add' })}>
+            <span className="material-symbols-outlined" aria-hidden="true">person_add</span> Add Doctor
+          </button>
+        </div>
+      </header>
+
+      <Banner banner={banner} onClose={() => setBanner(null)} />
+
+      <section className="cl-pd-card cl-ad-toolbar">
+        <label className="cl-ad-search">
+          <span className="material-symbols-outlined" aria-hidden="true">search</span>
+          <input
+            type="search"
+            placeholder="Search by doctor name or email…"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
+            aria-label="Search doctors"
+          />
+        </label>
+        <div className="cl-ad-filters" role="tablist" aria-label="Filter doctors by status">
+          {tabs.map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={filter === value}
+              className={`cl-ad-filter ${filter === value ? 'is-active' : ''}`}
+              onClick={() => {
+                setFilter(value);
+                setPage(1);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="cl-pd-card cl-ad-table-card" aria-label="Doctors directory">
+        {error && <div className="cl-ad-banner cl-ad-banner--error" style={{ margin: '1rem' }} role="alert">{error}</div>}
+
+        <div className="cl-ad-table-scroll">
+          <table className="cl-ad-table">
+            <thead>
+              <tr>
+                <th>Doctor &amp; Credentials</th>
+                <th>Specialty</th>
+                <th>Contact Email</th>
+                <th>Experience</th>
+                <th>System Status</th>
+                <th className="is-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {doctors.map((doctor) => (
+                <tr key={doctor.id}>
+                  <td>
+                    <div className="cl-ad-person">
+                      <Avatar name={doctor.full_name} src={doctor.photo_url} />
+                      <div>
+                        <strong>
+                          Dr. {doctor.full_name}
+                          {doctor.is_verified && (
+                            <span className="material-symbols-outlined cl-ad-verified" title="Verified" aria-label="Verified">verified</span>
+                          )}
+                        </strong>
+                        <small>
+                          {doctor.license_number ? `Lic. ${doctor.license_number}` : 'No license on file'}
+                          {doctor.clinic?.name ? ` • ${doctor.clinic.name}` : ''}
+                        </small>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span className="cl-ad-cell-title">{doctor.specialty?.name || '—'}</span>
+                    {doctor.title && <span className="cl-ad-cell-sub">{doctor.title}</span>}
+                  </td>
+                  <td><a className="cl-ad-email" href={`mailto:${doctor.email}`}>{doctor.email}</a></td>
+                  <td>
+                    <span className="cl-ad-cell-title">{doctor.years_of_experience} {doctor.years_of_experience === 1 ? 'year' : 'years'}</span>
+                    <span className="cl-ad-cell-sub">EGP {Number(doctor.consultation_fee).toLocaleString()} / visit</span>
+                  </td>
+                  <td>
+                    <span className={`cl-ad-pill cl-ad-pill--${doctor.status}`}>{STATUS_LABEL[doctor.status] ?? doctor.status}</span>
+                  </td>
+                  <td>
+                    <div className="cl-ad-row-actions">
+                      {(doctor.status === 'pending' || doctor.status === 'rejected') && (
+                        <button type="button" className="cl-ad-link-btn" onClick={() => setModal({ type: 'review', doctor })}>Review</button>
+                      )}
+                      {doctor.status === 'inactive' && (
+                        <button type="button" className="cl-ad-link-btn cl-ad-link-btn--green" onClick={() => setModal({ type: 'manage', doctor })}>Reactivate</button>
+                      )}
+                      {doctor.status === 'active' && (
+                        <button type="button" className="cl-ad-icon-btn" aria-label={`Manage Dr. ${doctor.full_name}`} onClick={() => setModal({ type: 'manage', doctor })}>
+                          <span className="material-symbols-outlined" aria-hidden="true">edit</span>
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {loading && (
+          <div className="cl-ad-loading" role="status">
+            <span className="spinner-border spinner-border-sm" aria-hidden="true" /> Loading doctors…
+          </div>
         )}
-      </main>
-
-      {/* مودال إضافة دكتور جديد */}
-      {isAddModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ backgroundColor: '#FFFFFF', padding: '32px', borderRadius: '12px', width: '450px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-            <h3 style={{ margin: '0 0 20px', fontSize: '20px', color: '#0F172A' }}>Add New Doctor</h3>
-            <form onSubmit={handleAddDoctorSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '500', color: '#64748B' }}>Doctor Name</label>
-                <input type="text" required placeholder="Dr. John Doe" value={newDoctor.name} onChange={(e) => setNewDoctor({ ...newDoctor, name: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '500', color: '#64748B' }}>NPI Number</label>
-                <input type="text" required placeholder="12345678" value={newDoctor.npi} onChange={(e) => setNewDoctor({ ...newDoctor, npi: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '500', color: '#64748B' }}>Specialty</label>
-                <input type="text" required placeholder="Cardiology" value={newDoctor.specialty} onChange={(e) => setNewDoctor({ ...newDoctor, specialty: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '500', color: '#64748B' }}>Contact Email</label>
-                <input type="email" required placeholder="doctor@clinika.com" value={newDoctor.email} onChange={(e) => setNewDoctor({ ...newDoctor, email: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '500', color: '#64748B' }}>Experience</label>
-                <input type="text" required placeholder="5 years" value={newDoctor.experience} onChange={(e) => setNewDoctor({ ...newDoctor, experience: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginTop: '4px', boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-                <button type="button" onClick={() => setIsAddModalOpen(false)} style={{ backgroundColor: '#F1F5F9', color: '#475569', border: 'none', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}>Cancel</button>
-                <button type="submit" style={{ backgroundColor: '#1B68F6', color: '#FFFFFF', border: 'none', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}>Save Doctor</button>
-              </div>
-            </form>
+        {!loading && !error && doctors.length === 0 && (
+          <div className="cl-ad-empty">
+            <span className="material-symbols-outlined" aria-hidden="true">person_search</span>
+            <h3>No doctors found</h3>
+            <p className="cl-pd-muted">Try a different search or filter.</p>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* مودال تعديل / مراجعة دكتور */}
-      {isEditModalOpen && selectedDoctor && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ backgroundColor: '#FFFFFF', padding: '32px', borderRadius: '12px', width: '450px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-            <h3 style={{ margin: '0 0 20px', fontSize: '20px', color: '#0F172A' }}>Review / Edit: {selectedDoctor.name}</h3>
-            <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '16px' }}>Current Status: <strong style={{ color: '#1B68F6' }}>{selectedDoctor.status}</strong></p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <button onClick={() => { alert(`Approved credentials for ${selectedDoctor.name}`); setIsEditModalOpen(false); }} style={{ backgroundColor: '#16A34A', color: '#FFFFFF', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}>Approve Doctor</button>
-              <button onClick={() => { alert(`Updated details for ${selectedDoctor.name}`); setIsEditModalOpen(false); }} style={{ backgroundColor: '#1B68F6', color: '#FFFFFF', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}>Save Changes</button>
-              <button onClick={() => setIsEditModalOpen(false)} style={{ backgroundColor: '#F1F5F9', color: '#475569', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}>Close</button>
+        <div className="cl-ad-foot">
+          <span>
+            Showing <b>{from} - {to}</b> of <b>{total}</b> credentialed practitioners
+          </span>
+          <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
+        </div>
+      </section>
+
+      <div className="cl-ad-grid">
+        <section className="cl-pd-card cl-ad-info-card">
+          <div className="cl-ad-info-card__head">
+            <div>
+              <span className="cl-ad-kicker">Regulatory Review</span>
+              <h3>License Verification</h3>
             </div>
+            <span className="cl-ad-info-card__icon material-symbols-outlined" aria-hidden="true">verified_user</span>
           </div>
-        </div>
+          <span className="cl-ad-big">{verifiedPct}%</span>
+          <div className="cl-ad-bar" role="img" aria-label={`${verifiedPct}% of active doctors verified`}>
+            <span style={{ width: `${verifiedPct}%` }} />
+          </div>
+          <p className="cl-ad-note">{counts.verified} of {counts.active} active doctors carry the verified badge.</p>
+        </section>
+
+        <section className="cl-pd-card cl-ad-info-card">
+          <div className="cl-ad-info-card__head">
+            <div>
+              <span className="cl-ad-kicker">Specialty Breakdown</span>
+              <h3>Network Capacity</h3>
+            </div>
+            <span className="cl-ad-info-card__icon material-symbols-outlined" aria-hidden="true">pie_chart</span>
+          </div>
+          {donut ? (
+            <div className="cl-ad-donut-row">
+              <div className="cl-ad-donut" style={{ background: `conic-gradient(${donut.gradient})` }} role="img" aria-label="Appointments by specialty" />
+              <ul className="cl-ad-legend">
+                {donut.parts.map((part) => (
+                  <li key={part.name}>
+                    <i className="cl-ad-dot" style={{ background: part.color }} />
+                    {part.name}
+                    <b>{Math.round((part.value / donut.sum) * 100)}%</b>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="cl-ad-note">No bookings yet, so there is nothing to break down.</p>
+          )}
+          <p className="cl-ad-note" style={{ marginTop: '0.75rem' }}>Share of appointments by specialty.</p>
+        </section>
+
+        <section className="cl-pd-card cl-ad-info-card cl-ad-cta">
+          <span className="cl-ad-kicker">Fast Onboarding</span>
+          <h3>Doctor Applications</h3>
+          <p className="cl-ad-note">
+            {counts.pending > 0
+              ? `${counts.pending} doctor ${counts.pending === 1 ? 'application is' : 'applications are'} waiting for your review.`
+              : 'No applications are waiting right now.'}
+          </p>
+          <button
+            type="button"
+            className="cl-pd-btn"
+            onClick={() => {
+              setFilter('pending');
+              setPage(1);
+            }}
+          >
+            Review pending doctors
+          </button>
+        </section>
+      </div>
+
+      {modal?.type === 'add' && (
+        <Modal title="Add Doctor" subtitle="Creates an active doctor account that can sign in right away." onClose={closeModal}>
+          <form className="cl-pd-form" onSubmit={handleAdd}>
+            <div className="cl-pd-field">
+              <label htmlFor="ad-fn">First name</label>
+              <input id="ad-fn" required value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
+            </div>
+            <div className="cl-pd-field">
+              <label htmlFor="ad-ln">Last name</label>
+              <input id="ad-ln" required value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+            </div>
+            <div className="cl-pd-field">
+              <label htmlFor="ad-email">Email</label>
+              <input id="ad-email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </div>
+            <div className="cl-pd-field">
+              <label htmlFor="ad-pass">Temporary password</label>
+              <input id="ad-pass" type="password" minLength={8} maxLength={72} required autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            </div>
+            <div className="cl-pd-field">
+              <label htmlFor="ad-phone">Phone</label>
+              <input id="ad-phone" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            </div>
+            <div className="cl-pd-field">
+              <label htmlFor="ad-spec">Specialty</label>
+              <select id="ad-spec" required value={form.specialty_id} onChange={(e) => setForm({ ...form, specialty_id: e.target.value })}>
+                <option value="">Select…</option>
+                {specialties.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div className="cl-pd-field">
+              <label htmlFor="ad-lic">License number</label>
+              <input id="ad-lic" value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} />
+            </div>
+            <div className="cl-pd-field">
+              <label htmlFor="ad-exp">Years of experience</label>
+              <input id="ad-exp" type="number" min="0" max="70" value={form.years_of_experience} onChange={(e) => setForm({ ...form, years_of_experience: e.target.value })} />
+            </div>
+            <div className="cl-pd-field">
+              <label htmlFor="ad-fee">Consultation fee (EGP)</label>
+              <input id="ad-fee" type="number" min="0" value={form.consultation_fee} onChange={(e) => setForm({ ...form, consultation_fee: e.target.value })} />
+            </div>
+            {formError && <p className="cl-ad-error" role="alert">{formError}</p>}
+            <div className="cl-ad-modal__actions">
+              <button type="button" className="cl-pd-btn" onClick={closeModal} disabled={busy}>Cancel</button>
+              <button type="submit" className="cl-pd-btn cl-pd-btn--primary" disabled={busy}>{busy ? 'Saving…' : 'Add doctor'}</button>
+            </div>
+          </form>
+        </Modal>
       )}
-    </div>
+
+      {modal?.type === 'review' && (
+        <Modal title={`Review Dr. ${modal.doctor.full_name}`} subtitle="Approving lets the doctor sign in. They are notified by email either way." onClose={closeModal}>
+          <dl className="cl-ad-detail">
+            <div><dt>Specialty</dt><dd>{modal.doctor.specialty?.name || '—'}</dd></div>
+            <div><dt>License</dt><dd>{modal.doctor.license_number || '—'}</dd></div>
+            <div><dt>Email</dt><dd>{modal.doctor.email}</dd></div>
+            <div><dt>Experience</dt><dd>{modal.doctor.years_of_experience} years</dd></div>
+            {modal.doctor.bio && <div className="is-wide"><dt>Bio</dt><dd>{modal.doctor.bio}</dd></div>}
+            {modal.doctor.rejection_reason && <div className="is-wide"><dt>Previous rejection reason</dt><dd>{modal.doctor.rejection_reason}</dd></div>}
+          </dl>
+          <div className="cl-pd-field" style={{ marginTop: '1rem' }}>
+            <label htmlFor="ad-reason">Reason (only used when rejecting)</label>
+            <textarea id="ad-reason" rows={2} maxLength={500} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
+          </div>
+          {formError && <p className="cl-ad-error" role="alert">{formError}</p>}
+          <div className="cl-ad-modal__actions">
+            <button type="button" className="cl-pd-btn" onClick={closeModal} disabled={busy}>Close</button>
+            <button type="button" className="cl-pd-btn cl-pd-btn--danger" disabled={busy} onClick={() => handleReview(modal.doctor, 'reject')}>Reject</button>
+            <button type="button" className="cl-pd-btn cl-pd-btn--primary" disabled={busy} onClick={() => handleReview(modal.doctor, 'approve')}>Approve</button>
+          </div>
+        </Modal>
+      )}
+
+      {modal?.type === 'edit' && (
+        <Modal title={`Edit Dr. ${modal.doctor.full_name}`} onClose={closeModal}>
+          <form className="cl-pd-form" onSubmit={handleEdit}>
+            <div className="cl-pd-field">
+              <label htmlFor="ed-spec">Specialty</label>
+              <select id="ed-spec" value={editForm.specialty_id} onChange={(e) => setEditForm({ ...editForm, specialty_id: e.target.value })}>
+                {specialties.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div className="cl-pd-field">
+              <label htmlFor="ed-clinic">Clinic</label>
+              <select id="ed-clinic" value={editForm.clinic_id} onChange={(e) => setEditForm({ ...editForm, clinic_id: e.target.value })}>
+                <option value="">No clinic</option>
+                {clinics.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="cl-pd-field"><label htmlFor="ed-lic">License number</label><input id="ed-lic" value={editForm.license_number} onChange={(e) => setEditForm({ ...editForm, license_number: e.target.value })} /></div>
+            <div className="cl-pd-field"><label htmlFor="ed-exp">Years of experience</label><input id="ed-exp" type="number" min="0" max="70" value={editForm.years_of_experience} onChange={(e) => setEditForm({ ...editForm, years_of_experience: e.target.value })} /></div>
+            <div className="cl-pd-field"><label htmlFor="ed-fee">Consultation fee (EGP)</label><input id="ed-fee" type="number" min="0" value={editForm.consultation_fee} onChange={(e) => setEditForm({ ...editForm, consultation_fee: e.target.value })} /></div>
+            <div className="cl-pd-field cl-pd-field--wide"><label htmlFor="ed-bio">Bio</label><textarea id="ed-bio" rows={3} value={editForm.bio} onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })} /></div>
+            {formError && <p className="cl-ad-error" role="alert">{formError}</p>}
+            <div className="cl-ad-modal__actions">
+              <button type="button" className="cl-pd-btn cl-pd-btn--danger" disabled={busy} onClick={() => handleRemove(modal.doctor)} style={{ marginRight: 'auto' }}>Remove doctor</button>
+              <button type="button" className="cl-pd-btn" onClick={closeModal} disabled={busy}>Cancel</button>
+              <button type="submit" className="cl-pd-btn cl-pd-btn--primary" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {modal?.type === 'manage' && (
+        <Modal title={`Dr. ${modal.doctor.full_name}`} subtitle={`${modal.doctor.specialty?.name || 'Doctor'} • ${modal.doctor.email}`} onClose={closeModal}>
+          {formError && <p className="cl-ad-error" role="alert">{formError}</p>}
+          <div className="cl-ad-modal__actions">
+            <button type="button" className="cl-pd-btn" onClick={closeModal} disabled={busy}>Close</button>
+            {modal.doctor.status === 'active' && (
+              <>
+                <button type="button" className="cl-pd-btn" disabled={busy} onClick={() => handleVerify(modal.doctor)}>
+                  {modal.doctor.is_verified ? 'Remove verified badge' : 'Mark as verified'}
+                </button>
+                <button type="button" className="cl-pd-btn" disabled={busy} onClick={() => openEdit(modal.doctor)}>Edit details</button>
+                <button type="button" className="cl-pd-btn cl-pd-btn--danger" disabled={busy} onClick={() => handleActive(modal.doctor, false)}>Deactivate</button>
+              </>
+            )}
+            {modal.doctor.status === 'inactive' && (
+              <button type="button" className="cl-pd-btn cl-pd-btn--primary" disabled={busy} onClick={() => handleActive(modal.doctor, true)}>Reactivate</button>
+            )}
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }
