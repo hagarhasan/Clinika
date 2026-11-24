@@ -23,15 +23,9 @@ ArrowRight,
 
 import "./Login.css";
 
-// Where each role lands after a successful login.
-const HOME_BY_ROLE = {
-  patient: "/patient-dashboard",
-  doctor: "/doctor-dashboard",
-  admin: "/admin-dashboard",
-};
+
 
 export default function Login() {
-  const [loading, setLoading] = useState(false);
 const [error, setError] = useState("");
   const [role, setRole] = useState("patient");
   const [showPassword, setShowPassword] = useState(false);
