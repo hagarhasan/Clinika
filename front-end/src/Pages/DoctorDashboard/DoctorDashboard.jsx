@@ -1,8 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import DashboardLayout from './DashboardLayout';
+import { stripDoctorTitle } from '../../utils/nameUtils';
+import { showToast } from '../../Components/Toast/toastService';
 
 
 export const TOKEN_KEY = 'token';
@@ -36,7 +38,7 @@ export const dayText = (d) => {
 };
 export const initials = (n = '') =>
   n.trim().split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-export const drName = (n = '') => (/^dr\.?\s/i.test(n) ? n : `Dr. ${n}`);
+export const drName = (n = '') => stripDoctorTitle(n);
 
 export const C = {
   primary: '#0050cb', text: '#191c1e', muted: '#424655', secondary: '#d7e4f4', low: '#f2f4f6',
@@ -73,24 +75,27 @@ const DOCTOR_LINKS = [
 ];
 
 export default function DoctorDashboard() {
+  const navigate = useNavigate();
   const [state, setState] = useState({
     user: null, profile: null, stats: null, today: [], appointments: [], slots: [], schedules: [], loading: true, error: '',
   });
-  const [authForm, setAuthForm] = useState({ email: '', password: '' });
-  const [authBusy, setAuthBusy] = useState(false);
-  const [authErr, setAuthErr] = useState('');
-  const [needsLogin, setNeedsLogin] = useState(false);
-
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
-    setNeedsLogin(true);
+    localStorage.removeItem('role');
+    localStorage.removeItem('userName');
+    window.dispatchEvent(new Event('authChange'));
+    showToast({
+      type: 'info',
+      title: 'Logged Out',
+      message: 'You have been logged out successfully. Stay safe & healthy!',
+    });
     setState((p) => ({ ...p, user: null, profile: null, loading: false }));
-  }, []);
+    navigate('/', { replace: true });
+  }, [navigate]);
 
   const load = useCallback(async (isActive = () => true) => {
     if (!localStorage.getItem(TOKEN_KEY)) {
       if (isActive()) {
-        setNeedsLogin(true);
         setState((p) => ({ ...p, loading: false, error: '' }));
       }
       return;
@@ -101,7 +106,6 @@ export default function DoctorDashboard() {
       if (!isActive()) return;
       if (!me || me.role !== 'doctor') {
         localStorage.removeItem(TOKEN_KEY);
-        setNeedsLogin(true);
         setState((p) => ({ ...p, loading: false, error: 'This account is not a doctor account.' }));
         return;
       }
@@ -120,7 +124,6 @@ export default function DoctorDashboard() {
       ]);
       if (!isActive()) return;
 
-      setNeedsLogin(false);
       setState({
         user: me, profile: prof, stats: st?.data ?? null,
         today: Array.isArray(td?.data) ? td.data : [],
@@ -134,7 +137,6 @@ export default function DoctorDashboard() {
       const code = e?.response?.status;
       if (code === 401 || code === 403) {
         localStorage.removeItem(TOKEN_KEY);
-        setNeedsLogin(true);
         setState((p) => ({ ...p, loading: false, error: '' }));
         return;
       }
@@ -148,29 +150,6 @@ export default function DoctorDashboard() {
     return () => { active = false; clearTimeout(t); };
   }, [load]);
 
-  const handleInlineLogin = async (e) => {
-    e.preventDefault();
-    setAuthErr('');
-    setAuthBusy(true);
-    try {
-      const { data } = await api.post('/auth/login', {
-        email: authForm.email.trim(),
-        password: authForm.password,
-      });
-      const token = data?.access_token || data?.token || data?.data?.access_token || data?.data?.token;
-      if (!token) {
-        setAuthErr('No token returned from server.');
-        return;
-      }
-      localStorage.setItem(TOKEN_KEY, token);
-      await load(() => true);
-    } catch (err) {
-      setAuthErr(errMsg(err));
-    } finally {
-      setAuthBusy(false);
-    }
-  };
-
   const refresh = useCallback(() => load(() => true), [load]);
   const setUser = useCallback((fn) => setState((p) => ({ ...p, user: typeof fn === 'function' ? fn(p.user) : fn })), []);
   const setProfile = useCallback((fn) => setState((p) => ({ ...p, profile: typeof fn === 'function' ? fn(p.profile) : fn })), []);
@@ -181,42 +160,6 @@ export default function DoctorDashboard() {
     () => ({ ...state, setUser, setProfile, setAppointments, setSchedules, refresh }),
     [state, setUser, setProfile, setAppointments, setSchedules, refresh]
   );
-
-  if (needsLogin) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', backgroundColor: '#f6f8fb', padding: 20 }}>
-        <Helmet><title>Doctor Sign In | Clinika</title></Helmet>
-        <form onSubmit={handleInlineLogin} style={{ ...card, width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <h2 style={{ margin: 0, fontSize: 22 }}>Doctor Sign In</h2>
-          <p style={{ margin: 0, fontSize: 13, color: C.muted }}>Sign in with your approved doctor account.</p>
-          {(authErr || state.error) && (
-            <div style={{ backgroundColor: C.errBg, color: C.errText, padding: '10px 12px', borderRadius: 10, fontSize: 13 }}>
-              {authErr || state.error}
-            </div>
-          )}
-          <input
-            type="email"
-            required
-            placeholder="Email address"
-            value={authForm.email}
-            onChange={(e) => setAuthForm((p) => ({ ...p, email: e.target.value }))}
-            style={{ padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 14 }}
-          />
-          <input
-            type="password"
-            required
-            placeholder="Password"
-            value={authForm.password}
-            onChange={(e) => setAuthForm((p) => ({ ...p, password: e.target.value }))}
-            style={{ padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 14 }}
-          />
-          <button type="submit" disabled={authBusy} style={btn(C.primary, C.white)}>
-            {authBusy ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
-      </div>
-    );
-  }
 
   const name = drName(state.user?.full_name || [state.user?.first_name, state.user?.last_name].filter(Boolean).join(' ') || 'Doctor');
   const specialty = state.profile?.specialty?.name || 'General Medicine';

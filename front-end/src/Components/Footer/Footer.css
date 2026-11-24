@@ -5,10 +5,10 @@
 
 .clinika-footer {
   width: 100%;
-  background: #f1f3f6;
+  background: #f3f6fa;
   color: #212d3c;
   border: none;
-  border-bottom: 3px solid #7567ff;
+  border-top: 1px solid #e5ebf2;
   border-radius: 0;
   overflow: hidden;
   font-family: inherit;
@@ -21,7 +21,7 @@
 .clinika-footer-emergency {
   min-height: 42px;
   padding: 8px 15px;
-  background: #d7e4f4;
+  background: #edf3fb;
   display: flex;
   align-items: center;
   justify-content: center;

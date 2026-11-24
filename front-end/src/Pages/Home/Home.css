@@ -6,10 +6,10 @@
 .home-page {
   width: 100%;
   min-height: 100vh;
-  background: #f6f8fb;
+  background: #f8fafc;
   font-family: "Inter", sans-serif;
   color: #111827;
-padding: 55px 0;
+  padding: 44px 24px;
   box-sizing: border-box;
   gap: 20px;
 }
@@ -25,7 +25,7 @@ padding: 55px 0;
 ========================= */
 
 .home-hero {
-  max-width: 1400px;
+  max-width: 1180px;
   margin: 0 auto;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import logoIcon from '../../assets/Logo.svg';
-import { getInitials } from '../../Components/Patient/dateFormat';
+import { useLocation, useNavigate } from 'react-router-dom';
+import DashboardShell from '../../Components/DashboardShell/DashboardShell';
 import { fetchProfile, fetchUnreadCount, UNREAD_EVENT } from './patientApi';
+import { showToast } from '../../Components/Toast/toastService';
 import './patient-dashboard.css';
 import './patient-shell.css';
 
@@ -50,94 +50,46 @@ export default function PatientDashboard() {
     };
   }, [location.pathname]);
 
-  // Forget the login token, then go to the login page.
+  // Forget the login token, then go to home page with toast feedback
   function handleLogout() {
     localStorage.removeItem('token');
-    navigate('/login');
+    localStorage.removeItem('user');
+    localStorage.removeItem('role');
+    localStorage.removeItem('userName');
+    window.dispatchEvent(new Event('authChange'));
+    showToast({
+      type: 'info',
+      title: 'Logged Out',
+      message: 'You have been logged out successfully. Stay safe & healthy!',
+    });
+    navigate('/', { replace: true });
   }
+
+  const PAGE_TITLES = {
+    'my-appointments': 'My Appointments',
+    'medical-records': 'Medical Records',
+    'my-profile': 'My Profile',
+    notifications: 'Notifications',
+  };
+  const segment = location.pathname.split('/').filter(Boolean).at(-1);
+  const pageTitle = location.pathname === '/patient-dashboard'
+    ? 'Patient Dashboard'
+    : PAGE_TITLES[segment] || 'Patient Dashboard';
 
   return (
     <>
       <Helmet>
         <title>Patient Dashboard | Clinika</title>
       </Helmet>
-
-      <div className="cl-pd-shell">
-        <aside className="cl-pd-sidebar">
-          <Link to="/" className="cl-pd-brand" aria-label="Clinika home">
-            <img className="cl-pd-brand__icon" src={logoIcon} alt="" />
-            <span>
-              <span className="cl-pd-brand__name">Clinika</span>
-              <span className="cl-pd-brand__sub">Patient Portal</span>
-            </span>
-          </Link>
-
-          <nav className="cl-pd-nav" aria-label="Patient dashboard">
-            {NAV_ITEMS.map(({ label, to, icon, end, badge }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={end}
-                className={({ isActive }) => `cl-pd-nav__link ${isActive ? 'is-active' : ''}`}
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">{icon}</span>
-                <span>{label}</span>
-                {badge && unread > 0 && (
-                  <span className="cl-pd-nav__badge" aria-label={`${unread} unread notifications`}>
-                    {unread > 99 ? '99+' : unread}
-                  </span>
-                )}
-              </NavLink>
-            ))}
-          </nav>
-
-          <Link to="/" className="cl-pd-nav__link cl-pd-sidebar__back">
-            <span className="material-symbols-outlined" aria-hidden="true">arrow_back</span>
-            <span>Back to site</span>
-          </Link>
-          <button type="button" className="cl-pd-nav__link cl-pd-logout" onClick={handleLogout}>
-            <span className="material-symbols-outlined" aria-hidden="true">logout</span>
-            <span>Log out</span>
-          </button>
-        </aside>
-
-        <div className="cl-pd-main">
-          <header className="cl-pd-topbar">
-            <p className="cl-pd-topbar__title">Patient Dashboard</p>
-
-            <div className="cl-pd-topbar__actions">
-              <Link
-                to="/patient-dashboard/notifications"
-                className="cl-pd-topbar__bell"
-                aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">notifications</span>
-                {unread > 0 && <span className="cl-pd-topbar__dot" aria-hidden="true" />}
-              </Link>
-
-              {profile && (
-                <Link to="/patient-dashboard/my-profile" className="cl-pd-user">
-                  {profile.avatar_url ? (
-                    <img className="cl-pd-avatar cl-pd-avatar--sm" src={profile.avatar_url} alt="" />
-                  ) : (
-                    <span className="cl-pd-avatar cl-pd-avatar--sm" aria-hidden="true">
-                      {getInitials(profile.full_name)}
-                    </span>
-                  )}
-                  <span className="cl-pd-user__text">
-                    <span className="cl-pd-user__name">{profile.full_name}</span>
-                    <span className="cl-pd-user__role">Patient #{profile.id}</span>
-                  </span>
-                </Link>
-              )}
-            </div>
-          </header>
-
-          <main className="cl-pd-content">
-            <Outlet />
-          </main>
-        </div>
-      </div>
+      <DashboardShell
+        portalLabel="PATIENT PORTAL"
+        pageTitle={pageTitle}
+        navItems={NAV_ITEMS}
+        userName={profile?.full_name}
+        userSubtitle={profile ? `Patient #${profile.id}` : ''}
+        badge={unread}
+        onLogout={handleLogout}
+      />
     </>
   );
 }

@@ -34,7 +34,9 @@ import ContactMessages from './Pages/AdminDashboard/ContactMessages';
 import CatalogManage from './Pages/AdminDashboard/CatalogManage';
 import Reports from './Pages/AdminDashboard/Reports';
 import AdminTeam from './Pages/AdminDashboard/AdminTeam';
-import RequireAdmin from './Components/RequireAdmin/RequireAdmin';
+import RequireRole from './Components/RequireRole/RequireRole';
+
+import ToastNotification from './Components/Toast/ToastNotification';
 
 const basename = import.meta.env.BASE_URL === './'
   ? '/'
@@ -59,7 +61,7 @@ const router = createBrowserRouter([
   { path: "terms", element: <Terms /> },
   { path: "accessibility", element: <Accessibility /> },
   {
-    path: "patient-dashboard", element: <PatientDashboard />, children: [
+    path: "patient-dashboard", element: <RequireRole role="patient"><PatientDashboard /></RequireRole>, children: [
       { index: true, element: <PatientOverview /> },
       { path: "my-appointments", element: <PatientAppointments /> },
       { path: "medical-records", element: <PatientMedicalRecords /> },
@@ -68,7 +70,7 @@ const router = createBrowserRouter([
     ]
   },
   {
-    path: 'doctor-dashboard', element: <DoctorDashboard />, children: [
+    path: 'doctor-dashboard', element: <RequireRole role="doctor"><DoctorDashboard /></RequireRole>, children: [
       { index: true, element: <DoctorOverview /> },
       { path: "manage-appointments", element: <DoctorAppointments /> },
       { path: "manage-availability", element: <DoctorAvailability /> },
@@ -77,7 +79,7 @@ const router = createBrowserRouter([
   },
   {
 
-    path: 'admin-dashboard', element: <RequireAdmin><AdminDashboard /></RequireAdmin>, children: [
+    path: 'admin-dashboard', element: <RequireRole role="admin"><AdminDashboard /></RequireRole>, children: [
       { index: true, element: <AdminOverview /> },
       { path: "manage-doctors", element: <ManageDoctors /> },
       { path: "manage-users-and-appointments", element: <AdminManage /> },
@@ -93,6 +95,9 @@ const router = createBrowserRouter([
 
 export default function App() {
   return (
-    <RouterProvider router={router} />
-  )
+    <>
+      <RouterProvider router={router} />
+      <ToastNotification />
+    </>
+  );
 }

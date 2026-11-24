@@ -1,4 +1,3 @@
-
 /* =====================================
    CLINIKA NAVBAR
 ===================================== */
@@ -12,14 +11,15 @@
   top: 0;
   left: 0;
   width: 100%;
-  height :76px;
+  height: 72px;
   z-index: 10000;
-  background: transparent;
-  border-bottom: 1px solid transparent;
-  font-family: Arial, Helvetica, sans-serif;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid #edf1f5;
+  backdrop-filter: blur(12px);
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
   transition: background 0.3s ease,
-              box-shadow 0.3s ease,
-              border-color 0.3s ease;
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .clinika-navbar.scrolled {
@@ -33,8 +33,8 @@
 ===================================== */
 
 .navbar-container {
-  width: 88%;
-  max-width: 1650px;
+  width: min(1180px, calc(100% - 48px));
+  max-width: none;
   height: 100%;
   margin: 0 auto;
   display: flex;
@@ -128,164 +128,279 @@
 .navbar-actions {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
   margin-left: auto;
   padding: 0 10px;
-}/* =====================================
-   ACCOUNT MENU
-===================================== */
-
-.account-menu-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
 }
 
-.account-dropdown {
-  position: absolute;
-  top: calc(100% + 12px);
-  right: 0;
-  width: 190px;
-  padding: 7px;
-  background: #ffffff;
-  border: 1px solid #edf0f5;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.12);
-  z-index: 10001;
-  display: flex;
-  flex-direction: column;
-}
-
-.account-dropdown a,
-.account-dropdown button {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: 12px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: #344054;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.account-dropdown a:hover {
-  background: #f0f5ff;
-  color: #2164f5;
-}
-
-.account-dropdown button {
-  color: #c65353;
-  border-top: 1px solid #f0f2f5;
-  border-radius: 0 0 8px 8px;
-}
-
-.account-dropdown button:hover {
-  background: #fff5f5;
-  color: #b83e3e;
-}
 /* =====================================
-   ACCOUNT MENU
+   ACCOUNT MENU & DROPDOWN
 ===================================== */
 
 .account-menu-wrapper {
   position: relative;
   display: flex;
   align-items: center;
+  gap: 12px;
 }
 
-.account-menu-btn {
-  min-height: 40px;
-  padding: 0 15px;
+.profile-btn {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  border-radius: 50%;
+  background: #2164f5;
+  color: #ffffff;
+  border: 2px solid #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  border: 1px solid #2164f5;
-  border-radius: 11px;
-  background: #2164f5;
-  color: #ffffff;
   font-family: inherit;
   font-size: 13px;
   font-weight: 700;
+  letter-spacing: 0.5px;
   cursor: pointer;
+  box-shadow: 0 2px 10px rgba(33, 100, 245, 0.3);
   transition: all 0.2s ease;
 }
 
-.account-menu-btn:hover,
-.account-menu-btn.active {
-  background: #1854db;
-  border-color: #1854db;
+.profile-btn:hover,
+.profile-btn.active {
+  background: #1752d4;
+  box-shadow: 0 4px 14px rgba(33, 100, 245, 0.4);
+  transform: translateY(-1px);
 }
 
 .account-dropdown {
   position: absolute;
   top: calc(100% + 12px);
   right: 0;
-  width: 190px;
-  padding: 7px;
+  width: 260px;
+  padding: 8px;
   background: #ffffff;
-  border: 1px solid #edf0f5;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.12);
-  z-index: 10001;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px -6px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(15, 23, 42, 0.08);
+  z-index: 10002;
   display: flex;
   flex-direction: column;
+  animation: dropdownFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.account-dropdown a,
-.account-dropdown button {
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.account-dropdown-header {
   display: flex;
   align-items: center;
+  gap: 12px;
+  padding: 10px 10px 12px 10px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 6px;
+}
+
+.account-dropdown-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #1e3a8a;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13.5px;
+  font-weight: 800;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(30, 58, 138, 0.25);
+}
+
+.account-dropdown-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.account-dropdown-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+.account-dropdown-role {
+  display: inline-block;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 9px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  text-transform: capitalize;
+}
+
+.badge-patient {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.badge-doctor {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.badge-admin {
+  background: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+}
+
+.account-dropdown-divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 4px 4px;
+}
+
+.account-dropdown-links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 290px;
+  overflow-y: auto;
+}
+
+.account-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
   width: 100%;
-  padding: 12px;
+  padding: 9px 12px;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   background: transparent;
-  color: #344054;
+  color: #1e293b;
   font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.account-dropdown a:hover {
-  background: #f0f5ff;
-  color: #2164f5;
-}
-
-.account-dropdown button {
-  color: #c65353;
-  border-top: 1px solid #f0f2f5;
-  border-radius: 0 0 8px 8px;
-}
-
-.account-dropdown button:hover {
-  background: #fff5f5;
-  color: #b83e3e;
-}
-/* Login */
-
-.login-link {
-  color: #111111;
   font-size: 13.5px;
   font-weight: 600;
   text-decoration: none;
-  transition: color 0.2s ease;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.account-dropdown-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.account-dropdown-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.account-dropdown-item:hover .account-dropdown-item-icon {
+  color: #2164f5;
+}
+
+.account-dropdown-item-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-dropdown-logout {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #b91c1c;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.account-dropdown-logout:hover {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.account-dropdown-logout .account-dropdown-item-icon {
+  color: #b91c1c;
+}
+
+/* Login & Register Links */
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  padding: 0 10px;
+}
+
+.login-link {
+  color: #1e293b;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .login-link:hover,
 .login-link.active {
+  background: #f1f5f9;
   color: #2164f5;
+}
+
+.register-link {
+  color: #2164f5;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 7px 14px;
+  border-radius: 10px;
+  border: 1.5px solid #2164f5;
+  background: #ffffff;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.register-link:hover,
+.register-link.active {
+  background: #eff6ff;
+  border-color: #1752d4;
+  color: #1752d4;
 }
 
 /* =====================================
@@ -293,25 +408,26 @@
 ===================================== */
 
 .appointment-btn {
-  min-height: 38px;
-  padding: 0 16px;
+  min-height: 40px;
+  padding: 0 18px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #2164f5;
   color: #ffffff;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
-  box-shadow: 0 4px 10px rgba(33, 100, 245, 0.2);
+  box-shadow: 0 4px 12px rgba(33, 100, 245, 0.25);
   transition: all 0.2s ease;
 }
 
 .appointment-btn:hover {
-  background: #2164f5;
+  background: #1752d4;
   transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(33, 100, 245, 0.35);
 }
 
 /* =====================================
@@ -319,7 +435,7 @@
 ===================================== */
 
 .profile-btn {
-  width: 37px; 
+  width: 37px;
   height: 37px;
   display: flex;
   align-items: center;
@@ -437,13 +553,16 @@
     width: 100%;
     margin: 0;
   }
-.logout-btn {
-  display: flex;
-}
+
+  .logout-btn {
+    display: flex;
+  }
+
   /* Mobile Links */
 
   .nav-link,
-  .login-link {
+  .login-link,
+  .register-link {
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -467,7 +586,8 @@
   }
 
   .nav-link:hover,
-  .login-link:hover {
+  .login-link:hover,
+  .register-link:hover {
     background: #f5f8ff;
     color: #2164f5;
   }
@@ -486,12 +606,16 @@
     display: none;
   }
 
-  .login-link.active {
+  .login-link.active,
+  .register-link.active {
     color: #2164f5;
     background: #f0f5ff;
+    font-weight: 800;
+    border-left: 3px solid #2164f5;
+    padding-left: 12px;
   }
 
- 
+
   /* Profile Text */
 
 
@@ -517,6 +641,7 @@
     transform: translateY(-7px) rotate(-45deg);
   }
 }
+
 /* Account Menu - Mobile */
 
 .account-menu-wrapper {
@@ -579,6 +704,7 @@
   padding: 12px;
   font-size: 14px;
 }
+
 /* =====================================
    SMALL MOBILE
 ===================================== */
@@ -625,6 +751,7 @@
     padding: 10px 16px 18px;
   }
 }
+
 /* LOG OUT BUTTON */
 
 .logout-btn {
@@ -650,11 +777,15 @@
 .logout-btn:hover {
   background: #fff5f5;
   color: #b83e3e;
-}@media (max-width: 900px) {
+}
+
+@media (max-width: 900px) {
   .logout-btn {
     display: flex;
   }
-}/* =====================================
+}
+
+/* =====================================
    LOGOUT CONFIRMATION MODAL
 ===================================== */
 
@@ -754,6 +885,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -764,11 +896,13 @@
     opacity: 0;
     transform: translateY(12px) scale(0.97);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
 }
+
 /* =====================================
    DESKTOP ACCOUNT & PROFILE ALIGNMENT
 ===================================== */
@@ -792,10 +926,10 @@
   }
 
   .profile-btn {
-    width: 37px;
-    min-width: 37px;
-    height: 37px;
-    min-height: 37px;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    min-height: 38px;
     padding: 0;
     margin: 0;
     display: flex;
@@ -804,8 +938,8 @@
     border-radius: 50%;
     background: #2164f5;
     color: #ffffff;
-    border: none;
-    box-shadow: none;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 10px rgba(33, 100, 245, 0.3);
   }
 
   .profile-icon {
@@ -820,6 +954,6 @@
     position: absolute;
     top: calc(100% + 12px);
     right: 0;
-    width: 190px;
+    width: 250px;
   }
 }

@@ -1,8 +1,9 @@
 import { Helmet } from 'react-helmet-async';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import logoImg from '../../assets/clinika-logo.png';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { clearSession } from '../../api/adminApi';
+import { showToast } from '../../Components/Toast/toastService';
 import { DashboardProvider, useDashboard } from '../../context/DashboardContext';
+import DashboardShell from '../../Components/DashboardShell/DashboardShell';
 import '../PatientDashboard/patient-dashboard.css';
 import './admin.css';
 
@@ -44,7 +45,15 @@ function AdminShell() {
 
   const handleLogout = () => {
     clearSession();
-    navigate('/login', { replace: true });
+    localStorage.removeItem('role');
+    localStorage.removeItem('userName');
+    window.dispatchEvent(new Event('authChange'));
+    showToast({
+      type: 'info',
+      title: 'Logged Out',
+      message: 'You have been logged out successfully. Stay safe & healthy!',
+    });
+    navigate('/', { replace: true });
   };
 
   return (
@@ -52,65 +61,13 @@ function AdminShell() {
       <Helmet>
         <title>Admin Dashboard | Clinika</title>
       </Helmet>
-
-      <div className="cl-pd-shell">
-        <aside className="cl-pd-sidebar">
-          <Link to="/" className="cl-pd-sidebar__brand" aria-label="Clinika home">
-            <img src={logoImg} alt="Clinika" />
-          </Link>
-
-          <nav className="cl-pd-nav" aria-label="Admin dashboard">
-            {NAV_ITEMS.map(({ label, to, icon, end, badge }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={end}
-                className={({ isActive }) => `cl-pd-nav__link ${isActive ? 'is-active' : ''}`}
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">{icon}</span>
-                <span>{label}</span>
-                {badge && stats.newMessages > 0 && (
-                  <span className="cl-ad-nav-badge" aria-label={`${stats.newMessages} new`}>{stats.newMessages}</span>
-                )}
-              </NavLink>
-            ))}
-          </nav>
-
-          <div className="cl-pd-sidebar__back">
-            <button
-              type="button"
-              className="cl-pd-nav__link"
-              style={{ width: '100%', border: 0, background: 'transparent', cursor: 'pointer', color: 'var(--cl-error)' }}
-              onClick={handleLogout}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">logout</span>
-              <span>Logout</span>
-            </button>
-            <Link to="/" className="cl-pd-nav__link">
-              <span className="material-symbols-outlined" aria-hidden="true">arrow_back</span>
-              <span>Back to site</span>
-            </Link>
-          </div>
-        </aside>
-
-        <div className="cl-ad-main">
-          <header className="cl-ad-topbar">
-            <div className="cl-ad-crumbs">
-              <span>Admin Portal</span>
-              <span aria-hidden="true">/</span>
-              <strong>{pageTitle}</strong>
-            </div>
-            <span className="cl-ad-sync">
-              <i aria-hidden="true" />
-              Registry Database Sync: <strong>Real-time</strong>
-            </span>
-          </header>
-
-          <main className={`cl-ad-content ${pathname.includes('my-profile') ? 'cl-ad-content--narrow' : ''}`}>
-            <Outlet />
-          </main>
-        </div>
-      </div>
+      <DashboardShell
+        portalLabel="ADMIN PORTAL"
+        pageTitle={pageTitle}
+        navItems={NAV_ITEMS}
+        badge={stats.newMessages}
+        onLogout={handleLogout}
+      />
     </>
   );
 }

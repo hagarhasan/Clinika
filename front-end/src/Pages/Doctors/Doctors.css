@@ -1,4 +1,6 @@
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 /* ================================
    DOCTORS PAGE
 ================================ */
@@ -7,10 +9,10 @@
 
   width: 100%;
   min-height: 100vh;
-  background: #f6f8fa;
+  background: #f8fafc;
   color: #172b4d;
   font-family: 'Inter', sans-serif;
-  padding: 60px 0 30px;
+  padding: 44px 24px 30px;
   box-sizing: border-box;
 }
 
@@ -20,7 +22,7 @@
 
 .doctors-container {
   width: 100%;
-  max-width: 1400px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 20px 54px 30px;
   box-sizing: border-box;
@@ -2225,8 +2227,6 @@
 /* =========================================
    CLINIKA - BOOK APPOINTMENT PAGE
    ========================================= */
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
   --booking-primary: #0755d9;

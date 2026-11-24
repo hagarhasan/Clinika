@@ -1,9 +1,11 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API_BASE_URL, TOKEN_KEY } from "../../api/adminApi";
+import { setPendingToast, showToast } from "../../Components/Toast/toastService";
+import { stripDoctorTitle } from "../../utils/nameUtils";
 
 import {
   Stethoscope,
@@ -54,19 +56,66 @@ const handleLogin = async (e) => {
       remember_me: rememberMe,
     });
 
-    localStorage.setItem(TOKEN_KEY, data.access_token);
+    const actualRole = data.user?.role || "patient";
 
-    const role = data.user?.role;
+    // Validate selected tab vs account role (Admins can sign in from either tab)
+    if (actualRole !== "admin") {
+      if (role === "doctor" && actualRole !== "doctor") {
+        setError(
+          "This account is registered as a Patient. Please switch to the Patient tab to sign in."
+        );
+        setSubmitting(false);
+        return;
+      }
+      if (role === "patient" && actualRole !== "patient") {
+        setError(
+          "This account is registered as a Doctor. Please switch to the Doctor tab to sign in."
+        );
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    // Strip titles like DR., Dr., Doctor, Prof. from user name
+    const rawName =
+      data.user?.full_name ||
+      `${data.user?.first_name || ""} ${data.user?.last_name || ""}`.trim();
+    const cleanName = stripDoctorTitle(rawName) || "Clinika User";
+
+    localStorage.setItem(TOKEN_KEY, data.access_token);
+    if (data.user) {
+      const cleanUser = {
+        ...data.user,
+        full_name: cleanName,
+        first_name: stripDoctorTitle(data.user.first_name || ""),
+      };
+      localStorage.setItem("user", JSON.stringify(cleanUser));
+      localStorage.setItem("role", actualRole);
+      localStorage.setItem("userName", cleanName);
+    }
+
+    // Trigger toast notification for login
+    setPendingToast({
+      type: "success",
+      title: "Welcome Back!",
+      message: `Signed in successfully as ${cleanName}.`,
+    });
+    showToast({
+      type: "success",
+      title: "Welcome Back!",
+      message: `Signed in successfully as ${cleanName}.`,
+    });
+
+    window.dispatchEvent(new Event("authChange"));
 
     navigate(
-      role === "patient"
+      actualRole === "patient"
         ? "/patient-dashboard"
-        : role === "doctor"
+        : actualRole === "doctor"
         ? "/doctor-dashboard"
         : "/admin-dashboard",
       { replace: true }
     );
-
   } catch (err) {
     const detail = err?.response?.data?.detail;
 
@@ -77,7 +126,6 @@ const handleLogin = async (e) => {
         ? detail
         : "Could not sign in. Please check your email and password."
     );
-
   } finally {
     setSubmitting(false);
   }

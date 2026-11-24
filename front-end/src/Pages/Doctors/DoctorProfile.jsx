@@ -57,9 +57,9 @@ const [loading, setLoading] = useState(!passedDoctor);
 const [error, setError] = useState("");
 
 const [selectedTime, setSelectedTime] = useState("");
-const [availableSlots, setAvailableSlots] = useState([]);
-const [slotsLoading, setSlotsLoading] = useState(false);
-const [slotsError, setSlotsError] = useState("");
+const [availableSlots] = useState([]);
+const [slotsLoading] = useState(false);
+const [slotsError] = useState("");
 const [selectedDate, setSelectedDate] = useState(() =>
   formatLocalDate(new Date())
 );

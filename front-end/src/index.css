@@ -82,3 +82,45 @@ a {
   flex-direction: column;
   width: 100%;
 }
+
+/* Public website surface */
+.cl-app-layout .cl-main-content {
+  background: #f8fafc;
+}
+
+.cl-app-layout .cl-main-content button,
+.cl-app-layout .cl-main-content input,
+.cl-app-layout .cl-main-content textarea,
+.cl-app-layout .cl-main-content select {
+  font-family: inherit;
+}
+
+.cl-app-layout .cl-main-content :focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.16);
+  outline-offset: 2px;
+}
+
+.cl-app-layout .cl-main-content img {
+  max-width: 100%;
+}
+
+.cl-app-layout .home-page,
+.cl-app-layout .about-page,
+.cl-app-layout .clinika-contact-page,
+.cl-app-layout .doctors-page,
+.cl-app-layout .clinika-login,
+.cl-app-layout .register-page,
+.cl-app-layout .cl-page {
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-app-layout *,
+  .cl-app-layout *::before,
+  .cl-app-layout *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
