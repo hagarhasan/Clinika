@@ -1,6 +1,7 @@
 import  { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
+import api from "../../api";
 import {
   Home,
   ChevronRight,
@@ -33,9 +34,12 @@ export default function DoctorProfile() {
   const [error, setError] = useState("");
 
   // Fetch doctor data if not received through navigation
+  
   useEffect(() => {
     const fetchDoctor = async () => {
       try {
+        setError("");
+
         if (passedDoctor && String(passedDoctor.id) === String(id)) {
           setDoctor(passedDoctor);
           setLoading(false);
@@ -44,9 +48,19 @@ export default function DoctorProfile() {
 
         setLoading(true);
 
-        const response = await fetch(`/api/doctors/${id}`);
+        const response = await api.get("/doctors", {
+          params: {
+            limit: 20,
+            offset: 0,
+            sort: "recommended",
+          },
+        });
 
-        if (!response.ok) {
+        const doctorFromApi = response.data.find(
+          (item) => String(item.id) === String(id)
+        );
+
+        if (!doctorFromApi) {
           throw new Error("Doctor not found");
         }
 
@@ -61,6 +75,7 @@ export default function DoctorProfile() {
 
     fetchDoctor();
   }, [id, passedDoctor]);
+
 
   // Loading
   if (loading) {
@@ -111,7 +126,7 @@ export default function DoctorProfile() {
 
     fee: doctor.fee || doctor.consultationFee || 0,
 
-    rating: doctor.rating || 0,
+  rating: doctor.rating ?? 0,
     reviews: doctor.reviews || doctor.reviewCount || 0,
 
     experience: doctor.experience || 0,
@@ -156,14 +171,22 @@ export default function DoctorProfile() {
       doctor.location ||
       "",
 
-    verified: doctor.verified ?? true,
+    verified: doctor.verified ?? false,
   };
 
   // Book appointment
 
 const handleBookAppointment = () => {
   navigate(`/doctors/doctor_profile/${doctor.id}/book-appointment`, {
-    state: { doctor },
+    state: {
+      doctor: {
+        ...doctor,
+        clinicId: doctor.clinicId,
+        appointmentDate: doctor.appointmentDate,
+        startTime: doctor.startTime,
+        fee: doctor.fee,
+      },
+    },
   });
 };
 

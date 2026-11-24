@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   useParams,
   useSearchParams,
@@ -8,8 +8,10 @@ import {
 } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import './ResetPassword.css';
+import api from '../../api';
 
 export default function ResetPassword() {
+ 
   const { token: paramToken } = useParams();
   const [searchParams] = useSearchParams();
 
@@ -24,8 +26,57 @@ export default function ResetPassword() {
     message: ''
   });
   const [loading, setLoading] = useState(false);
+  const [validating, setValidating] = useState(true);
+  const [tokenValid, setTokenValid] = useState(false);
 
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let active = true;
+
+    const validateToken = async () => {
+      if (!token) {
+        setStatus({
+          type: 'danger',
+          message: 'Invalid or missing reset token.'
+        });
+        setTokenValid(false);
+        setValidating(false);
+        return;
+      }
+
+      try {
+        await api.get('/auth/reset-password/validate', {
+          params: { token }
+        });
+
+        if (active) {
+          setTokenValid(true);
+          setStatus({ type: '', message: '' });
+        }
+      } catch (err) {
+        if (active) {
+          setTokenValid(false);
+          setStatus({
+            type: 'danger',
+            message:
+              err.response?.data?.detail ||
+              'This reset link is invalid or has expired.'
+          });
+        }
+      } finally {
+        if (active) {
+          setValidating(false);
+        }
+      }
+    };
+
+    validateToken();
+
+    return () => {
+      active = false;
+    };
+  }, [token]);
 
   const requirements = {
     length: newPassword.length >= 8,
@@ -48,10 +99,10 @@ export default function ResetPassword() {
 
     setStatus({ type: '', message: '' });
 
-    if (!token) {
+    if (!tokenValid || validating) {
       setStatus({
         type: 'danger',
-        message: 'Invalid or missing reset token. Please request a new link from your email.'
+        message: 'Please use a valid password reset link.'
       });
       return;
     }
@@ -75,26 +126,10 @@ export default function ResetPassword() {
     setLoading(true);
 
     try {
-      const res = await fetch(
-        'http://localhost:8000/auth/reset-password',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            token,
-            new_password: newPassword
-          })
-        }
-      );
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(
-          errorData.detail || 'Failed to reset password.'
-        );
-      }
+      await api.post('/auth/reset-password', {
+        token,
+        new_password: newPassword
+      });
 
       setStatus({
         type: 'success',
@@ -108,7 +143,10 @@ export default function ResetPassword() {
     } catch (err) {
       setStatus({
         type: 'danger',
-        message: err.message || 'Something went wrong. Please try again.'
+        message:
+          err.response?.data?.detail ||
+          err.response?.data?.message ||
+          'Failed to reset password. Please try again.'
       });
     } finally {
       setLoading(false);
@@ -269,9 +307,11 @@ export default function ResetPassword() {
             <button
               type="submit"
               className="reset-submit-btn"
-              disabled={loading || !token}
+              disabled={loading || validating || !tokenValid}
             >
-              {loading ? (
+              {validating ? (
+                'Validating Link...'
+              ) : loading ? (
                 <>
                   <i className="fa-solid fa-spinner fa-spin"></i>
                   Resetting...

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import './About.css';
 import doctorImage from '../../assets/images/about.png';
-import teamImage from '../../assets/images/abaout1.png';
+import teamImage from '../../assets/images/about1.png';
 export default function About() {
   return (
     <>

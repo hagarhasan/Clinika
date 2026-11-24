@@ -648,3 +648,21 @@ a.info-card-value:hover {
     align-items: flex-start;
   }
 }
+.contact-success {
+  color: #16803c;
+  font-size: 14px;
+  text-align: center;
+  margin-top: 12px;
+}
+
+.contact-error {
+  color: #d92d20;
+  font-size: 14px;
+  text-align: center;
+  margin-top: 12px;
+}
+
+.send-message-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

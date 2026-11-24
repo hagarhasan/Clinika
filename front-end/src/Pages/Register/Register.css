@@ -1060,3 +1060,14 @@
     height: 210px;
   }
 }
+.register-error {
+  color: #d92d20;
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+.register-success {
+  color: #16803c;
+  font-size: 13px;
+  margin-top: 12px;
+}

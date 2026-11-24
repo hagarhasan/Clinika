@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
+import api from "../../api";
 import { Link } from "react-router-dom";
 import "./Home.css";
 import {
@@ -60,6 +62,36 @@ function ShieldIcon() {
 }
 
 export default function Home() {
+    const [doctors, setDoctors] = useState([]);
+  const [loadingDoctors, setLoadingDoctors] = useState(true);
+  const [doctorsError, setDoctorsError] = useState("");
+
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        const response = await api.get("/doctors", {
+          params: {
+            limit: 4,
+            offset: 0,
+            sort: "recommended",
+          },
+        });
+
+        setDoctors(
+  Array.isArray(response.data) ? response.data : []
+);
+      } catch (err) {
+        setDoctorsError(
+          err.response?.data?.detail ||
+          "Unable to load doctors."
+        );
+      } finally {
+        setLoadingDoctors(false);
+      }
+    };
+
+    fetchDoctors();
+  }, []);
   return (
     <>
       <Helmet>
@@ -458,6 +490,7 @@ export default function Home() {
   </div>
 
 </section>
+
 {/* FEATURED DOCTORS SECTION */}
 
 <section className="home-doctors-section">
@@ -486,308 +519,111 @@ export default function Home() {
 
     </div>
 
-
   </div>
-
-
-  {/* DOCTORS GRID */}
 
   <div className="home-doctors-grid">
 
-    {/* DOCTOR 1 */}
+    {loadingDoctors ? (
+      <p>Loading doctors...</p>
+    ) : doctorsError ? (
+      <p role="alert">{doctorsError}</p>
+    ) : doctors.length === 0 ? (
+      <p>No doctors available right now.</p>
+    ) : (
+      doctors.map((doctor) => (
 
-    <article className="home-doctor-card">
+        <article className="home-doctor-card" key={doctor.id}>
 
-      <div className="home-doctor-image-wrapper">
+          <div className="home-doctor-image-wrapper">
 
-        <img
-          src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=85"
-          alt="Dr. Maya Bennett"
-          className="home-doctor-image"
-        />
+            <img
+              src={
+                doctor.photo_url ||
+                "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=85"
+              }
+              alt={doctor.full_name}
+              className="home-doctor-image"
+            />
 
-        <span className="home-verified-badge">
-          Verified Doctor
-        </span>
+            {doctor.is_verified && (
+              <span className="home-verified-badge">
+                Verified Doctor
+              </span>
+            )}
 
-      </div>
+          </div>
 
-      <div className="home-doctor-info">
+          <div className="home-doctor-info">
 
-        <h3>Dr. Maya Bennett</h3>
+            <h3>{doctor.full_name}</h3>
 
-        <span className="home-doctor-specialty">
-          Primary Care Physician
-        </span>
+            <span className="home-doctor-specialty">
+              {doctor.specialty?.name || "Medical Specialist"}
+            </span>
 
-        <p className="home-doctor-experience">
-          12 years clinical practice
-        </p>
+            <p className="home-doctor-experience">
+              {doctor.years_of_experience ?? 0} years clinical practice
+            </p>
 
-        <div className="home-doctor-rating">
-          <Star size={13} fill="#f59e0b" color="#f59e0b" />
-          <strong>4.9</strong>
-          <span>(128 patient reviews)</span>
-        </div>
+            <div className="home-doctor-rating">
+              <Star size={13} fill="#f59e0b" color="#f59e0b" />
 
-        <div className="home-doctor-availability">
+              <strong>
+                {doctor.rating_avg ?? "No rating"}
+              </strong>
 
-          <span className="home-availability-label">
-            NEXT AVAILABLE
-          </span>
+              <span>
+                ({doctor.reviews_count ?? 0} patient reviews)
+              </span>
+            </div>
 
-          <span className="home-availability-dot"></span>
+            <div className="home-doctor-availability">
 
-          <span className="home-availability-time">
-            Today, 2:30 PM
-          </span>
+              <span className="home-availability-label">
+                NEXT AVAILABLE
+              </span>
 
-        </div>
+              <span className="home-availability-dot"></span>
 
-        <div className="home-doctor-actions">
+              <span className="home-availability-time">
+                {doctor.next_available
+                  ? `${doctor.next_available.appointment_date} · ${doctor.next_available.start_time}`
+                  : "Not available"}
+              </span>
 
-          <Link
-            to="/doctors/doctor_profile/1"
-            className="home-doctor-profile-button"
-          >
-            Profile
-          </Link>
+            </div>
 
-          <Link
-            to="/doctors/doctor_profile/1/book-appointment"
-            className="home-doctor-book-button"
-          >
-            Book
-          </Link>
+            <div className="home-doctor-actions">
 
-        </div>
+              <Link
+                to={`/doctors/doctor_profile/${doctor.id}`}
+                className="home-doctor-profile-button"
+              >
+                Profile
+              </Link>
 
-      </div>
+              <Link
+                to={`/doctors/doctor_profile/${doctor.id}`}
+                className="home-doctor-book-button"
+              >
+                Book
+              </Link>
 
-    </article>
+            </div>
 
+          </div>
 
-    {/* DOCTOR 2 */}
+        </article>
 
-    <article className="home-doctor-card">
-
-      <div className="home-doctor-image-wrapper">
-
-        <img
-          src="https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=600&q=85"
-          alt="Dr. Daniel Park"
-          className="home-doctor-image"
-        />
-
-        <span className="home-verified-badge">
-          Verified Doctor
-        </span>
-
-      </div>
-
-      <div className="home-doctor-info">
-
-        <h3>Dr. Daniel Park</h3>
-
-        <span className="home-doctor-specialty">
-          Cardiologist
-        </span>
-
-        <p className="home-doctor-experience">
-          15 years clinical practice
-        </p>
-
-        <div className="home-doctor-rating">
-          <Star size={13} fill="#f59e0b" color="#f59e0b" />
-          <strong>4.8</strong>
-          <span>(94 patient reviews)</span>
-        </div>
-
-        <div className="home-doctor-availability">
-
-          <span className="home-availability-label">
-            NEXT AVAILABLE
-          </span>
-
-          <span className="home-availability-dot"></span>
-
-          <span className="home-availability-time">
-            Tomorrow, 10:00 AM
-          </span>
-
-        </div>
-
-        <div className="home-doctor-actions">
-
-          <Link
-            to="/doctors/doctor_profile/2"
-            className="home-doctor-profile-button"
-          >
-            Profile
-          </Link>
-
-          <Link
-            to="/doctors/doctor_profile/2/book-appointment"
-            className="home-doctor-book-button"
-          >
-            Book
-          </Link>
-
-        </div>
-
-      </div>
-
-    </article>
-
-
-    {/* DOCTOR 3 */}
-
-    <article className="home-doctor-card">
-
-      <div className="home-doctor-image-wrapper">
-
-        <img
-          src="https://images.unsplash.com/photo-1594824476967-48c8b964273f?auto=format&fit=crop&w=600&q=85"
-          alt="Dr. Elena Rossi"
-          className="home-doctor-image"
-        />
-
-        <span className="home-verified-badge">
-          Verified Doctor
-        </span>
-
-      </div>
-
-      <div className="home-doctor-info">
-
-        <h3>Dr. Elena Rossi</h3>
-
-        <span className="home-doctor-specialty">
-          Dermatologist
-        </span>
-
-        <p className="home-doctor-experience">
-          9 years clinical practice
-        </p>
-
-        <div className="home-doctor-rating">
-          <Star size={13} fill="#f59e0b" color="#f59e0b" />
-          <strong>4.9</strong>
-          <span>(215 patient reviews)</span>
-        </div>
-
-        <div className="home-doctor-availability">
-
-          <span className="home-availability-label">
-            NEXT AVAILABLE
-          </span>
-
-          <span className="home-availability-dot"></span>
-
-          <span className="home-availability-time">
-            Today, 4:00 PM
-          </span>
-
-        </div>
-
-        <div className="home-doctor-actions">
-
-          <Link
-            to="/doctors/doctor_profile/3"
-            className="home-doctor-profile-button"
-          >
-            Profile
-          </Link>
-
-          <Link
-            to="/doctors/doctor_profile/3/book-appointment"
-            className="home-doctor-book-button"
-          >
-            Book
-          </Link>
-
-        </div>
-
-      </div>
-
-    </article>
-
-
-    {/* DOCTOR 4 */}
-
-    <article className="home-doctor-card">
-
-      <div className="home-doctor-image-wrapper">
-
-        <img
-          src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=85"
-          alt="Dr. James Morgan"
-          className="home-doctor-image"
-        />
-
-        <span className="home-verified-badge">
-          Verified Doctor
-        </span>
-
-      </div>
-
-      <div className="home-doctor-info">
-
-        <h3>Dr. James Morgan</h3>
-
-        <span className="home-doctor-specialty">
-          Pediatrician
-        </span>
-
-        <p className="home-doctor-experience">
-          11 years clinical practice
-        </p>
-
-        <div className="home-doctor-rating">
-          <Star size={13} fill="#f59e0b" color="#f59e0b" />
-          <strong>4.8</strong>
-          <span>(180 patient reviews)</span>
-        </div>
-
-        <div className="home-doctor-availability">
-
-          <span className="home-availability-label">
-            NEXT AVAILABLE
-          </span>
-
-          <span className="home-availability-dot"></span>
-
-          <span className="home-availability-time">
-            Tomorrow, 9:30 AM
-          </span>
-
-        </div>
-
-        <div className="home-doctor-actions">
-
-          <Link
-            to="/doctors/doctor_profile/4"
-            className="home-doctor-profile-button"
-          >
-            Profile
-          </Link>
-
-          <Link
-            to="/doctors/doctor_profile/4/book-appointment"
-            className="home-doctor-book-button"
-          >
-            Book
-          </Link>
-
-        </div>
-
-      </div>
-
-    </article>
+      ))
+    )}
 
   </div>
 
 </section>
+
+
+
 {/* HOW IT WORKS SECTION */}
 
 <section className="home-how-section">

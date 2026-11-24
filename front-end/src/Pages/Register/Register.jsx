@@ -1,8 +1,7 @@
-
-
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
+import api from "../../api";
 import {
   ArrowLeft,
   ArrowRight,
@@ -23,6 +22,69 @@ export default function Register() {
   const [accountType, setAccountType] = useState("patient");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+
+    setError("");
+    setSuccess("");
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    const nameParts = fullName.trim().split(/\s+/);
+
+    if (nameParts.length < 2) {
+      setError("Please enter your first and last name.");
+      return;
+    }
+
+    const data = {
+      full_name: fullName.trim(),
+      first_name: nameParts[0],
+      last_name: nameParts.slice(1).join(" "),
+      email,
+      password,
+      phone: phone.startsWith("+20") ? phone : `+20${phone}`,
+    };
+
+    setLoading(true);
+
+    try {
+      const endpoint =
+        accountType === "patient"
+          ? "/auth/register"
+          : "/auth/register/doctor";
+
+      await api.post(endpoint, data);
+
+      setSuccess(
+        accountType === "patient"
+          ? "Account created successfully! You can now sign in."
+          : "Doctor registration submitted successfully. Your account is pending approval."
+      );
+    } catch (err) {
+      setError(
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        "Registration failed. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
@@ -139,7 +201,7 @@ export default function Register() {
                     )}
                   </strong>
 
-                  <small>
+                    <small>
                     Join our verified medical network &amp; manage clinic slots
                   </small>
 
@@ -178,7 +240,7 @@ export default function Register() {
               </div>
 
               {/* Form */}
-              <form className="register-form">
+              <form className="register-form" onSubmit={handleRegister}>
 
                 {/* Full Name */}
                 <div className="register-field">
@@ -191,6 +253,8 @@ export default function Register() {
                     id="register-name"
                     type="text"
                     placeholder="e.g. Youssef Tarek El-Sayed"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
                     required
                   />
 
@@ -210,6 +274,8 @@ export default function Register() {
                       id="register-email"
                       type="email"
                       placeholder="name@domain.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                     />
                   </div>
@@ -233,6 +299,8 @@ export default function Register() {
                       id="register-phone"
                       type="tel"
                       placeholder="101 234 5678"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
                       required
                     />
 
@@ -259,6 +327,8 @@ export default function Register() {
                       id="register-password"
                       type={showPassword ? "text" : "password"}
                       placeholder="At least 8 characters with numbers"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       required
                       minLength={8}
                     />
@@ -307,6 +377,8 @@ export default function Register() {
                           : "password"
                       }
                       placeholder="Re-enter your password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
                       required
                     />
 
@@ -356,17 +428,32 @@ export default function Register() {
                 <button
                   type="submit"
                   className="register-submit"
+                  disabled={loading}
                 >
 
                   <span>
-                    Create {accountType === "patient"
-                      ? "Patient"
-                      : "Doctor"} Account
+                    {loading
+                      ? "Creating Account..."
+                      : `Create ${accountType === "patient"
+                          ? "Patient"
+                          : "Doctor"} Account`}
                   </span>
 
                   <ArrowRight size={17} />
 
                 </button>
+
+                {error && (
+                  <p className="register-error" role="alert">
+                    {error}
+                  </p>
+                )}
+
+                {success && (
+                  <p className="register-success" role="status">
+                    {success}
+                  </p>
+                )}
 
               </form>
 

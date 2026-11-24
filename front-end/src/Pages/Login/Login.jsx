@@ -31,6 +31,8 @@ const HOME_BY_ROLE = {
 };
 
 export default function Login() {
+  const [loading, setLoading] = useState(false);
+const [error, setError] = useState("");
   const [role, setRole] = useState("patient");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -70,7 +72,27 @@ export default function Login() {
     } finally {
       setSubmitting(false);
     }
-  };
+
+   localStorage.setItem("token", token);
+localStorage.setItem("role", role);
+
+navigate(
+  role === "patient"
+    ? "/patient-dashboard"
+    : role === "doctor"
+    ? "/doctor-dashboard"
+    : "/admin-dashboard"
+);
+  } catch (err) {
+    setError(
+      err.response?.data?.detail ||
+      err.response?.data?.message ||
+      "Login failed. Please check your email and password."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDemo = (selectedRole) => {
     setRole(selectedRole);
@@ -370,7 +392,11 @@ export default function Login() {
               </button>
 
             </form>
-
+{error && (
+  <p className="login-error" role="alert">
+    {error}
+  </p>
+)}
             {/* DEMO */}
             <div className="clinika-demo-section">
 

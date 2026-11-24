@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import './ForgetPassword.css';
-
+import api from '../../api';
 function ShieldIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -40,42 +40,31 @@ export default function ForgetPassword() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+ const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    setLoading(true);
-    setMessage('');
-    setError('');
+  setLoading(true);
+  setMessage('');
+  setError('');
 
-    try {
-      const response = await fetch(
-        'http://localhost:5000/api/auth/forgot-password',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email }),
-        }
-      );
+  try {
+    await api.post('/auth/forgot-password', {
+      email,
+    });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Something went wrong.');
-      }
-
-      setMessage(
-        'If an account exists with this email, a password reset link has been sent.'
-      );
-    } catch (err) {
-      setError(
-        err.message || 'Failed to send reset link. Please try again.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+    setMessage(
+      'If an account exists with this email, a password reset link has been sent.'
+    );
+  } catch (err) {
+    setError(
+      err.response?.data?.detail ||
+      err.response?.data?.message ||
+      'Failed to send reset link. Please try again.'
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <>
@@ -261,16 +250,16 @@ export default function ForgetPassword() {
 
                 {/* Success Message */}
                 {message && (
-                  <p className="success-message">
-                    {message}
-                  </p>
+                 <p className="success-message" role="status">
+  {message}
+</p>
                 )}
 
                 {/* Error Message */}
                 {error && (
-                  <p className="error-message">
-                    {error}
-                  </p>
+                 <p className="error-message" role="alert">
+  {error}
+</p>
                 )}
 
               </form>
