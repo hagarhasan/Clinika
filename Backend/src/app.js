@@ -20,6 +20,7 @@ app.use(
     exposedHeaders: ['X-Total-Count'],
   })
 );
+app.options('*', cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));
 
