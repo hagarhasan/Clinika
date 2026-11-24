@@ -15,9 +15,9 @@ app.set('trust proxy', true);
 
 app.use(
   cors({
-    origin: settings.corsOriginsList,
+    origin: true,
     credentials: true,
-    exposedHeaders: ['X-Total-Count'], // عشان الفرونت يقرا العدد الكلي للـ pagination
+    exposedHeaders: ['X-Total-Count'],
   })
 );
 app.use(express.json({ limit: '1mb' }));
