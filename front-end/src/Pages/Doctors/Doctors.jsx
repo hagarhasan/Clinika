@@ -1,5 +1,5 @@
 
-import  { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../../api";
 import {
@@ -692,28 +692,32 @@ const formattedDoctors = response.data.map((doctor) => {
                   <article className="doctor-card" key={doctor.id}>
 
                     {/* Doctor Image */}
-                    <div className="doctor-image-wrapper">
-                      <img
-                        src={doctor.image || undefined}
-                        alt={doctor.name}
-                        className="doctor-image"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                          e.currentTarget.nextElementSibling.style.display =
-                            "flex";
-                        }}
-                      />
+                   {/* Doctor Image */}
+<div className="doctor-image-wrapper">
+  {doctor.image && (
+    <img
+      src={doctor.image}
+      alt={doctor.name}
+      className="doctor-image"
+      onError={(e) => {
+        e.currentTarget.style.display = "none";
+        e.currentTarget.nextElementSibling.style.display = "flex";
+      }}
+    />
+  )}
 
-                      <div className="doctor-image-placeholder">
-                        <UserRound size={45} />
-                      </div>
+  <div
+    className="doctor-image-placeholder"
+    style={{ display: doctor.image ? "none" : "flex" }}
+  >
+    <UserRound size={45} />
+  </div>
 
-                      <span className="image-verified">
-                        <BadgeCheck size={11} />
-                        Verified
-                      </span>
-                    </div>
-
+  <span className="image-verified">
+    <BadgeCheck size={11} />
+    Verified
+  </span>
+</div>
                     {/* Doctor Information */}
                     <div className="doctor-information">
 

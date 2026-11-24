@@ -20,7 +20,31 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import "./Doctors.css";
+const formatLocalDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
 
+  return `${year}-${month}-${day}`;
+};
+
+const getUpcomingDates = (days = 14) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return Array.from({ length: days }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + index);
+
+    return {
+      value: formatLocalDate(date),
+      day: date.toLocaleDateString("en-US", {
+        weekday: "short",
+      }),
+      number: date.getDate(),
+    };
+  });
+};
 export default function DoctorProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -28,10 +52,17 @@ export default function DoctorProfile() {
 
   // بيانات الدكتور القادمة من صفحة Doctors
   const passedDoctor = location.state?.doctor;
+const [doctor, setDoctor] = useState(passedDoctor || null);
+const [loading, setLoading] = useState(!passedDoctor);
+const [error, setError] = useState("");
 
-  const [doctor, setDoctor] = useState(passedDoctor || null);
-  const [loading, setLoading] = useState(!passedDoctor);
-  const [error, setError] = useState("");
+const [selectedTime, setSelectedTime] = useState("");
+const [availableSlots, setAvailableSlots] = useState([]);
+const [slotsLoading, setSlotsLoading] = useState(false);
+const [slotsError, setSlotsError] = useState("");
+const [selectedDate, setSelectedDate] = useState(() =>
+  formatLocalDate(new Date())
+);
 
   // Fetch doctor data if not received through navigation
   
@@ -173,7 +204,7 @@ export default function DoctorProfile() {
 
     verified: doctor.verified ?? false,
   };
-
+const upcomingDates = getUpcomingDates(14);
   // Book appointment
 
 const handleBookAppointment = () => {
@@ -221,20 +252,26 @@ const handleBookAppointment = () => {
           <div className="profile-header-card">
 
             {/* Doctor Image */}
-            <div className="profile-doctor-image">
-              {doctorData.image ? (
-                <img
-                  src={doctorData.image}
-                  alt={doctorData.name}
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : (
-                <UserRound size={55} />
-              )}
-            </div>
+            {/* Doctor Image */}
+<div className="profile-doctor-image">
+  {doctorData.image && (
+    <img
+      src={doctorData.image}
+      alt={doctorData.name}
+      onError={(e) => {
+        e.currentTarget.style.display = "none";
+        e.currentTarget.nextElementSibling.style.display = "flex";
+      }}
+    />
+  )}
 
+  <UserRound
+    size={55}
+    style={{
+      display: doctorData.image ? "none" : "flex",
+    }}
+  />
+</div>
             {/* Doctor Information */}
             <div className="profile-header-info">
 
@@ -600,56 +637,23 @@ const handleBookAppointment = () => {
               </div>
 
               {/* Dates */}
-              <div className="profile-date-options">
-
-                {doctorData.availableDays.length > 0 ? (
-                  doctorData.availableDays
-                    .slice(0, 4)
-                    .map((day, index) => (
-                      <button
-                        type="button"
-                        className={
-                          index === 1 ? "active" : ""
-                        }
-                        key={index}
-                      >
-                        <span>
-                          {day.day || day.name}
-                        </span>
-
-                        <strong>
-                          {day.date || day.number}
-                        </strong>
-                      </button>
-                    ))
-                ) : (
-                  <>
-                    <button type="button">
-                      <span>Tue</span>
-                      <strong>20</strong>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="active"
-                    >
-                      <span>Wed</span>
-                      <strong>21</strong>
-                    </button>
-
-                    <button type="button">
-                      <span>Thu</span>
-                      <strong>22</strong>
-                    </button>
-
-                    <button type="button">
-                      <span>Fri</span>
-                      <strong>23</strong>
-                    </button>
-                  </>
-                )}
-
-              </div>
+            {/* Dates */}
+<div className="profile-date-options">
+  {upcomingDates.map((date) => (
+    <button
+      type="button"
+      key={date.value}
+      className={selectedDate === date.value ? "active" : ""}
+      onClick={() => {
+        setSelectedDate(date.value);
+        setSelectedTime("");
+      }}
+    >
+      <span>{date.day}</span>
+      <strong>{date.number}</strong>
+    </button>
+  ))}
+</div>
 
               {/* Available Slots */}
               <div className="profile-slots-header">
@@ -664,56 +668,32 @@ const handleBookAppointment = () => {
               </div>
 
               {/* Times */}
-              <div className="profile-time-slots">
+             {/* Times */}
+<div className="profile-time-slots">
+  {slotsLoading ? (
+    <p>Loading available slots...</p>
+  ) : slotsError ? (
+    <p>{slotsError}</p>
+  ) : availableSlots.length > 0 ? (
+    availableSlots.map((slot, index) => {
+      const time =
+        typeof slot === "string" ? slot : slot.time;
 
-                {doctorData.availableSlots.length > 0 ? (
-                  doctorData.availableSlots.map(
-                    (slot, index) => (
-                      <button
-                        type="button"
-                        className={
-                          index === 2 ? "active" : ""
-                        }
-                        key={index}
-                      >
-                        {typeof slot === "string"
-                          ? slot
-                          : slot.time}
-                      </button>
-                    )
-                  )
-                ) : (
-                  <>
-                    <button type="button">
-                      09:30 AM
-                    </button>
-
-                    <button type="button">
-                      10:30 AM
-                    </button>
-
-                    <button
-                      type="button"
-                      className="active"
-                    >
-                      02:30 PM
-                    </button>
-
-                    <button type="button">
-                      03:15 PM
-                    </button>
-
-                    <button type="button" disabled>
-                      04:00 PM
-                    </button>
-
-                    <button type="button">
-                      04:45 PM
-                    </button>
-                  </>
-                )}
-
-              </div>
+      return (
+        <button
+          type="button"
+          key={index}
+          className={selectedTime === time ? "active" : ""}
+          onClick={() => setSelectedTime(time)}
+        >
+          {time}
+        </button>
+      );
+    })
+  ) : (
+    <p>No available slots for this date.</p>
+  )}
+</div>
 
               {/* Appointment Summary */}
               <div className="profile-booking-summary">
