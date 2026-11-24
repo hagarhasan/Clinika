@@ -24,88 +24,65 @@ import {
 
 import "./Login.css";
 
-const HOME_BY_ROLE = {
-  patient: "/patient-dashboard",
-  doctor: "/doctor-dashboard",
-  admin: "/admin-dashboard",
-};
+
 
 export default function Login() {
-  const [error, setError] = useState("");
+const [error, setError] = useState("");
   const [role, setRole] = useState("patient");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY);
+  // Real login: the server checks the password and tells us the account role.
+  // The role buttons above are only a hint - the account's own role decides the dashboard
+  // (this is also how an admin signs in).
+  
+const handleLogin = async (e) => {
+  e.preventDefault();
+  setError("");
+  setSubmitting(true);
 
-    if (token) {
-      const savedRole = localStorage.getItem("role") || "patient";
+  try {
+    const { data } = await axios.post(`${API_BASE_URL}/auth/login`, {
+      email: email.trim(),
+      password,
+      remember_me: rememberMe,
+    });
 
-      navigate(HOME_BY_ROLE[savedRole] || "/patient-dashboard", {
-        replace: true,
-      });
-    }
-  }, [navigate]);
+    localStorage.setItem(TOKEN_KEY, data.access_token);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+    const role = data.user?.role;
 
-    setError("");
-    setSubmitting(true);
+    navigate(
+      role === "patient"
+        ? "/patient-dashboard"
+        : role === "doctor"
+        ? "/doctor-dashboard"
+        : "/admin-dashboard",
+      { replace: true }
+    );
 
-    try {
-      const { data } = await axios.post(`${API_BASE_URL}/auth/login`, {
-        email: email.trim(),
-        password,
-        remember_me: rememberMe,
-      });
+  } catch (err) {
+    const detail = err?.response?.data?.detail;
 
-      const token = data.access_token;
+    setError(
+      !err?.response
+        ? "Cannot reach the server. Check your connection and try again."
+        : typeof detail === "string"
+        ? detail
+        : "Could not sign in. Please check your email and password."
+    );
 
-      if (!token) {
-        throw new Error("Login succeeded but no access token was returned.");
-      }
+  } finally {
+    setSubmitting(false);
+  }
+};
 
-      const accountRole = data.user?.role || role;
-
-      localStorage.setItem(TOKEN_KEY, token);
-      localStorage.setItem("role", accountRole);
-
-      const userName =
-        data.user?.full_name ||
-        data.user?.name ||
-        data.full_name ||
-        data.name ||
-        "";
-
-      localStorage.setItem("userName", userName);
-
-      window.dispatchEvent(new Event("authChange"));
-
-      navigate(HOME_BY_ROLE[accountRole] || "/", {
-        replace: true,
-      });
-    } catch (err) {
-      const detail = err?.response?.data?.detail;
-
-      setError(
-        !err?.response
-          ? "Cannot reach the server. Check your connection and try again."
-          : typeof detail === "string"
-          ? detail
-          : err?.message ||
-            "Could not sign in. Please check your email and password."
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleDemo = (selectedRole) => {
     setRole(selectedRole);

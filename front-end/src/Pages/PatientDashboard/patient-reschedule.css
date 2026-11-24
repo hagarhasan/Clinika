@@ -1,0 +1,45 @@
+/* Styles for the reschedule picker inside the appointment card. Same "cl-pd-" prefix. */
+
+.cl-pd-date {
+  width: 100%;
+  max-width: 14rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--cl-border);
+  border-radius: 12px;
+  background: var(--cl-surface-card);
+  font: inherit;
+}
+
+.cl-pd-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cl-pd-slot {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--cl-border);
+  border-radius: 999px;
+  background: var(--cl-surface-card);
+  color: var(--cl-text-variant);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.cl-pd-slot:hover {
+  background: var(--cl-surface-low);
+}
+
+.cl-pd-slot.is-active {
+  background: var(--cl-primary-container);
+  border-color: var(--cl-primary-container);
+  color: var(--cl-on-primary);
+  font-weight: 600;
+}
+
+.cl-pd-slot:focus-visible,
+.cl-pd-date:focus-visible {
+  outline: 2px solid var(--cl-primary-container);
+  outline-offset: 2px;
+}

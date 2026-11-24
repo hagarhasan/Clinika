@@ -1,0 +1,165 @@
+/* Logo, top bar and log-out button of the patient dashboard.
+   Kept in its own file so patient-dashboard.css stays untouched. Same "cl-pd-" prefix. */
+
+/* ---------- Logo: icon + name + "Patient Portal" ---------- */
+.cl-pd-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.5rem;
+}
+
+/* Logo.svg has empty space around the icon, so it is drawn larger and pulled in with margins. */
+.cl-pd-brand__icon {
+  width: 3.6rem;
+  height: 3.6rem;
+  margin: 0 -0.75rem;
+  display: block;
+}
+
+.cl-pd-brand__name {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--cl-text);
+}
+
+.cl-pd-brand__sub {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cl-primary);
+}
+
+/* ---------- Log-out button (looks like the other sidebar links) ---------- */
+.cl-pd-logout {
+  width: 100%;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: var(--cl-error);
+}
+
+.cl-pd-logout:hover {
+  background: #fdecec;
+}
+
+/* The "Back to site" link had margin-top: auto; the log-out button now sits right under it. */
+.cl-pd-logout:focus-visible {
+  outline: 2px solid var(--cl-primary-container);
+  outline-offset: 2px;
+}
+
+/* ---------- Top bar ---------- */
+.cl-pd-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cl-pd-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  background: var(--cl-surface-card);
+  border-bottom: 1px solid var(--cl-border);
+}
+
+.cl-pd-topbar__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.cl-pd-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cl-pd-topbar__bell {
+  position: relative;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--cl-text-variant);
+}
+
+.cl-pd-topbar__bell:hover {
+  background: var(--cl-surface-low);
+}
+
+.cl-pd-topbar__dot {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.6rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--cl-error);
+}
+
+.cl-pd-user {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.25rem 0.6rem 0.25rem 0.25rem;
+  border-radius: 999px;
+}
+
+.cl-pd-user:hover {
+  background: var(--cl-surface-low);
+}
+
+.cl-pd-avatar--sm {
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 0.85rem;
+}
+
+.cl-pd-user__name {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.cl-pd-user__role {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--cl-text-muted);
+}
+
+.cl-pd-topbar__bell:focus-visible,
+.cl-pd-user:focus-visible,
+.cl-pd-brand:focus-visible {
+  outline: 2px solid var(--cl-primary-container);
+  outline-offset: 2px;
+}
+
+@media (max-width: 991px) {
+  .cl-pd-logout {
+    width: auto;
+    white-space: nowrap;
+  }
+
+  .cl-pd-topbar {
+    padding: 0 1rem;
+  }
+
+  .cl-pd-user__text {
+    display: none;
+  }
+}
