@@ -1,7 +1,7 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { useAdminUser } from '../../context/AdminUserContext';
-import { useDashboard } from '../../context/DashboardContext';
+import { useAuth } from '../../context/AuthContext';
+import { useAdminStats, useAdminActivity } from '../../hooks/useAdmin';
 import { formatDateTime } from './adminUi';
 
 const CARDS = [
@@ -12,8 +12,22 @@ const CARDS = [
 ];
 
 export default function AdminOverview() {
-  const { user } = useAdminUser();
-  const { stats, activities, loading, errorMsg } = useDashboard();
+  const { user } = useAuth();
+  const statsQuery = useAdminStats();
+  const activityQuery = useAdminActivity();
+  const rawStats = statsQuery.data || {};
+  const stats = {
+    totalDoctors: rawStats.users?.doctors ?? 0,
+    totalPatients: rawStats.users?.patients ?? 0,
+    totalAppointments: rawStats.appointments?.total ?? 0,
+    pendingRequests: rawStats.pending_doctor_requests ?? 0,
+    todayAppointments: rawStats.appointments?.today ?? 0,
+    newMessages: rawStats.new_contact_messages ?? 0,
+    topSpecialties: Array.isArray(rawStats.top_specialties) ? rawStats.top_specialties : [],
+  };
+  const activities = Array.isArray(activityQuery.data) ? activityQuery.data : [];
+  const loading = statsQuery.isLoading || activityQuery.isLoading;
+  const errorMsg = statsQuery.error?.message || activityQuery.error?.message || '';
 
   return (
     <>

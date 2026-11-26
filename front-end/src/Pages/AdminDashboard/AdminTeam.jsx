@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import adminApi, { getErrorMessage } from '../../api/adminApi';
-import { useAdminUser } from '../../context/AdminUserContext';
+import { useAuth } from '../../context/AuthContext';
 import { Avatar, Banner, formatShortDate, Modal, showingRange } from './adminUi';
 import useServerList from './useServerList';
 
@@ -9,7 +9,7 @@ const PAGE_SIZE = 10;
 const EMPTY = { first_name: '', last_name: '', email: '', phone: '', password: '' };
 
 export default function AdminTeam() {
-  const { user } = useAdminUser();
+  const { user } = useAuth();
   const [page, setPage] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
   const [banner, setBanner] = useState(null);

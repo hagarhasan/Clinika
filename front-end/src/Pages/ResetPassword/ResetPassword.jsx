@@ -58,7 +58,7 @@ export default function ResetPassword() {
           setStatus({
             type: 'danger',
             message:
-              err.response?.data?.detail ||
+              err?.message ||
               'This reset link is invalid or has expired.'
           });
         }
@@ -142,8 +142,7 @@ export default function ResetPassword() {
       setStatus({
         type: 'danger',
         message:
-          err.response?.data?.detail ||
-          err.response?.data?.message ||
+          err?.message ||
           'Failed to reset password. Please try again.'
       });
     } finally {
@@ -152,17 +151,17 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="reset-page">
+    <div className="reset-page min-vh-100 d-flex flex-column">
 
       <Helmet>
         <title>Reset Password | Clinika</title>
       </Helmet>
 
-      <div className="reset-main">
+      <main className="reset-main container flex-grow-1 d-flex flex-column align-items-center justify-content-center py-5">
 
-        <div className="reset-card">
+        <section className="reset-card card border-0 shadow-sm w-100" aria-labelledby="reset-heading">
 
-          <div className="reset-header">
+          <div className="reset-header text-center">
 
             <div className="reset-icon-wrapper">
               <i className="fa-solid fa-clock-rotate-left"></i>
@@ -171,7 +170,7 @@ export default function ResetPassword() {
               </span>
             </div>
 
-            <h2>Reset Your Password</h2>
+            <h1 id="reset-heading">Reset Your Password</h1>
 
             <p>
               Please enter and confirm your new password
@@ -183,8 +182,9 @@ export default function ResetPassword() {
 
           {status.message && (
             <div
-              className={`reset-alert ${status.type}`}
+              className={`reset-alert alert alert-${status.type}`}
               role="alert"
+              aria-live="polite"
             >
               {status.message}
             </div>
@@ -192,19 +192,22 @@ export default function ResetPassword() {
 
           <form onSubmit={handleSubmit}>
 
-            <div className="reset-form-group">
+            <div className="reset-form-group mb-4">
 
-              <label htmlFor="newPassword">
+              <label className="form-label" htmlFor="newPassword">
                 New Password
               </label>
 
-              <div className="reset-input-wrapper">
+              <div className="reset-input-wrapper input-group">
 
-                <i className="fa-solid fa-lock input-lock"></i>
+                <span className="reset-input-icon input-group-text">
+                  <i className="fa-solid fa-lock input-lock"></i>
+                </span>
 
                 <input
                   id="newPassword"
                   type={showPassword ? 'text' : 'password'}
+                  className="form-control"
                   placeholder="Enter new password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
@@ -214,9 +217,10 @@ export default function ResetPassword() {
 
                 <button
                   type="button"
-                  className="reset-eye-btn"
+                  className="reset-eye-btn btn"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label="Toggle password visibility"
+                  aria-pressed={showPassword}
                 >
                   <i className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                 </button>
@@ -225,19 +229,22 @@ export default function ResetPassword() {
 
             </div>
 
-            <div className="reset-form-group confirm-group">
+            <div className="reset-form-group confirm-group mb-4">
 
-              <label htmlFor="confirmPassword">
+              <label className="form-label" htmlFor="confirmPassword">
                 Confirm New Password
               </label>
 
-              <div className="reset-input-wrapper">
+              <div className="reset-input-wrapper input-group">
 
-                <i className="fa-solid fa-lock input-lock"></i>
+                <span className="reset-input-icon input-group-text">
+                  <i className="fa-solid fa-lock input-lock"></i>
+                </span>
 
                 <input
                   id="confirmPassword"
                   type={showPassword ? 'text' : 'password'}
+                  className="form-control"
                   placeholder="Confirm new password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -247,9 +254,10 @@ export default function ResetPassword() {
 
                 <button
                   type="button"
-                  className="reset-eye-btn"
+                  className="reset-eye-btn btn"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label="Toggle password visibility"
+                  aria-pressed={showPassword}
                 >
                   <i className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                 </button>
@@ -267,7 +275,7 @@ export default function ResetPassword() {
                 </span>
               </div>
 
-              <div className="strength-bars">
+              <div className={`strength-bars ${getStrength().toLowerCase()}`}>
                 {[1, 2, 3, 4].map((bar) => (
                   <span
                     key={bar}
@@ -304,7 +312,7 @@ export default function ResetPassword() {
 
             <button
               type="submit"
-              className="reset-submit-btn"
+              className="reset-submit-btn btn btn-primary w-100"
               disabled={loading || validating || !tokenValid}
             >
               {validating ? (
@@ -324,7 +332,7 @@ export default function ResetPassword() {
 
           </form>
 
-          <div className="reset-back-login">
+          <div className="reset-back-login text-center">
             <Link to="/login">
               <i className="fa-solid fa-arrow-left"></i>
               Back to Login
@@ -339,18 +347,18 @@ export default function ResetPassword() {
             </p>
           </div>
 
-        </div>
+        </section>
 
-        <div className="reset-support">
+        <div className="reset-support text-center">
           Need assistance with verification?
           <a href="mailto:support@clinika.com">
             Contact Care Support
           </a>
         </div>
 
-      </div>
+      </main>
 
-      <footer className="reset-footer">
+      <footer className="reset-footer container text-center py-3">
         © 2025 Clinika Health, Inc. • Healthcare & Clinic Care •
         <Link to="/privacy"> Privacy </Link>
         & 

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import SharedStatusBadge from '../ui/StatusBadge';
 
 const STATUS_LABELS = {
   pending: 'Pending',
@@ -10,7 +11,7 @@ const STATUS_LABELS = {
 
 export function StatusBadge({ status }) {
   const label = STATUS_LABELS[status] ?? status;
-  return <span className={`cl-pd-badge cl-pd-badge--${status}`}>{label}</span>;
+  return <SharedStatusBadge status={status} label={label} />;
 }
 
 export function LoadingState({ label = 'Loading…' }) {

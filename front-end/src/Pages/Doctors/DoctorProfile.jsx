@@ -1,25 +1,34 @@
-import  { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
-import { listDoctors } from "../../api/doctorsApi";
+import {
+  useDoctor,
+  useDoctorAvailability,
+  useDoctorReviews,
+  useDoctorSlots,
+} from "../../hooks/useDoctors";
+import {
+  formatName,
+  formatTime,
+  formatAvailability,
+} from "../../utils/format";
 import {
   Home,
   ChevronRight,
   Star,
   MapPin,
-  Clock,
   CalendarDays,
   ShieldCheck,
-  BadgeCheck,
   Video,
   UserRound,
   GraduationCap,
   Stethoscope,
   Languages,
-  Heart,
   ArrowLeft,
 } from "lucide-react";
 import "./Doctors.css";
+import { useAuth } from "../../context/AuthContext";
+import DoctorProfileHeader from "../../Components/Doctors/DoctorProfileHeader";
 const formatLocalDate = (date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -27,7 +36,6 @@ const formatLocalDate = (date) => {
 
   return `${year}-${month}-${day}`;
 };
-
 const getUpcomingDates = (days = 14) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -47,63 +55,88 @@ const getUpcomingDates = (days = 14) => {
 };
 export default function DoctorProfile() {
   const { id } = useParams();
+  const doctorQuery = useDoctor(id);
+  const availabilityQuery = useDoctorAvailability(id);
+  useDoctorReviews(id);
   const navigate = useNavigate();
   const location = useLocation();
+  const { role, user } = useAuth();
 
   // بيانات الدكتور القادمة من صفحة Doctors
   const passedDoctor = location.state?.doctor;
-const [doctor, setDoctor] = useState(passedDoctor || null);
-const [loading, setLoading] = useState(!passedDoctor);
-const [error, setError] = useState("");
+  const [doctor, setDoctor] = useState(passedDoctor || null);
+  const [loading, setLoading] = useState(!passedDoctor);
+  const [error, setError] = useState("");
 
-const [selectedTime, setSelectedTime] = useState("");
-const [availableSlots] = useState([]);
-const [slotsLoading] = useState(false);
-const [slotsError] = useState("");
-const [selectedDate, setSelectedDate] = useState(() =>
-  formatLocalDate(new Date())
-);
+  const upcomingDates = useMemo(() => getUpcomingDates(14), []);
+
+  const availabilityMap = useMemo(() => {
+    const map = new Map();
+    if (Array.isArray(availabilityQuery.data)) {
+      for (const item of availabilityQuery.data) {
+        map.set(item.date, item);
+      }
+    }
+    return map;
+  }, [availabilityQuery.data]);
+
+  const [selectedDate, setSelectedDate] = useState(() =>
+    passedDoctor?.appointmentDate || formatLocalDate(new Date())
+  );
+  const [selectedTime, setSelectedTime] = useState(() => passedDoctor?.startTime || "");
+  const [selectedSlot, setSelectedSlot] = useState(null);
+
+  // Automatically select the first available date if current selectedDate is not available
+  useEffect(() => {
+    if (availabilityMap.size > 0) {
+      const currentItem = availabilityMap.get(selectedDate);
+      const isCurrentAvailable = currentItem
+        ? currentItem.is_working_day && currentItem.available_slots > 0
+        : false;
+      if (!isCurrentAvailable) {
+        const firstAvailable = upcomingDates.find((d) => {
+          const item = availabilityMap.get(d.value);
+          return item && item.is_working_day && item.available_slots > 0;
+        });
+        if (firstAvailable) {
+          setSelectedDate(firstAvailable.value);
+          setSelectedTime("");
+          setSelectedSlot(null);
+        }
+      }
+    }
+  }, [availabilityMap, selectedDate, upcomingDates]);
+
+  // Fetch real available slots for selected doctor and date
+  const slotsQuery = useDoctorSlots(id, selectedDate);
+  const availableSlots = Array.isArray(slotsQuery.data) ? slotsQuery.data : [];
+  const slotsLoading = slotsQuery.isLoading;
+  const slotsError = slotsQuery.error?.message || "";
 
   // Fetch doctor data if not received through navigation
-  
   useEffect(() => {
-    const fetchDoctor = async () => {
-      try {
-        setError("");
-
-        if (passedDoctor && String(passedDoctor.id) === String(id)) {
-          setDoctor(passedDoctor);
-          setLoading(false);
-          return;
-        }
-
-        setLoading(true);
-
-        const response = await listDoctors({
-          limit: 20,
-          offset: 0,
-          sort: "recommended",
-        });
-
-        const doctorFromApi = response.data.find(
-          (item) => String(item.id) === String(id)
-        );
-
-        if (!doctorFromApi) {
-          throw new Error("Doctor not found");
-        }
-
-        const data = await response.json();
-        setDoctor(data);
-      } catch {
-        setError("Unable to load doctor profile.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDoctor();
-  }, [id, passedDoctor]);
+    if (passedDoctor && String(passedDoctor.id) === String(id)) {
+      setDoctor(passedDoctor);
+      setLoading(false);
+      setError("");
+      return;
+    }
+    if (doctorQuery.isLoading) {
+      setLoading(true);
+      setError("");
+      return;
+    }
+    if (doctorQuery.isError) {
+      setLoading(false);
+      setError("Unable to load doctor profile.");
+      return;
+    }
+    if (doctorQuery.data) {
+      setDoctor(doctorQuery.data);
+      setLoading(false);
+      setError("");
+    }
+  }, [id, passedDoctor, doctorQuery.data, doctorQuery.isLoading, doctorQuery.isError]);
 
 
   // Loading
@@ -144,29 +177,37 @@ const [selectedDate, setSelectedDate] = useState(() =>
 
   // Doctor data
   const doctorData = {
-    name: doctor.name || "Doctor Name",
+    name: formatName(doctor.name || doctor.full_name || "Doctor Name"),
     specialty:
-      doctor.specialty ||
-      doctor.specialization ||
-      "Medical Specialist",
+      typeof doctor.specialty === "object"
+        ? doctor.specialty?.name || "Medical Specialist"
+        : doctor.specialty || doctor.specialization || "Medical Specialist",
 
-    clinic: doctor.clinic || "Medical Center",
-    location: doctor.location || "",
+    clinic:
+      typeof doctor.clinic === "object"
+        ? doctor.clinic?.name || "Medical Center"
+        : doctor.clinic || "Medical Center",
+    location:
+      typeof doctor.location === "object"
+        ? doctor.location?.city || doctor.location?.name || ""
+        : doctor.location || (typeof doctor.clinic === "object" ? doctor.clinic?.city : "") || "",
 
-    fee: doctor.fee || doctor.consultationFee || 0,
+    fee: doctor.fee || doctor.consultation_fee || doctor.consultationFee || 0,
 
-  rating: doctor.rating ?? 0,
-    reviews: doctor.reviews || doctor.reviewCount || 0,
+    rating: doctor.rating ?? doctor.rating_avg ?? 0,
+    reviews: doctor.reviews ?? doctor.reviews_count ?? doctor.reviewCount ?? 0,
 
-    experience: doctor.experience || 0,
+    experience: doctor.experience ?? doctor.years_of_experience ?? 0,
 
     degree:
       doctor.degree ||
+      doctor.title ||
       doctor.qualification ||
       "",
 
     image:
       doctor.image ||
+      doctor.photo_url ||
       doctor.profileImage ||
       "",
 
@@ -179,45 +220,61 @@ const [selectedDate, setSelectedDate] = useState(() =>
 
     languages: doctor.languages || ["English"],
 
-    focusAreas: doctor.focusAreas || [],
+    focusAreas: doctor.focus_areas || doctor.focusAreas || [],
 
-    education: doctor.education || [],
+    education:
+      Array.isArray(doctor.credentials) && doctor.credentials.length > 0
+        ? doctor.credentials
+        : Array.isArray(doctor.education)
+        ? doctor.education
+        : [],
 
     availableDays: doctor.availableDays || [],
 
     availableSlots: doctor.availableSlots || [],
 
-    nextAvailable:
-      doctor.nextAvailable ||
-      doctor.availability ||
-      "Available",
+    nextAvailable: doctor.next_available
+      ? formatAvailability(doctor.next_available)
+      : doctor.nextAvailable || doctor.availability || "Available",
 
-    nextAvailableTime: doctor.time || "",
+    nextAvailableTime: doctor.next_available?.start_time
+      ? formatTime(doctor.next_available.start_time)
+      : doctor.time || "",
 
     clinicAddress:
       doctor.clinicAddress ||
+      (typeof doctor.clinic === "object" ? doctor.clinic?.address || doctor.clinic?.city : "") ||
       doctor.address ||
       doctor.location ||
       "",
 
-    verified: doctor.verified ?? false,
+    verified: doctor.is_verified ?? doctor.verified ?? false,
   };
-const upcomingDates = getUpcomingDates(14);
+  const isOwnDoctorProfile =
+    role === "doctor" && Number(doctor.user_id) === Number(user?.id);
   // Book appointment
-
-const handleBookAppointment = () => {
-  navigate(`/doctors/doctor_profile/${doctor.id}/book-appointment`, {
-    state: {
-      doctor: {
-        ...doctor,
-        clinicId: doctor.clinicId,
-        appointmentDate: doctor.appointmentDate,
-        startTime: doctor.startTime,
-        fee: doctor.fee,
+  const handleBookAppointment = () => {
+    navigate(`/doctors/doctor_profile/${doctor.id}/book-appointment`, {
+      state: {
+        doctor: {
+          ...doctor,
+          id: doctor.id,
+          name: doctorData.name,
+          specialty: doctorData.specialty,
+          clinic: doctorData.clinic,
+          clinicId:
+            selectedSlot?.clinic_id ||
+            doctor.clinic_id ||
+            (typeof doctor.clinic === "object" ? doctor.clinic?.id : null),
+          appointmentDate: selectedDate,
+          startTime: selectedTime || doctor.next_available?.start_time || "",
+          fee: doctorData.fee,
+          image: doctorData.image,
+          selectedSlot: selectedSlot || null,
+        },
       },
-    },
-  });
-};
+    });
+  };
 
   return (
     <>
@@ -226,7 +283,7 @@ const handleBookAppointment = () => {
       </Helmet>
 
       <section className="doctor-profile-page">
-        <div className="doctor-profile-container">
+        <div className="container doctor-profile-container">
 
           {/* Breadcrumb */}
           <div className="profile-breadcrumb">
@@ -246,113 +303,14 @@ const handleBookAppointment = () => {
             <span>{doctorData.name}</span>
           </div>
 
-          {/* Doctor Header */}
-          <div className="profile-header-card">
-
-            {/* Doctor Image */}
-            {/* Doctor Image */}
-<div className="profile-doctor-image">
-  {doctorData.image && (
-    <img
-      src={doctorData.image}
-      alt={doctorData.name}
-      onError={(e) => {
-        e.currentTarget.style.display = "none";
-        e.currentTarget.nextElementSibling.style.display = "flex";
-      }}
-    />
-  )}
-
-  <UserRound
-    size={55}
-    style={{
-      display: doctorData.image ? "none" : "flex",
-    }}
-  />
-</div>
-            {/* Doctor Information */}
-            <div className="profile-header-info">
-
-              <div className="profile-name-row">
-                <h1>{doctorData.name}</h1>
-
-                {doctorData.verified && (
-                  <span className="profile-verified-badge">
-                    <BadgeCheck size={14} />
-                    Verified
-                  </span>
-                )}
-              </div>
-
-              <p className="profile-specialty">
-                {doctorData.specialty}
-              </p>
-
-              <p className="profile-degree">
-                {doctorData.degree}
-              </p>
-
-              <div className="profile-header-details">
-
-                <span>
-                  <Star
-                    size={14}
-                    fill="currentColor"
-                    className="profile-star"
-                  />
-
-                  <strong>{doctorData.rating}</strong>
-                  ({doctorData.reviews} patient reviews)
-                </span>
-
-                <span>
-                  <Clock size={14} />
-                  {doctorData.experience} Years Clinical Practice
-                </span>
-
-                <span>
-                  <MapPin size={14} />
-                  {doctorData.clinic}
-                  {doctorData.location &&
-                    `, ${doctorData.location}`}
-                </span>
-
-              </div>
-            </div>
-
-            {/* Consultation Fee */}
-            <div className="profile-fee-card">
-
-              <span>CONSULTATION FEE</span>
-
-              <strong>
-                {doctorData.fee}
-                <small> EGP</small>
-              </strong>
-
-              <p>Per appointment</p>
-
-              <div className="profile-fee-actions">
-
-                <button
-                  type="button"
-                  onClick={handleBookAppointment}
-                >
-                  <CalendarDays size={14} />
-                  Book Visit
-                </button>
-
-                <button type="button">
-                  <Heart size={14} />
-                  Save Doctor
-                </button>
-
-              </div>
-            </div>
-          </div>
+          <DoctorProfileHeader
+            doctor={doctorData}
+            isOwnProfile={isOwnDoctorProfile}
+            onBook={handleBookAppointment}
+          />
 
           {/* Main Content */}
-          <div className="profile-main-layout">
+          <div className={`profile-main-layout ${isOwnDoctorProfile ? "profile-main-layout--self" : ""}`}>
 
             {/* Left Content */}
             <div className="profile-content">
@@ -413,7 +371,7 @@ const handleBookAppointment = () => {
                         className="profile-focus-tag"
                       >
                         <ShieldCheck size={12} />
-                        {area}
+                        {typeof area === "object" ? area.name || area.title || "" : area}
                       </span>
                     ))
                   ) : (
@@ -450,21 +408,21 @@ const handleBookAppointment = () => {
 
                         <div>
                           <strong>
-                            {item.title ||
-                              item.degree ||
-                              item.name}
+                            {typeof item === "object"
+                              ? item.title || item.degree || item.name || ""
+                              : item}
                           </strong>
 
                           <p>
-                            {item.institution ||
-                              item.university ||
-                              ""}
+                            {typeof item === "object"
+                              ? item.institution || item.university || ""
+                              : ""}
                           </p>
 
                           <small>
-                            {item.year ||
-                              item.date ||
-                              ""}
+                            {typeof item === "object"
+                              ? item.year || item.date || ""
+                              : ""}
                           </small>
                         </div>
                       </div>
@@ -573,7 +531,7 @@ const handleBookAppointment = () => {
             </div>
 
             {/* Booking Sidebar */}
-            <aside className="profile-booking-card">
+            {!isOwnDoctorProfile && <aside className="profile-booking-card">
 
               {/* Booking Header */}
               <div className="profile-booking-title">
@@ -636,79 +594,96 @@ const handleBookAppointment = () => {
 
               {/* Dates */}
             {/* Dates */}
-<div className="profile-date-options">
-  {upcomingDates.map((date) => (
-    <button
-      type="button"
-      key={date.value}
-      className={selectedDate === date.value ? "active" : ""}
-      onClick={() => {
-        setSelectedDate(date.value);
-        setSelectedTime("");
-      }}
-    >
-      <span>{date.day}</span>
-      <strong>{date.number}</strong>
-    </button>
-  ))}
-</div>
+              {/* Dates */}
+              <div className="profile-date-options">
+                {upcomingDates.map((date) => {
+                  const availItem = availabilityMap.get(date.value);
+                  const isAvailable =
+                    availabilityMap.size === 0 ||
+                    (availItem ? availItem.is_working_day && availItem.available_slots > 0 : false);
+                  const isSelected = selectedDate === date.value;
+
+                  return (
+                    <button
+                      type="button"
+                      key={date.value}
+                      className={isSelected ? "active" : ""}
+                      disabled={!isAvailable}
+                      title={!isAvailable ? "Doctor not available on this date" : ""}
+                      onClick={() => {
+                        if (!isAvailable) return;
+                        setSelectedDate(date.value);
+                        setSelectedTime("");
+                        setSelectedSlot(null);
+                      }}
+                    >
+                      <span>{date.day}</span>
+                      <strong>{date.number}</strong>
+                    </button>
+                  );
+                })}
+              </div>
 
               {/* Available Slots */}
               <div className="profile-slots-header">
-
                 <h4>Available Slots</h4>
-
                 <span>
                   <span className="slots-green-dot"></span>
                   Slots open
                 </span>
-
               </div>
 
               {/* Times */}
-             {/* Times */}
-<div className="profile-time-slots">
-  {slotsLoading ? (
-    <p>Loading available slots...</p>
-  ) : slotsError ? (
-    <p>{slotsError}</p>
-  ) : availableSlots.length > 0 ? (
-    availableSlots.map((slot, index) => {
-      const time =
-        typeof slot === "string" ? slot : slot.time;
+              <div className="profile-time-slots">
+                {slotsLoading ? (
+                  <p>Loading available slots...</p>
+                ) : slotsError ? (
+                  <p className="text-danger">{slotsError}</p>
+                ) : availableSlots.length > 0 ? (
+                  availableSlots
+                    .filter((slot) => slot.is_available !== false)
+                    .map((slot, index) => {
+                      const rawTime = slot.start_time || slot.time || slot;
+                      const displayTime = formatTime(rawTime);
+                      const isSelected = selectedTime === rawTime;
 
-      return (
-        <button
-          type="button"
-          key={index}
-          className={selectedTime === time ? "active" : ""}
-          onClick={() => setSelectedTime(time)}
-        >
-          {time}
-        </button>
-      );
-    })
-  ) : (
-    <p>No available slots for this date.</p>
-  )}
-</div>
+                      return (
+                        <button
+                          type="button"
+                          key={slot.id || index}
+                          className={isSelected ? "active" : ""}
+                          onClick={() => {
+                            setSelectedTime(rawTime);
+                            setSelectedSlot(slot);
+                          }}
+                        >
+                          {displayTime}
+                        </button>
+                      );
+                    })
+                ) : (
+                  <p className="text-muted">No available slots for this date.</p>
+                )}
+              </div>
 
               {/* Appointment Summary */}
               <div className="profile-booking-summary">
-
                 <CalendarDays size={15} />
-
                 <div>
                   <strong>Appointment Summary</strong>
-
                   <p>
-                    {doctorData.nextAvailable}
-
-                    {doctorData.nextAvailableTime &&
-                      ` - ${doctorData.nextAvailableTime}`}
+                    {selectedTime ? (
+                      formatAvailability({
+                        appointment_date: selectedDate,
+                        start_time: selectedTime,
+                      })
+                    ) : doctor.next_available ? (
+                      `Next available: ${formatAvailability(doctor.next_available)}`
+                    ) : (
+                      "Select a date and time slot"
+                    )}
                   </p>
                 </div>
-
               </div>
 
               {/* Confirm Booking */}
@@ -731,7 +706,7 @@ const handleBookAppointment = () => {
                 Consultation Fee: {doctorData.fee} EGP
               </p>
 
-            </aside>
+            </aside>}
           </div>
         </div>
       </section>

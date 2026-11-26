@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import adminApi, { getErrorMessage } from '../../api/adminApi';
+import { getErrorMessage } from '../../api/client';
 import PasswordCard from '../../Components/Patient/PasswordCard';
-import { getInitials } from '../../Components/Patient/dateFormat';
-import { useAdminUser } from '../../context/AdminUserContext';
-import { useDashboard } from '../../context/DashboardContext';
-import '../PatientDashboard/patient-dashboard.css';
+import { getInitials } from '../../utils/format';
+import { useAuth } from '../../context/AuthContext';
+import { useAdminActivity } from '../../hooks/useAdmin';
+import { uploadAvatar } from '../../api/uploadsApi';
 import '../PatientDashboard/patient-profile.css';
 import './admin.css';
 import { formatDateTime, formatShortDate } from './adminUi';
@@ -33,8 +33,10 @@ const valueOf = (user, key) => (key === 'phone' ? user.phone ?? '' : nameParts(u
 const toForm = (user) => Object.fromEntries(FIELDS.map(({ key }) => [key, valueOf(user, key)]));
 
 export default function AdminProfile() {
-  const { user, setUser } = useAdminUser();
-  const { activities, loading: activityLoading } = useDashboard();
+  const { user, updateProfile, setUserData } = useAuth();
+  const activityQuery = useAdminActivity();
+  const activities = activityQuery.data || [];
+  const activityLoading = activityQuery.isLoading;
 
   const [form, setForm] = useState(null); // null = viewing, an object = editing
   const [saving, setSaving] = useState(false);
@@ -43,7 +45,6 @@ export default function AdminProfile() {
   const [notice, setNotice] = useState({ type: '', text: '' });
   const fileInput = useRef(null);
 
-  if (!user) return null; // <RequireAdmin> guarantees a user, this only keeps hooks safe
 
   async function handleSave(event) {
     event.preventDefault();
@@ -54,12 +55,7 @@ export default function AdminProfile() {
     setSaving(true);
     setFormError('');
     try {
-      const { data } = await adminApi.put('/auth/me', {
-        first_name: form.first_name.trim(),
-        last_name: form.last_name.trim(),
-        phone: form.phone.trim() || null,
-      });
-      setUser(data);
+      await updateProfile({ first_name: form.first_name.trim(), last_name: form.last_name.trim(), phone: form.phone.trim() || null });
       setForm(null);
       setNotice({ type: 'ok', text: 'Your profile was updated.' });
     } catch (err) {
@@ -84,11 +80,8 @@ export default function AdminProfile() {
     setAvatarBusy(true);
     setNotice({ type: '', text: '' });
     try {
-      const body = new FormData();
-      body.append('file', file);
-      // Image upload goes through Cloudinary and can be slow on a cold start, so allow more time.
-      const { data } = await adminApi.post('/uploads/avatar', body, { timeout: 90000 });
-      setUser(data);
+      const data = await uploadAvatar(file);
+      setUserData(data?.user ? { ...user, ...data.user } : { ...user, avatar_url: data?.avatar_url || data?.url });
       setNotice({ type: 'ok', text: 'Your photo was updated.' });
     } catch (err) {
       setNotice({ type: 'error', text: getErrorMessage(err) });

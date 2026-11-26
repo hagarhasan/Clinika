@@ -1,4 +1,4 @@
-import { formatDate, getInitials } from './dateFormat';
+import { formatDate, getInitials } from '../../utils/format';
 
 function DoctorLine({ doctor, date }) {
   return (

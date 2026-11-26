@@ -6,13 +6,14 @@ import { getMyDoctorProfile, getDoctorStats, getSlots, getSchedules } from '../.
 import { getTodayAppointments, listAppointments } from '../../api/appointmentsApi';
 import DashboardLayout from '../../Components/Dashboard/DashboardLayout';
 import { dashboardNavConfig } from '../../Components/Dashboard/navConfig';
-import { stripDoctorTitle } from '../../utils/nameUtils';
-import { showToast } from '../../Components/Toast/toastService';
+import { formatName } from '../../utils/format';
+import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 
 
 export const TOKEN_KEY = 'token';
 export const errMsg = (e) => {
-  const d = e?.response?.data?.detail;
+  const d = e?.detail;
   if (typeof d === 'string') return d;
   if (Array.isArray(d)) return d.map((x) => x.msg).filter(Boolean).join(', ');
   return e?.message || 'Something went wrong';
@@ -34,7 +35,7 @@ export const dayText = (d) => {
 };
 export const initials = (n = '') =>
   n.trim().split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-export const drName = (n = '') => stripDoctorTitle(n);
+export const drName = (n = '') => formatName(n);
 
 export const C = {
   primary: '#0050cb', text: '#191c1e', muted: '#424655', secondary: '#d7e4f4', low: '#f2f4f6',
@@ -65,14 +66,13 @@ export const useDoctorData = () => useContext(DoctorDataContext);
 
 export default function DoctorDashboard() {
   const navigate = useNavigate();
+  const { logout: authLogout, token } = useAuth();
+  const { showToast } = useToast();
   const [state, setState] = useState({
     user: null, profile: null, stats: null, today: [], appointments: [], slots: [], schedules: [], loading: true, error: '',
   });
   const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem('role');
-    localStorage.removeItem('userName');
-    window.dispatchEvent(new Event('authChange'));
+    authLogout();
     showToast({
       type: 'info',
       title: 'Logged Out',
@@ -80,10 +80,10 @@ export default function DoctorDashboard() {
     });
     setState((p) => ({ ...p, user: null, profile: null, loading: false }));
     navigate('/', { replace: true });
-  }, [navigate]);
+  }, [navigate, authLogout, showToast]);
 
   const load = useCallback(async (isActive = () => true) => {
-    if (!localStorage.getItem(TOKEN_KEY)) {
+    if (!token) {
       if (isActive()) {
         setState((p) => ({ ...p, loading: false, error: '' }));
       }
@@ -94,7 +94,6 @@ export default function DoctorDashboard() {
       const me = await getMe();
       if (!isActive()) return;
       if (!me || me.role !== 'doctor') {
-        localStorage.removeItem(TOKEN_KEY);
         setState((p) => ({ ...p, loading: false, error: 'This account is not a doctor account.' }));
         return;
       }
@@ -125,13 +124,12 @@ export default function DoctorDashboard() {
       if (!isActive()) return;
       const code = e?.status;
       if (code === 401 || code === 403) {
-        localStorage.removeItem(TOKEN_KEY);
         setState((p) => ({ ...p, loading: false, error: '' }));
         return;
       }
       setState((p) => ({ ...p, loading: false, error: errMsg(e) }));
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     let active = true;
@@ -157,6 +155,7 @@ export default function DoctorDashboard() {
     <DoctorDataContext.Provider value={ctx}>
       <Helmet><title>Doctor Portal | Clinika</title></Helmet>
       <DashboardLayout
+        role="doctor"
         portalLabel={dashboardNavConfig.doctor.portalLabel}
         userName={name}
         userSubtitle={specialty}

@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import adminApi, { getErrorMessage, totalFrom } from '../../api/adminApi';
-import { useDashboard } from '../../context/DashboardContext';
+import adminApi, { getErrorMessage } from '../../api/adminApi';
+import { useAdminStats } from '../../hooks/useAdmin';
 import { Avatar, Banner, Modal, Pager, showingRange, useDebounced } from './adminUi';
+import { useAdminAllList, useAdminRequest } from './adminQueries';
+import useServerList from './useServerList';
 
 // Directory page size. The design needs at least 5 doctors visible at once.
 const PAGE_SIZE = 8;
@@ -22,7 +24,10 @@ const EMPTY_FORM = {
 };
 
 export default function ManageDoctors() {
-  const { stats, refreshDashboard } = useDashboard();
+  const statsQuery = useAdminStats();
+  const rawStats = statsQuery.data || {};
+  const stats = { topSpecialties: Array.isArray(rawStats.top_specialties) ? rawStats.top_specialties : [] };
+  const refreshDashboard = () => statsQuery.refetch();
 
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(1);
@@ -30,9 +35,25 @@ export default function ManageDoctors() {
   const debouncedSearch = useDebounced(search.trim());
   const [reloadKey, setReloadKey] = useState(0);
 
-  const [result, setResult] = useState({ key: '', doctors: [], total: 0, error: '' });
-  const [counts, setCounts] = useState({ all: 0, active: 0, pending: 0, inactive: 0, rejected: 0, verified: 0 });
-  const [specialties, setSpecialties] = useState([]);
+  const result = useServerList('/admin/doctors', {
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+    ...(filter !== 'all' && { status: filter }),
+    ...(debouncedSearch && { q: debouncedSearch }),
+  }, reloadKey);
+  const countsQuery = useAdminRequest('/admin/doctors/counts', {}, reloadKey);
+  const counts = {
+    all: 0,
+    active: 0,
+    pending: 0,
+    inactive: 0,
+    rejected: 0,
+    verified: 0,
+    ...(countsQuery.data?.data || {}),
+  };
+  const specialtiesQuery = useAdminRequest('/specialties');
+  const specialties = Array.isArray(specialtiesQuery.data?.data) ? specialtiesQuery.data.data : [];
+  const clinics = useAdminAllList('/clinics', { limit: 100 }).items;
   const [banner, setBanner] = useState(null);
 
   const [modal, setModal] = useState(null); // { type: 'add' | 'review' | 'manage', doctor? }
@@ -40,71 +61,9 @@ export default function ManageDoctors() {
   const [formError, setFormError] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
   const [rejectReason, setRejectReason] = useState('');
-  const [clinics, setClinics] = useState([]);
   const [editForm, setEditForm] = useState({});
 
-  const requestKey = `${page}|${filter}|${debouncedSearch}|${reloadKey}`;
-  const loading = result.key !== requestKey;
   const reload = useCallback(() => setReloadKey((n) => n + 1), []);
-
-  // Doctors list (server side filter, search and pagination)
-  useEffect(() => {
-    let ignore = false;
-    adminApi
-      .get('/admin/doctors', {
-        params: {
-          limit: PAGE_SIZE,
-          offset: (page - 1) * PAGE_SIZE,
-          ...(filter !== 'all' && { status: filter }),
-          ...(debouncedSearch && { q: debouncedSearch }),
-        },
-      })
-      .then((res) => {
-        if (!ignore) setResult({ key: requestKey, doctors: res.data, total: totalFrom(res, res.data.length), error: '' });
-      })
-      .catch((err) => {
-        if (!ignore) setResult({ key: requestKey, doctors: [], total: 0, error: getErrorMessage(err, 'Could not load doctors.') });
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [page, filter, debouncedSearch, requestKey]);
-
-  // Tab counts + verified count
-  useEffect(() => {
-    let ignore = false;
-    adminApi
-      .get('/admin/doctors/counts')
-      .then((res) => !ignore && setCounts((prev) => ({ ...prev, ...res.data })))
-      .catch(() => {});
-    return () => {
-      ignore = true;
-    };
-  }, [reloadKey]);
-
-  // Specialties for the "Add doctor" form
-  useEffect(() => {
-    let ignore = false;
-    adminApi
-      .get('/specialties')
-      .then((res) => !ignore && setSpecialties(res.data))
-      .catch(() => {});
-    return () => {
-      ignore = true;
-    };
-  }, []);
-
-  // Clinics for the "Edit doctor" form
-  useEffect(() => {
-    let ignore = false;
-    adminApi
-      .get('/clinics', { params: { limit: 100 } })
-      .then((res) => !ignore && setClinics(res.data))
-      .catch(() => {});
-    return () => {
-      ignore = true;
-    };
-  }, []);
 
   const notify = (type, text) => setBanner({ type, text });
 
@@ -229,7 +188,8 @@ export default function ManageDoctors() {
     }
   }
 
-  const { doctors, total, error } = result;
+  const { items: doctors, total, error } = result;
+  const loading = result.loading;
   const [from, to] = showingRange(page, PAGE_SIZE, total, doctors.length);
   const verifiedPct = counts.active ? Math.min(100, Math.round((counts.verified / counts.active) * 100)) : 0;
   const activePct = counts.all ? Math.round((counts.active / counts.all) * 1000) / 10 : 0;

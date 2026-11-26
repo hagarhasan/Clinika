@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useQueryClient } from '@tanstack/react-query';
 import adminApi, { getErrorMessage } from '../../api/adminApi';
-import { formatDate, formatTime } from '../../Components/Patient/dateFormat';
-import { useDashboard } from '../../context/DashboardContext';
+import { formatDate, formatTime } from '../../utils/format';
+import { useAdminStats } from '../../hooks/useAdmin';
 import { Avatar, Banner, formatShortDate, Modal, Pager, showingRange, useDebounced } from './adminUi';
+import { adminAllListQueryOptions, useAdminRequest } from './adminQueries';
 import useServerList from './useServerList';
 
 const PAGE_SIZE = 8;
@@ -39,12 +41,20 @@ function TableState({ loading, error, empty, icon, title }) {
 }
 
 export default function AdminManage() {
-  const { stats, refreshDashboard } = useDashboard();
+  const queryClient = useQueryClient();
+  const statsQuery = useAdminStats();
+  const rawStats = statsQuery.data || {};
+  const stats = {
+    totalAppointments: rawStats.appointments?.total ?? 0,
+    todayAppointments: rawStats.appointments?.today ?? 0,
+  };
+  const refreshDashboard = () => statsQuery.refetch();
 
   const [tab, setTab] = useState('patients');
   const [banner, setBanner] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const [patientCounts, setPatientCounts] = useState({ all: 0, active: 0, inactive: 0 });
+  const patientCountsQuery = useAdminRequest('/admin/patients/counts', {}, reloadKey);
+  const patientCounts = patientCountsQuery.data?.data || { all: 0, active: 0, inactive: 0 };
 
   // Patients list state
   const [pSearch, setPSearch] = useState('');
@@ -90,17 +100,6 @@ export default function AdminManage() {
     },
     reloadKey
   );
-
-  useEffect(() => {
-    let ignore = false;
-    adminApi
-      .get('/admin/patients/counts')
-      .then((res) => !ignore && setPatientCounts(res.data))
-      .catch(() => {});
-    return () => {
-      ignore = true;
-    };
-  }, [reloadKey]);
 
   const notify = (type, text) => setBanner({ type, text });
   const closeModal = useCallback(() => {
@@ -168,8 +167,8 @@ export default function AdminManage() {
     setModal({ type: 'book' });
     try {
       const [p, d] = await Promise.all([
-        adminApi.get('/admin/patients', { params: { limit: 100 } }),
-        adminApi.get('/admin/doctors', { params: { status: 'active', limit: 100 } }),
+        queryClient.fetchQuery(adminAllListQueryOptions('/admin/patients', { limit: 100 })),
+        queryClient.fetchQuery(adminAllListQueryOptions('/admin/doctors', { status: 'active', limit: 100 })),
       ]);
       setOptions({ patients: p.data, doctors: d.data });
     } catch (err) {

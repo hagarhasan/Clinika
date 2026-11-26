@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { changePassword } from '../../api/authApi';
 import { getErrorMessage } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
 
 const EMPTY = { current: '', next: '', confirm: '' };
 
 export default function PasswordCard() {
+  const { setTokenData } = useAuth();
   const [values, setValues] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -26,7 +28,7 @@ export default function PasswordCard() {
     try {
       const data = await changePassword(values.current, values.next);
       // The server cancels the old token, so keep the new one or the patient is logged out.
-      if (data.access_token) localStorage.setItem('token', data.access_token);
+      if (data.access_token) setTokenData(data.access_token);
       setValues(EMPTY);
       setMessage({ type: 'ok', text: 'Your password was changed.' });
     } catch (err) {

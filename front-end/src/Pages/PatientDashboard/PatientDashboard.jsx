@@ -4,14 +4,15 @@ import DashboardLayout from '../../Components/Dashboard/DashboardLayout';
 import { dashboardNavConfig } from '../../Components/Dashboard/navConfig';
 import { usePatientProfile } from '../../hooks/usePatientStats';
 import { useUnreadCount } from '../../hooks/useNotifications';
-import { showToast } from '../../Components/Toast/toastService';
-import './patient-dashboard.css';
-import './patient-shell.css';
+import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 
 
 export default function PatientDashboard() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { logout } = useAuth();
+  const { showToast } = useToast();
   const profileQuery = usePatientProfile();
   const unreadQuery = useUnreadCount();
   const profile = profileQuery.data || null;
@@ -19,11 +20,7 @@ export default function PatientDashboard() {
 
   // Forget the login token, then go to home page with toast feedback
   function handleLogout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('role');
-    localStorage.removeItem('userName');
-    window.dispatchEvent(new Event('authChange'));
+    logout();
     showToast({
       type: 'info',
       title: 'Logged Out',
@@ -49,6 +46,7 @@ export default function PatientDashboard() {
         <title>Patient Dashboard | Clinika</title>
       </Helmet>
       <DashboardLayout
+        role="patient"
         portalLabel={dashboardNavConfig.patient.portalLabel}
         pageTitle={pageTitle}
         navItems={dashboardNavConfig.patient.items}

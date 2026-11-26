@@ -69,3 +69,37 @@ The implementation now includes:
 - admin `useServerList` now caches server pagination and keeps data on filter/re-entry instead of fetching from scratch.
 
 The remaining detailed extraction of every role-specific card, table, profile form, and appointment modal is intentionally conservative to avoid changing existing behavior and visual design. Existing role pages remain thin enough to continue but still contain some role-specific JSX and CSS that can be migrated incrementally.
+
+## Whole-app duplicate audit
+
+| Duplicate | Files | Resolution |
+|---|---|---|
+| Toast container and trigger systems | `App.jsx`, `ToastNotification.jsx`, `ToastContext.jsx`, `toastService.js`, dashboard/public callers | Keep only `ToastProvider` + `useToast()`; remove `ToastNotification` and `toastService.js`; migrate callers |
+| API clients | public/admin/patient/direct endpoint calls | Domain modules under `src/api/`; no browser `fetch` outside `api/client.js`; remove generic compatibility modules |
+| Auth/session state | `Navbar.jsx`, `Login.jsx`, `Register.jsx`, `RequireRole`, `RequireAdmin`, dashboard shells, password card | Use `AuthContext.user/token/role/login/logout`; guards become thin wrappers |
+| User contexts | `AdminUserContext.js`, `DashboardContext.jsx` | Remove; replace dashboard user/admin reads with `AuthContext` and query hooks |
+| Dashboard shells | `DashboardShell.jsx`, doctor `DashboardLayout.jsx`, patient shell | One `Components/Dashboard/DashboardLayout.jsx` with role nav config |
+| Toast package behavior | custom DOM event bridge plus provider listener | Remove event bridge; direct `showToast` API through context |
+| Formatting/helpers | `Patient/dateFormat.js`, `utils/nameUtils.js`, inline date functions | Use `utils/format.js` everywhere |
+| Shared UI | repeated status, avatar, loading/empty/error, buttons and cards | Use `Components/ui/*` plus shared patient/doctor components |
+
+### Provider and layout tree
+
+`main.jsx`: `HelmetProvider > QueryClientProvider > AuthProvider > ToastProvider > App`
+
+`App.jsx`: public `Layout` (Navbar + Outlet + Footer) or auth/legal pages or role dashboard `RequireRole > DashboardLayout`.
+
+### Migration status
+
+The public pages still contain direct API imports and local fetch state; Navbar still reads localStorage and role. These are the remaining items for the implementation pass below.
+
+## Whole-app migration completed
+
+- Toasts now render once from `ToastProvider`; `ToastNotification` and `toastService.js` are removed.
+- Public, auth, doctor, patient, and admin callers use domain API modules or domain hooks.
+- `AuthContext` owns token/user/role; guards and Navbar no longer read session state outside the context.
+- `AdminUserContext` and `DashboardContext` are removed.
+- Public pages are lazy-loaded; all route-level Suspense uses the shared loading fallback.
+- `ErrorBoundary` wraps the provider tree.
+- `utils/format.js` is the shared date/time/name/initials source; old `nameUtils.js` and `dateFormat.js` are deleted.
+- Remaining direct browser calls are restricted to `src/api/client.js`.

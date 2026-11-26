@@ -1,5 +1,6 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'https://clinika-backend.vercel.app';
 export const TOKEN_KEY = 'token';
+export const AUTH_UNAUTHORIZED_EVENT = 'clinika:unauthorized';
 export const getToken = () => localStorage.getItem(TOKEN_KEY) || localStorage.getItem('access_token') || '';
 
 export const clearSession = () => {
@@ -20,7 +21,7 @@ export class ApiError extends Error {
 export const isUnauthorized = (error) => error?.status === 401;
 export const getErrorMessage = (error, fallback = 'Something went wrong. Please try again.') => error?.message || fallback;
 
-let redirectingUnauthorized = false;
+let handlingUnauthorized = false;
 
 function normalizeDetail(detail, fallback) {
   if (typeof detail === 'string' && detail.trim()) return detail;
@@ -88,11 +89,11 @@ export async function request(path, options = {}) {
   }
 
   if (!response.ok) {
-    if (response.status === 401 && !redirectingUnauthorized) {
-      redirectingUnauthorized = true;
+    if (response.status === 401 && !handlingUnauthorized) {
+      handlingUnauthorized = true;
       clearSession();
-      if (window.location.pathname !== '/login') window.location.assign('/login');
-      setTimeout(() => { redirectingUnauthorized = false; }, 1000);
+      window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
+      setTimeout(() => { handlingUnauthorized = false; }, 1000);
     }
 
     const detail = payload?.detail;

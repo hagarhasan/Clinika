@@ -1,22 +1,21 @@
-
 /* =========================
    HOME PAGE
 ========================= */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 .home-page {
   width: 100%;
   min-height: 100vh;
   background: #f8fafc;
   font-family: "Inter", sans-serif;
   color: #111827;
-  padding: 44px 24px;
+  padding: 20px 0 50px;
   box-sizing: border-box;
-  gap: 20px;
 }
 
 .home-page * {
   box-sizing: border-box;
-  
+
 }
 
 
@@ -24,22 +23,25 @@
    HERO SECTION
 ========================= */
 
+.home-hero-wrapper {
+  width: 100%;
+}
+
 .home-hero {
-  max-width: 1180px;
-  margin: 0 auto;
+  width: 100%;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
   align-items: center;
-  gap: 20px;
+  gap: 24px;
   min-height: 300px;
-  padding: 30px 0 15px;
+  padding: 20px 0 15px;
 }
 
 .home-hero-content {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  
+
 }
 
 
@@ -266,9 +268,14 @@
    SEARCH SECTION
 ========================= */
 
+.home-search-wrapper {
+  width: 100%;
+  margin-top: 15px;
+}
+
 .home-search-section {
-  max-width: 1400px;
-  margin: 10px auto 0;
+  width: 100%;
+  margin: 0;
   padding: 24px;
   background: #ffffff;
   border: 1px solid #edf0f5;
@@ -294,7 +301,7 @@
   font-weight: 700;
 }
 
-.home-search-header > span {
+.home-search-header>span {
   color: #64748b;
   font-size: 13px;
 }
@@ -309,9 +316,10 @@
   gap: 12px;
   align-items: stretch;
 }
-.home-search-button{
-height: 55px;
-margin: 7px 1px 
+
+.home-search-button {
+  height: 55px;
+  margin: 7px 1px
 }
 
 /* SEARCH FIELDS */
@@ -366,7 +374,8 @@ margin: 7px 1px
   font-weight: 500;
 }
 
-.home-search-input-wrapper input {
+.home-search-input-wrapper input,
+.home-search-input-wrapper select {
   width: 100%;
   min-width: 0;
   border: none;
@@ -378,13 +387,14 @@ margin: 7px 1px
   padding: 0;
 }
 
-.home-search-input-wrapper input::placeholder {
+.home-search-input-wrapper input::placeholder,
+.home-search-input-wrapper select:invalid {
   color: #94a3b8;
 }
 
 .home-search-input-wrapper input[type="date"] {
   color: #475569;
-  font-size: 10px;
+  font-size: 14px;
 }
 
 
@@ -395,6 +405,8 @@ margin: 7px 1px
   color: #ffffff;
   border: none;
   border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
   min-height: 53px;
   text-decoration: none;
   display: flex;
@@ -548,7 +560,7 @@ margin: 7px 1px
     font-size: 16px;
   }
 
-  .home-search-header > span {
+  .home-search-header>span {
     font-size: 10px;
   }
 
@@ -613,6 +625,7 @@ margin: 7px 1px
   }
 
 }
+
 /* =========================
    SPECIALTIES SECTION
 ========================= */
@@ -620,9 +633,14 @@ margin: 7px 1px
    SPECIALTIES SECTION
 ========================= */
 
+.home-specialties-wrapper {
+  width: 100%;
+  margin-top: 45px;
+}
+
 .home-specialties-section {
-  max-width: 1400px;
-  margin: 45px auto 0;
+  width: 100%;
+  margin: 0;
   padding: 5px 0 25px;
 }
 
@@ -638,6 +656,7 @@ margin: 7px 1px
   margin-bottom: 22px;
   width: 100%;
 }
+
 .home-specialties-heading {
   max-width: 650px;
   flex: 1;
@@ -669,7 +688,7 @@ margin: 7px 1px
 
 .home-specialties-heading p {
   max-width: 600px;
-  
+
   margin: 10px 0 0;
   color: #64748b;
   font-size: 14px;
@@ -922,17 +941,24 @@ margin: 7px 1px
   }
 
 }
+
 /* =========================
    FEATURED DOCTORS
 ========================= */
 
+.home-doctors-wrapper {
+  width: 100%;
+  margin-top: 45px;
+}
+
 .home-doctors-section {
-  max-width: 1350px;
-  margin: 45px auto 0;
+  width: 100%;
+  margin: 0;
   padding-bottom: 25px;
 }
-.home-section-eyebrow{
-     display: block;
+
+.home-section-eyebrow {
+  display: block;
   color: #2563eb;
   font-size: 18px;
   font-weight: 700;
@@ -965,7 +991,7 @@ margin: 7px 1px
   margin: 0 0 8px;
 }
 
-.home-doctors-heading > p {
+.home-doctors-heading>p {
   color: #64748b;
   font-size: 14px;
   line-height: 1.7;
@@ -998,42 +1024,46 @@ margin: 7px 1px
 }
 
 
-/* GRID */
+/* ========================================================
+   FEATURED DOCTORS SECTION & CARDS
+======================================================== */
 
 .home-doctors-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  padding: 10px 5px ;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 22px;
+  padding: 10px 0 15px;
 }
 
-
 /* CARD */
-
 .home-doctor-card {
-  
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   background: #ffffff;
-  border: 1px solid #edf0f5;
-  border-radius: 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
   overflow: hidden;
   min-width: 0;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.22s ease;
 }
 
 .home-doctor-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 25px rgba(15, 23, 42, 0.08);
+  transform: translateY(-5px);
+  border-color: #cbd5e1;
+  box-shadow: 0 16px 32px -4px rgba(15, 23, 42, 0.1), 0 4px 12px rgba(15, 23, 42, 0.05);
 }
 
-
 /* IMAGE */
-
 .home-doctor-image-wrapper {
   position: relative;
   width: 100%;
-  height: 165px;
+  height: 230px;
   overflow: hidden;
-  background: #e9eef5;
+  background: #f1f5f9;
 }
 
 .home-doctor-image {
@@ -1041,7 +1071,7 @@ margin: 7px 1px
   height: 100%;
   display: block;
   object-fit: cover;
-  object-position: center 30%;
+  object-position: top center;
   transition: transform 0.35s ease;
 }
 
@@ -1049,173 +1079,231 @@ margin: 7px 1px
   transform: scale(1.04);
 }
 
-
-/* VERIFIED */
-
-.home-verified-badge {
-  position: absolute;
-  top: 9px;
-  left: 9px;
-  background: rgba(255, 255, 255, 0.96);
-  color: #475569;
-  border: 1px solid #e5eaf0;
-  border-radius: 30px;
-  padding: 5px 8px;
-  font-size: 9px;
-  font-weight: 600;
+.home-doctor-image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%);
+  color: #3b82f6;
 }
 
+/* VERIFIED BADGE */
+.home-verified-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(6px);
+  color: #1e40af;
+  border: 1px solid rgba(219, 234, 254, 0.85);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  z-index: 2;
+}
 
 /* INFO */
-
 .home-doctor-info {
-  padding: 12px 11px 11px;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  padding: 18px 18px 16px;
 }
 
 .home-doctor-info h3 {
   margin: 0 0 5px;
-  color: #111827;
-  font-size: 13px;
+  color: #0f172a;
+  font-size: 16.5px;
   font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .home-doctor-specialty {
   display: block;
   color: #2563eb;
-  font-size: 10px;
-  font-weight: 500;
-  margin-bottom: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .home-doctor-experience {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   color: #64748b;
-  font-size: 9px;
+  font-size: 12.5px;
+  font-weight: 500;
 }
 
-
 /* RATING */
-
 .home-doctor-rating {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 11px;
+  gap: 5px;
+  margin-bottom: 14px;
 }
 
 .home-doctor-rating strong {
-  color: #334155;
-  font-size: 10px;
-  font-weight: 600;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .home-doctor-rating span {
-  color: #94a3b8;
-  font-size: 9px;
+  color: #64748b;
+  font-size: 12px;
 }
 
-
 /* AVAILABILITY */
-
 .home-doctor-availability {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 39px;
-  padding: 7px 8px;
-  margin-bottom: 9px;
-  border-radius: 8px;
-  background: #f3f5f8;
+  gap: 9px;
+  min-height: 44px;
+  padding: 8px 12px;
+  margin-top: auto;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.home-availability-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+  flex-shrink: 0;
+}
+
+.home-availability-text-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .home-availability-label {
   color: #64748b;
-  font-size: 8px;
-  line-height: 1.4;
-  max-width: 52px;
-}
-
-.home-availability-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #16a34a;
-  flex-shrink: 0;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  line-height: 1.2;
 }
 
 .home-availability-time {
-  color: #475569;
-  font-size: 9px;
-  font-weight: 500;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-
 /* ACTIONS */
-
 .home-doctor-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: 8px;
+  margin-top: auto;
 }
 
 .home-doctor-profile-button,
 .home-doctor-book-button {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
-  border-radius: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 9px;
   text-decoration: none;
-  font-size: 10px;
+  font-size: 13.5px;
   font-weight: 600;
-  transition: 0.2s ease;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .home-doctor-profile-button {
-  background: #f3f5f8;
-  color: #1e293b;
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
 }
 
 .home-doctor-profile-button:hover {
-  background: #e7edf5;
-  color: #111827;
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
 .home-doctor-book-button {
   background: #2563eb;
-  color: #ffffff;
+  color: #ffffff !important;
+  border: 1px solid #2563eb;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.2);
 }
 
 .home-doctor-book-button:hover {
   background: #174fc7;
-  color: #ffffff;
+  border-color: #174fc7;
+  color: #ffffff !important;
+  box-shadow: 0 5px 14px rgba(37, 99, 235, 0.3);
 }
 
+/* SKELETON LOADING */
+.home-doctor-skeleton-card {
+  pointer-events: none;
+}
 
-/* =========================
-   DOCTORS TABLET
-========================= */
+.home-doctor-skeleton-image {
+  width: 100%;
+  height: 230px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: skeletonPulse 1.5s infinite;
+}
 
-@media (max-width: 1000px) {
+.skeleton-line {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  border-radius: 6px;
+  animation: skeletonPulse 1.5s infinite;
+}
 
+@keyframes skeletonPulse {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* RESPONSIVE DOCTOR CARDS */
+@media (max-width: 1100px) {
   .home-doctors-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
+    gap: 20px;
   }
 
   .home-doctor-image-wrapper {
-    height: 220px;
+    height: 230px;
   }
-
 }
 
-
-/* =========================
-   DOCTORS MOBILE
-========================= */
-
 @media (max-width: 700px) {
-
   .home-doctors-section {
     margin-top: 35px;
   }
@@ -1230,83 +1318,48 @@ margin: 7px 1px
     font-size: 23px;
   }
 
-  .home-doctors-heading > p {
-    font-size: 11px;
+  .home-doctors-heading>p {
+    font-size: 13px;
   }
 
   .home-doctors-trust {
     align-items: flex-start;
-    font-size: 9px;
+    font-size: 11px;
     line-height: 1.6;
   }
-
-  .home-doctors-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .home-doctor-image-wrapper {
-    height: 160px;
-  }
-
-  .home-doctor-info {
-    padding: 10px;
-  }
-
-  .home-doctor-info h3 {
-    font-size: 12px;
-  }
-
-  .home-doctor-availability {
-    flex-wrap: wrap;
-    gap: 5px;
-  }
-
 }
 
-
-/* =========================
-   SMALL MOBILE
-========================= */
-
-@media (max-width: 450px) {
-
+@media (max-width: 600px) {
   .home-doctors-grid {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
 
   .home-doctor-image-wrapper {
-    height: 220px;
+    height: 240px;
   }
 
   .home-doctor-info {
-    padding: 14px;
+    padding: 16px;
   }
 
   .home-doctor-info h3 {
-    font-size: 14px;
+    font-size: 16px;
   }
-
-  .home-doctor-specialty {
-    font-size: 11px;
-  }
-
-  .home-doctor-experience {
-    font-size: 10px;
-  }
-
-  .home-doctor-rating span {
-    font-size: 10px;
-  }
-
 }
+
 /* =========================
    HOW IT WORKS
 ========================= */
 
+.home-how-wrapper {
+  width: 100%;
+  margin-top: 45px;
+}
+
 .home-how-section {
-  max-width: 1400px;
-  margin: 45px auto 0;
+  width: 100%;
+  margin: 0;
   padding: 30px 0 35px;
 }
 
@@ -1405,7 +1458,7 @@ margin: 7px 1px
   margin: 0 0 8px;
 }
 
-.home-how-card > p {
+.home-how-card>p {
   color: #64748b;
   font-size: 12px;
   line-height: 1.7;
@@ -1422,7 +1475,7 @@ margin: 7px 1px
   border-radius: 8px;
 }
 
-.home-how-note > span {
+.home-how-note>span {
   display: block;
   font-size: 10px;
   font-weight: 600;
@@ -1441,9 +1494,14 @@ margin: 7px 1px
    WHY CHOOSE CLINIKA
 ========================= */
 
+.home-why-wrapper {
+  width: 100%;
+  margin-top: 25px;
+}
+
 .home-why-section {
-  max-width: 1400px;
-  margin: 25px auto 0;
+  width: 100%;
+  margin: 0;
   padding: 35px 0 40px;
   display: grid;
   grid-template-columns: 0.9fr 1.1fr;
@@ -1598,6 +1656,7 @@ margin: 7px 1px
   gap: 10px;
   color: #174fc7;
 }
+
 .home-view-all {
   display: inline-flex;
   align-items: center;
@@ -1615,6 +1674,7 @@ margin: 7px 1px
   color: #174fc7;
   gap: 12px;
 }
+
 /* =========================
    RESPONSIVE
 ========================= */
@@ -1715,23 +1775,26 @@ margin: 7px 1px
    BOOKING CTA SECTION
 ========================= */
 
+.home-booking-cta-wrapper {
+  width: 100%;
+  margin: 15px 0 35px;
+}
+
 .home-booking-cta {
-  width: 85%;
+  width: 100%;
   min-height: 188px;
   padding: 28px 34px;
-  margin: 10px auto 35px;
+  margin: 0;
 
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 30px;
 
-  background: linear-gradient(
-    110deg,
-    #2166f5 0%,
-    #1760ed 65%,
-    #1058df 100%
-  );
+  background: linear-gradient(110deg,
+      #2166f5 0%,
+      #1760ed 65%,
+      #1058df 100%);
 
   border: 1px solid #edf0f5;
   border-radius: 18px;
@@ -1924,7 +1987,7 @@ margin: 7px 1px
 @media (max-width: 900px) {
 
   .home-booking-cta {
-    width: 90%;
+    width: 100%;
     padding: 25px;
     gap: 20px;
   }
@@ -1939,7 +2002,7 @@ margin: 7px 1px
 @media (max-width: 650px) {
 
   .home-booking-cta {
-    width: 90%;
+    width: 100%;
     padding: 25px 20px;
 
     flex-direction: column;

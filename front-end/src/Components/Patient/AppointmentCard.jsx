@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from './StateViews';
-import { formatDate, formatTime, getInitials } from './dateFormat';
+import { formatDate, formatTime, getInitials } from '../../utils/format';
 import { cancelAppointment } from '../../api/appointmentsApi';
 import { getErrorMessage } from '../../api/client';
 

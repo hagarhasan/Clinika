@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useState } from 'react';
-import { useEffect } from 'react';
 
 const ToastContext = createContext(null);
 
@@ -20,11 +19,6 @@ export function ToastProvider({ children }) {
     setTimeout(() => dismiss(id), 4000);
   }, [dismiss]);
 
-  useEffect(() => {
-    const handler = (event) => showToast(event.detail);
-    window.addEventListener('app-toast', handler);
-    return () => window.removeEventListener('app-toast', handler);
-  }, [showToast]);
 
   return (
     <ToastContext.Provider value={{ showToast, dismiss }}>

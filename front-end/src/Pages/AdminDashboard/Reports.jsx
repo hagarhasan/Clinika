@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import adminApi, { getErrorMessage } from '../../api/adminApi';
-import { formatDate } from '../../Components/Patient/dateFormat';
+import { formatDate } from '../../utils/format';
 import { formatDateTime } from './adminUi';
+import { useAdminRequest } from './adminQueries';
 import useServerList from './useServerList';
 
 const STATUS_KEYS = ['pending', 'confirmed', 'completed', 'cancelled', 'no_show'];
@@ -31,20 +31,9 @@ function downloadCsv(name, header, rows) {
 function AppointmentsReport() {
   const [range, setRange] = useState({ date_from: '', date_to: '' });
   const [applied, setApplied] = useState({});
-  const [state, setState] = useState({ key: '', data: null, error: '' });
-  const key = JSON.stringify(applied);
-
-  useEffect(() => {
-    let ignore = false;
-    adminApi
-      .get('/admin/reports/appointments', { params: JSON.parse(key) })
-      .then((res) => !ignore && setState({ key, data: res.data, error: '' }))
-      .catch((err) => !ignore && setState({ key, data: null, error: getErrorMessage(err) }));
-    return () => { ignore = true; };
-  }, [key]);
-
-  const loading = state.key !== key;
-  const data = state.data || null;
+  const reportQuery = useAdminRequest('/admin/reports/appointments', applied);
+  const loading = reportQuery.isLoading;
+  const data = reportQuery.data?.data || null;
   const daily = data && Array.isArray(data.daily) ? data.daily : [];
   const perDoctor = data && Array.isArray(data.per_doctor) ? data.per_doctor : [];
   // Read these once, up front, so nothing below touches `data.` while it is still null.
@@ -75,7 +64,7 @@ function AppointmentsReport() {
         </button>
       </form>
 
-      {state.error && <div className="cl-ad-banner cl-ad-banner--error" role="alert">{state.error}</div>}
+      {reportQuery.isError && <div className="cl-ad-banner cl-ad-banner--error" role="alert">{reportQuery.error?.message || 'Could not load the report.'}</div>}
       {loading && <div className="cl-ad-loading" role="status"><span className="spinner-border spinner-border-sm" aria-hidden="true" /> Loading report…</div>}
 
       {data && !loading && (

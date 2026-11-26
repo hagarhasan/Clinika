@@ -1,26 +1,25 @@
 import Layout from './Components/Layout/Layout';
 import { lazy, Suspense } from 'react';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
-import Privacy from './Pages/Privacy/Privacy';
-import Terms from './Pages/Terms/Terms';
-import Accessibility from './Pages/Accessibility/Accessibility';
-import Home from './Pages/Home/Home';
-import ResetPassword from './Pages/ResetPassword/ResetPassword';
-import Login from './Pages/Login/Login';
-import Register from './Pages/Register/Register';
-import ForgetPassword from './Pages/ForgetPassword/ForgetPassword';
+const Privacy = lazy(() => import('./Pages/Privacy/Privacy'));
+const Terms = lazy(() => import('./Pages/Terms/Terms'));
+const Accessibility = lazy(() => import('./Pages/Accessibility/Accessibility'));
+const Home = lazy(() => import('./Pages/Home/Home'));
+const ResetPassword = lazy(() => import('./Pages/ResetPassword/ResetPassword'));
+const Login = lazy(() => import('./Pages/Login/Login'));
+const Register = lazy(() => import('./Pages/Register/Register'));
+const ForgetPassword = lazy(() => import('./Pages/ForgetPassword/ForgetPassword'));
 import PatientDashboard from './Pages/PatientDashboard/PatientDashboard';
 import DoctorDashboard from './Pages/DoctorDashboard/DoctorDashboard';
 import AdminDashboard from './Pages/AdminDashboard/AdminDashboard';
-import Contact from './Pages/Contact/Contact';
-import About from './Pages/About/About';
-import Doctors from './Pages/Doctors/Doctors';
-import DoctorProfile from './Pages/Doctors/DoctorProfile';
-import BookAppointment from './Pages/Doctors/BookAppointment';
-import NotFound from './Pages/NotFound/NotFound';
+const Contact = lazy(() => import('./Pages/Contact/Contact'));
+const About = lazy(() => import('./Pages/About/About'));
+const Doctors = lazy(() => import('./Pages/Doctors/Doctors'));
+const DoctorProfile = lazy(() => import('./Pages/Doctors/DoctorProfile'));
+const BookAppointment = lazy(() => import('./Pages/Doctors/BookAppointment'));
+const NotFound = lazy(() => import('./Pages/NotFound/NotFound'));
 import RequireRole from './Components/RequireRole/RequireRole';
 
-import ToastNotification from './Components/Toast/ToastNotification';
 
 const PatientOverview = lazy(() => import('./Pages/PatientDashboard/PatientOverview'));
 const PatientAppointments = lazy(() => import('./Pages/PatientDashboard/PatientAppointments'));
@@ -52,22 +51,22 @@ const basename = import.meta.env.BASE_URL === './'
 const router = createBrowserRouter([
   {
     path: "", element: <Layout />, children: [
-      { index: true, element: <Home /> },
-      { path: "doctors", element: <Doctors /> },
-      { path: "doctors/doctor_profile/:id", element: <DoctorProfile /> },
-      { path: "doctors/doctor_profile/:id/book-appointment", element: <BookAppointment /> },
-      { path: "contact", element: <Contact /> },
-      { path: "about", element: <About /> },
+      { index: true, element: <LazyPage component={Home} /> },
+      { path: "doctors", element: <LazyPage component={Doctors} /> },
+      { path: "doctors/doctor_profile/:id", element: <LazyPage component={DoctorProfile} /> },
+      { path: "doctors/doctor_profile/:id/book-appointment", element: <LazyPage component={BookAppointment} /> },
+      { path: "contact", element: <LazyPage component={Contact} /> },
+      { path: "about", element: <LazyPage component={About} /> },
     ]
   },
-  { path: "login", element: <Login /> },
-  { path: "register", element: <Register /> },
-  { path: "forget-password", element: <ForgetPassword /> },
-  { path: "reset-password/:token", element: <ResetPassword /> },
-  { path: "reset-password", element: <ResetPassword /> },
-  { path: "privacy", element: <Privacy /> },
-  { path: "terms", element: <Terms /> },
-  { path: "accessibility", element: <Accessibility /> },
+  { path: "login", element: <LazyPage component={Login} /> },
+  { path: "register", element: <LazyPage component={Register} /> },
+  { path: "forget-password", element: <LazyPage component={ForgetPassword} /> },
+  { path: "reset-password/:token", element: <LazyPage component={ResetPassword} /> },
+  { path: "reset-password", element: <LazyPage component={ResetPassword} /> },
+  { path: "privacy", element: <LazyPage component={Privacy} /> },
+  { path: "terms", element: <LazyPage component={Terms} /> },
+  { path: "accessibility", element: <LazyPage component={Accessibility} /> },
   {
     path: "patient-dashboard", element: <RequireRole role="patient"><PatientDashboard /></RequireRole>, children: [
       { index: true, element: <LazyPage component={PatientOverview} /> },
@@ -97,14 +96,13 @@ const router = createBrowserRouter([
       { path: "my-profile", element: <LazyPage component={AdminProfile} /> },
     ]
   },
-  { path: "*", element: <NotFound /> }
+  { path: "*", element: <LazyPage component={NotFound} /> }
 ], { basename })
 
 export default function App() {
   return (
     <>
       <RouterProvider router={router} />
-      <ToastNotification />
     </>
   );
 }

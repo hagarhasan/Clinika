@@ -2,10 +2,9 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
-import { login as loginRequest } from "../../api/authApi";
-import { TOKEN_KEY } from "../../api/client";
-import { setPendingToast, showToast } from "../../Components/Toast/toastService";
-import { stripDoctorTitle } from "../../utils/nameUtils";
+import { useAuth } from "../../context/AuthContext";
+import { useToast } from "../../context/ToastContext";
+import { formatName } from "../../utils/format";
 
 import {
   Stethoscope,
@@ -30,6 +29,8 @@ import "./Login.css";
 
 export default function Login() {
 const [error, setError] = useState("");
+  const { login } = useAuth();
+  const { showToast } = useToast();
   const [role, setRole] = useState("patient");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -50,13 +51,12 @@ const handleLogin = async (e) => {
   setSubmitting(true);
 
   try {
-    const data = await loginRequest({
+    const user = await login({
       email: email.trim(),
       password,
       remember_me: rememberMe,
     });
-
-    const actualRole = data.user?.role || "patient";
+    const actualRole = user?.role || "patient";
 
     // Validate selected tab vs account role (Admins can sign in from either tab)
     if (actualRole !== "admin") {
@@ -78,35 +78,10 @@ const handleLogin = async (e) => {
 
     // Strip titles like DR., Dr., Doctor, Prof. from user name
     const rawName =
-      data.user?.full_name ||
-      `${data.user?.first_name || ""} ${data.user?.last_name || ""}`.trim();
-    const cleanName = stripDoctorTitle(rawName) || "Clinika User";
-
-    localStorage.setItem(TOKEN_KEY, data.access_token);
-    if (data.user) {
-      const cleanUser = {
-        ...data.user,
-        full_name: cleanName,
-        first_name: stripDoctorTitle(data.user.first_name || ""),
-      };
-      localStorage.setItem("user", JSON.stringify(cleanUser));
-      localStorage.setItem("role", actualRole);
-      localStorage.setItem("userName", cleanName);
-    }
-
-    // Trigger toast notification for login
-    setPendingToast({
-      type: "success",
-      title: "Welcome Back!",
-      message: `Signed in successfully as ${cleanName}.`,
-    });
-    showToast({
-      type: "success",
-      title: "Welcome Back!",
-      message: `Signed in successfully as ${cleanName}.`,
-    });
-
-    window.dispatchEvent(new Event("authChange"));
+      user?.full_name ||
+      `${user?.first_name || ""} ${user?.last_name || ""}`.trim();
+    const cleanName = formatName(rawName) || "Clinika User";
+    showToast({ type: "success", title: "Welcome Back!", message: `Signed in successfully as ${cleanName}.` });
 
     navigate(
       actualRole === "patient"
@@ -150,10 +125,12 @@ const handleLogin = async (e) => {
         <title>Login | Clinika</title>
       </Helmet>
 
-      <main className="clinika-login">
+      <main className="clinika-login container-fluid min-vh-100 d-flex flex-column">
+        <div className="container-xxl flex-grow-1 d-flex flex-column">
+          <div className="row align-items-center justify-content-center g-4 g-xl-5 flex-grow-1">
 
         {/* LEFT SIDE */}
-        <section className="clinika-login-left">
+        <section className="clinika-login-left col-12 col-lg-5">
           <Link to="/" className="clinika-back-home">
             <ArrowLeft size={16} />
             <span>Back to Home</span>
@@ -248,8 +225,8 @@ const handleLogin = async (e) => {
         </section>
 
         {/* RIGHT SIDE */}
-        <section className="clinika-login-right">
-          <div className="clinika-login-card">
+        <section className="clinika-login-right col-12 col-lg-6">
+          <div className="clinika-login-card card border-0 shadow-sm">
 
             {/* HEADER */}
             <div className="clinika-card-header">
@@ -269,15 +246,15 @@ const handleLogin = async (e) => {
 
             {/* ROLE SELECTOR */}
             <div className="clinika-role-section">
-              <label className="clinika-section-label">
+              <p className="clinika-section-label">
                 Select Account Role
-              </label>
+              </p>
 
               <div className="clinika-role-switch">
                 <button
                   type="button"
                   className={
-                    role === "patient" ? "clinika-role-active" : ""
+                    role === "patient" ? "clinika-role-active btn" : "btn"
                   }
                   onClick={() => setRole("patient")}
                 >
@@ -288,7 +265,7 @@ const handleLogin = async (e) => {
                 <button
                   type="button"
                   className={
-                    role === "doctor" ? "clinika-role-active" : ""
+                    role === "doctor" ? "clinika-role-active btn" : "btn"
                   }
                   onClick={() => setRole("doctor")}
                 >
@@ -323,11 +300,14 @@ const handleLogin = async (e) => {
                   <span>Institutional or personal</span>
                 </div>
 
-                <div className="clinika-input-box">
-                  <Mail size={16} />
+                <div className="clinika-input-box input-group">
+                  <span className="input-group-text">
+                    <Mail size={17} />
+                  </span>
 
                   <input
                     id="clinika-email"
+                    className="form-control"
                     type="email"
                     placeholder="Enter your email address"
                     value={email}
@@ -349,11 +329,14 @@ const handleLogin = async (e) => {
                   </Link>
                 </div>
 
-                <div className="clinika-input-box">
-                  <KeyRound size={16} />
+                <div className="clinika-input-box input-group">
+                  <span className="input-group-text">
+                    <KeyRound size={17} />
+                  </span>
 
                   <input
                     id="clinika-password"
+                    className="form-control"
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your security password"
                     value={password}
@@ -363,8 +346,10 @@ const handleLogin = async (e) => {
 
                   <button
                     type="button"
-                    className="clinika-password-button"
+                    className="clinika-password-button btn"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
                   >
                     {showPassword ? (
                       <>
@@ -382,26 +367,19 @@ const handleLogin = async (e) => {
               </div>
 
               {/* REMEMBER ME */}
-              <label className="clinika-remember">
+              <label className="clinika-remember form-check">
                 <input
                   type="checkbox"
+                  className="form-check-input"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                 />
 
-                <span>Remember this device for 30 days</span>
+                <span className="form-check-label">Remember this device for 30 days</span>
               </label>
 
               {error && (
-                <p
-                  role="alert"
-                  style={{
-                    margin: "0 0 12px",
-                    color: "#b91c1c",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                  }}
-                >
+                <p className="login-error alert alert-danger" role="alert">
                   {error}
                 </p>
               )}
@@ -409,7 +387,7 @@ const handleLogin = async (e) => {
               {/* BUTTON */}
               <button
                 type="submit"
-                className="clinika-submit-button"
+                className="clinika-submit-button btn btn-primary"
                 disabled={submitting}
               >
                 <span>
@@ -453,8 +431,10 @@ const handleLogin = async (e) => {
           </div>
         </section>
 
+          </div>
+
         {/* PRIVACY NOTICE */}
-        <div className="clinika-privacy-notice">
+        <div className="clinika-privacy-notice alert alert-light mb-3">
           <div className="clinika-privacy-icon">
             <ShieldCheck size={17} />
           </div>
@@ -490,6 +470,7 @@ const handleLogin = async (e) => {
             Privacy &amp; Terms
           </Link>
         </footer>
+        </div>
       </main>
     </>
   );

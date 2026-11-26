@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import adminApi, { getErrorMessage } from '../../api/adminApi';
-import { useDashboard } from '../../context/DashboardContext';
 import { Banner, formatDateTime, Modal, Pager, showingRange } from './adminUi';
 import useServerList from './useServerList';
 
@@ -10,7 +9,6 @@ const FILTERS = [['', 'All'], ['new', 'New'], ['read', 'Read'], ['resolved', 'Re
 const PILL = { new: 'pending', read: 'confirmed', resolved: 'completed' };
 
 export default function ContactMessages() {
-  const { refreshDashboard } = useDashboard();
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
@@ -31,7 +29,6 @@ export default function ContactMessages() {
       setOpen((current) => (current && current.id === data.id ? data : current));
       if (!quiet) setBanner({ type: 'ok', text: `Message marked as ${next}.` });
       setReloadKey((n) => n + 1);
-      refreshDashboard();
     } catch (err) {
       setBanner({ type: 'error', text: getErrorMessage(err) });
     } finally {

@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import PasswordCard from '../../Components/Patient/PasswordCard';
-import { getInitials } from '../../Components/Patient/dateFormat';
-import '../PatientDashboard/patient-dashboard.css';
+import { getInitials } from '../../utils/format';
 import '../PatientDashboard/patient-profile.css';
 import { useDoctorData, errMsg, drName } from './DoctorDashboard';
 import { uploadAvatar } from '../../api/uploadsApi';

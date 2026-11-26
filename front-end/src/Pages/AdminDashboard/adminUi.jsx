@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getInitials } from '../../Components/Patient/dateFormat';
+import { getInitials } from '../../utils/format';
 
 // Small pieces shared by the admin pages.
 

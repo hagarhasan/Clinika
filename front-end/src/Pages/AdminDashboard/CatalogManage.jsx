@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import adminApi, { getErrorMessage } from '../../api/adminApi';
 import { Banner, Modal } from './adminUi';
+import { useAdminAllList, useAdminRequest } from './adminQueries';
 
 const EMPTY_SPECIALTY = { name: '', description: '' };
 const EMPTY_CLINIC = { name: '', city: '', district: '', address: '', phone: '', email: '', description: '' };
@@ -9,21 +10,6 @@ const CLINIC_FIELDS = [
   ['name', 'Name', true], ['city', 'City'], ['district', 'District'], ['address', 'Address'],
   ['phone', 'Phone'], ['email', 'Email'],
 ];
-
-// Loads a plain array endpoint (specialties, clinics).
-function useArray(path, params, reloadKey) {
-  const key = JSON.stringify([path, params, reloadKey]);
-  const [state, setState] = useState({ key: '', items: [], error: '' });
-  useEffect(() => {
-    let ignore = false;
-    const [url, query] = JSON.parse(key);
-    adminApi.get(url, { params: query })
-      .then((res) => !ignore && setState({ key, items: res.data, error: '' }))
-      .catch((err) => !ignore && setState({ key, items: [], error: getErrorMessage(err) }));
-    return () => { ignore = true; };
-  }, [key]);
-  return { ...state, loading: state.key !== key };
-}
 
 export default function CatalogManage() {
   const [tab, setTab] = useState('specialties');
@@ -34,8 +20,13 @@ export default function CatalogManage() {
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState('');
 
-  const specialties = useArray('/specialties', {}, reloadKey);
-  const clinics = useArray('/clinics', { limit: 100 }, reloadKey);
+  const specialtiesQuery = useAdminRequest('/specialties', {}, reloadKey);
+  const specialties = {
+    items: Array.isArray(specialtiesQuery.data?.data) ? specialtiesQuery.data.data : [],
+    loading: specialtiesQuery.isLoading,
+    error: specialtiesQuery.isError ? getErrorMessage(specialtiesQuery.error) : '',
+  };
+  const clinics = useAdminAllList('/clinics', { limit: 100 }, reloadKey);
 
   const closeModal = useCallback(() => { setModal(null); setFormError(''); }, []);
 

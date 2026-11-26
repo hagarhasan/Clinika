@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
 import { register, registerDoctor } from "../../api/authApi";
+import { useAuth } from "../../context/AuthContext";
 import {
   ArrowLeft,
   ArrowRight,
@@ -20,6 +21,7 @@ import "./Register.css";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { token, role } = useAuth();
   const [accountType, setAccountType] = useState("patient");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -34,11 +36,7 @@ export default function Register() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 useEffect(() => {
-  const token = localStorage.getItem("token");
-
   if (token) {
-    const role = localStorage.getItem("role");
-
     if (role === "doctor") {
       navigate("/doctor-dashboard", { replace: true });
     } else if (role === "admin") {
@@ -47,7 +45,7 @@ useEffect(() => {
       navigate("/patient-dashboard", { replace: true });
     }
   }
-}, [navigate]);
+}, [navigate, token, role]);
   const handleRegister = async (e) => {
     e.preventDefault();
 
@@ -88,8 +86,7 @@ useEffect(() => {
       );
     } catch (err) {
       setError(
-        err.response?.data?.detail ||
-        err.response?.data?.message ||
+        err?.message ||
         "Registration failed. Please try again."
       );
     } finally {

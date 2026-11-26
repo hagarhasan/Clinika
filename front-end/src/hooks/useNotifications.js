@@ -1,12 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteNotification, getUnreadCount, listNotifications, markAllNotificationsRead, markNotificationRead } from '../api/notificationsApi.js';
+import { getToken } from '../api/client.js';
 import { queryKeys } from './queryKeys.js';
 
-export function useNotifications(filters = {}) {
-  return useQuery({ queryKey: queryKeys.notifications.list(filters), queryFn: ({ signal }) => listNotifications(filters, signal), refetchInterval: 60 * 1000 });
+export function useNotifications(filters = {}, options = {}) {
+  const token = getToken();
+  return useQuery({
+    queryKey: queryKeys.notifications.list(filters),
+    queryFn: ({ signal }) => listNotifications(filters, signal),
+    enabled: Boolean(token) && (options.enabled ?? true),
+    refetchInterval: 60 * 1000,
+  });
 }
-export function useUnreadCount() {
-  return useQuery({ queryKey: queryKeys.notifications.unread, queryFn: ({ signal }) => getUnreadCount(signal), refetchInterval: 60 * 1000, staleTime: 30 * 1000 });
+export function useUnreadCount(options = {}) {
+  const token = getToken();
+  return useQuery({
+    queryKey: queryKeys.notifications.unread,
+    queryFn: ({ signal }) => getUnreadCount(signal),
+    enabled: Boolean(token) && (options.enabled ?? true),
+    refetchInterval: 60 * 1000,
+    staleTime: 30 * 1000,
+  });
 }
 export function useNotificationActions() {
   const queryClient = useQueryClient();

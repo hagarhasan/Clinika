@@ -20,7 +20,7 @@ export default function DoctorOverview() {
   const pct = Math.min(100, Math.round((bookedCount / totalSlots) * 100));
 
   return (
-    <div style={{ maxWidth: 1220, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 22, alignItems: 'start' }}>
+    <div className="cl-doctor-overview-grid">
       {/* Left: Today's Appointments */}
       <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
