@@ -25,7 +25,7 @@ const PatientOverview = lazy(() => import('./Pages/PatientDashboard/PatientOverv
 const PatientAppointments = lazy(() => import('./Pages/PatientDashboard/PatientAppointments'));
 const PatientMedicalRecords = lazy(() => import('./Pages/PatientDashboard/PatientMedicalRecords'));
 const PatientProfile = lazy(() => import('./Pages/PatientDashboard/PatientProfile'));
-const PatientNotifications = lazy(() => import('./Pages/PatientDashboard/PatientNotifications'));
+const NotificationsPage = lazy(() => import('./Pages/Shared/NotificationsPage'));
 const DoctorOverview = lazy(() => import('./Pages/DoctorDashboard/DoctorOverview'));
 const DoctorAppointments = lazy(() => import('./Pages/DoctorDashboard/DoctorAppointments'));
 const DoctorAvailability = lazy(() => import('./Pages/DoctorDashboard/DoctorAvailability'));
@@ -73,7 +73,7 @@ const router = createBrowserRouter([
       { path: "my-appointments", element: <LazyPage component={PatientAppointments} /> },
       { path: "medical-records", element: <LazyPage component={PatientMedicalRecords} /> },
       { path: "my-profile", element: <LazyPage component={PatientProfile} /> },
-      { path: "notifications", element: <LazyPage component={PatientNotifications} /> },
+      { path: "notifications", element: <LazyPage component={NotificationsPage} /> },
     ]
   },
   {
@@ -82,6 +82,7 @@ const router = createBrowserRouter([
       { path: "manage-appointments", element: <LazyPage component={DoctorAppointments} /> },
       { path: "manage-availability", element: <LazyPage component={DoctorAvailability} /> },
       { path: "my-profile", element: <LazyPage component={DoctorDashboardProfile} /> },
+      { path: "notifications", element: <LazyPage component={NotificationsPage} /> },
     ]
   },
   {
@@ -94,6 +95,7 @@ const router = createBrowserRouter([
       { path: "reports", element: <LazyPage component={Reports} /> },
       { path: "team", element: <LazyPage component={AdminTeam} /> },
       { path: "my-profile", element: <LazyPage component={AdminProfile} /> },
+      { path: "notifications", element: <LazyPage component={NotificationsPage} /> },
     ]
   },
   { path: "*", element: <LazyPage component={NotFound} /> }

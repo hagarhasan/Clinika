@@ -9,6 +9,7 @@ import { dashboardNavConfig } from '../../Components/Dashboard/navConfig';
 import { formatName } from '../../utils/format';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
+import { useUnreadCount } from '../../hooks/useNotifications';
 
 
 export const TOKEN_KEY = 'token';
@@ -68,6 +69,15 @@ export default function DoctorDashboard() {
   const navigate = useNavigate();
   const { logout: authLogout, token } = useAuth();
   const { showToast } = useToast();
+  const unread = useUnreadCount().data?.unread ?? 0;
+  // Download every doctor page once when the dashboard opens, so tabs open instantly.
+  useEffect(() => {
+    import('./DoctorOverview');
+    import('./DoctorAppointments');
+    import('./DoctorAvailability');
+    import('./DashDoctProfile');
+    import('../Shared/NotificationsPage');
+  }, []);
   const [state, setState] = useState({
     user: null, profile: null, stats: null, today: [], appointments: [], slots: [], schedules: [], loading: true, error: '',
   });
@@ -160,6 +170,8 @@ export default function DoctorDashboard() {
         userName={name}
         userSubtitle={specialty}
         navItems={dashboardNavConfig.doctor.items}
+        badge={unread}
+        unread={unread}
         onLogout={logout}
       >
         {state.error && (

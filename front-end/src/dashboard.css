@@ -1228,3 +1228,10 @@
     transition-duration: 0.01ms;
   }
 }
+
+/* Avatars: user photo (or initials) */
+.cl-pd-avatar { flex-shrink: 0; }
+img.cl-pd-avatar {
+  object-fit: cover;
+  background: var(--dash-primary-soft);
+}

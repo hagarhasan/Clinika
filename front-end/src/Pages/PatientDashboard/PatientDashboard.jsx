@@ -1,11 +1,14 @@
 import { Helmet } from 'react-helmet-async';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../Components/Dashboard/DashboardLayout';
 import { dashboardNavConfig } from '../../Components/Dashboard/navConfig';
 import { usePatientProfile } from '../../hooks/usePatientStats';
 import { useUnreadCount } from '../../hooks/useNotifications';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
+import { useDashboardPreload } from '../../hooks/useDashboardPreload';
+import { LoadingState } from '../../Components/Patient/StateViews';
+import { prefetchPatientDashboard } from './preload';
 
 
 export default function PatientDashboard() {
@@ -15,6 +18,8 @@ export default function PatientDashboard() {
   const { showToast } = useToast();
   const profileQuery = usePatientProfile();
   const unreadQuery = useUnreadCount();
+  // Fetch all dashboard data + page code once on entry; pages then open instantly from the cache.
+  const ready = useDashboardPreload(prefetchPatientDashboard);
   const profile = profileQuery.data || null;
   const unread = unreadQuery.data?.unread ?? 0;
 
@@ -53,8 +58,11 @@ export default function PatientDashboard() {
         userName={profile?.full_name}
         userSubtitle={profile ? `Patient #${profile.id}` : ''}
         badge={unread}
+        unread={unread}
         onLogout={handleLogout}
-      />
+      >
+        {ready ? <Outlet /> : <LoadingState label="Loading your dashboard…" />}
+      </DashboardLayout>
     </>
   );
 }

@@ -1,46 +1,46 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge } from './StateViews';
-import { formatDate, formatTime, getInitials } from '../../utils/format';
-import { cancelAppointment } from '../../api/appointmentsApi';
+import Avatar from '../ui/Avatar';
+import { formatDate, formatTime } from '../../utils/format';
+import { useAppointmentActions } from '../../hooks/useAppointments';
+import RescheduleModal from '../appointments/RescheduleModal';
+import ReviewModal from '../appointments/ReviewModal';
 import { getErrorMessage } from '../../api/client';
 
 const CANCELLABLE = ['pending', 'confirmed'];
 
-// onCancelled() runs after the server confirms the cancellation, so the page can reload its list.
-export default function AppointmentCard({ appointment, onCancelled }) {
+// onChanged(message) runs after the server confirms a change (cancel, reschedule, review).
+// `onCancelled` is kept as an alias for older callers.
+export default function AppointmentCard({ appointment, onChanged, onCancelled }) {
   const { id, doctor, status, reason, clinic } = appointment;
+  const notify = onChanged || onCancelled;
+  const { cancel } = useAppointmentActions();
   const [confirming, setConfirming] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [modal, setModal] = useState(null); // 'reschedule' | 'review' | null
+  const busy = cancel.isPending;
 
   const isOnline = appointment.consultation_type === 'online';
   const canCancel = CANCELLABLE.includes(status);
   const place = isOnline ? 'Online consultation' : clinic?.name || doctor.clinic_name || 'In-person visit';
 
   async function handleConfirmCancel() {
-    setBusy(true);
     setError('');
     try {
-      await cancelAppointment(id, cancelReason.trim());
+      await cancel.mutateAsync({ id, reason: cancelReason.trim() });
       setConfirming(false);
-      onCancelled(`Your appointment with ${doctor.full_name} was cancelled.`);
+      notify?.(`Your appointment with ${doctor.full_name} was cancelled.`);
     } catch (err) {
       setError(getErrorMessage(err));
-    } finally {
-      setBusy(false);
     }
   }
 
   return (
     <article className="cl-pd-card cl-pd-appt">
       <div className="cl-pd-appt__main">
-        {doctor.photo_url ? (
-          <img className="cl-pd-avatar" src={doctor.photo_url} alt="" />
-        ) : (
-          <span className="cl-pd-avatar" aria-hidden="true">{getInitials(doctor.full_name)}</span>
-        )}
+        <Avatar src={doctor.photo_url} name={doctor.full_name} />
 
         <div className="cl-pd-appt__info">
           <div className="cl-pd-appt__top">
@@ -89,6 +89,19 @@ export default function AppointmentCard({ appointment, onCancelled }) {
             Join online
           </a>
         )}
+        {canCancel && (
+          <button type="button" className="cl-pd-btn" onClick={() => setModal('reschedule')}>
+            Reschedule
+          </button>
+        )}
+        {status === 'completed' && !appointment.has_review && (
+          <button type="button" className="cl-pd-btn cl-pd-btn--primary" onClick={() => setModal('review')}>
+            Rate doctor
+          </button>
+        )}
+        {status === 'completed' && appointment.has_review && (
+          <span className="cl-pd-muted">Reviewed ✓</span>
+        )}
         {canCancel && !confirming && (
           <button type="button" className="cl-pd-btn cl-pd-btn--danger" onClick={() => setConfirming(true)}>
             Cancel appointment
@@ -116,6 +129,13 @@ export default function AppointmentCard({ appointment, onCancelled }) {
             </button>
           </div>
         </div>
+      )}
+
+      {modal === 'reschedule' && (
+        <RescheduleModal appointment={appointment} onClose={() => setModal(null)} onDone={notify} />
+      )}
+      {modal === 'review' && (
+        <ReviewModal appointment={appointment} onClose={() => setModal(null)} onDone={notify} />
       )}
     </article>
   );

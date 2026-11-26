@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { PrescriptionCard, RecordCard } from '../../Components/Patient/RecordCards';
 import { EmptyState, ErrorState, LoadingState } from '../../Components/Patient/StateViews';
-import { fetchMedicalRecords } from '../../api/medicalRecordsApi';
-import { fetchPrescriptions } from '../../api/prescriptionsApi';
+import { useMyMedicalRecords, useMyPrescriptions } from '../../hooks/usePatientData';
 import { getErrorMessage, isUnauthorized } from '../../api/client';
 import './patient-records.css';
 
@@ -12,41 +11,21 @@ const TABS = [
   { key: 'prescriptions', label: 'Prescriptions' },
 ];
 
-const LOADING = { status: 'loading', items: [], error: '', needsLogin: false };
-
 export default function PatientMedicalRecords() {
   const [tab, setTab] = useState('records');
-  const [state, setState] = useState(LOADING);
-  const [attempt, setAttempt] = useState(0); // bump this number to reload the list
+  // Both lists are loaded when the dashboard opens, so switching tabs is instant.
+  const recordsQuery = useMyMedicalRecords();
+  const prescriptionsQuery = useMyPrescriptions();
+  const query = tab === 'records' ? recordsQuery : prescriptionsQuery;
+  const state = {
+    status: query.isLoading ? 'loading' : query.isError ? 'error' : 'ready',
+    items: query.data || [],
+    error: query.isError ? getErrorMessage(query.error) : '',
+    needsLogin: query.isError && isUnauthorized(query.error),
+  };
 
-  // Load the list whenever the tab changes or we ask for a reload.
-  useEffect(() => {
-    let ignore = false;
-    const load = tab === 'records' ? fetchMedicalRecords : fetchPrescriptions;
-    load()
-      .then((items) => {
-        if (!ignore) setState({ status: 'ready', items, error: '', needsLogin: false });
-      })
-      .catch((err) => {
-        if (!ignore) {
-          setState({ status: 'error', items: [], error: getErrorMessage(err), needsLogin: isUnauthorized(err) });
-        }
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [tab, attempt]);
-
-  function changeTab(next) {
-    if (next === tab) return;
-    setState(LOADING);
-    setTab(next);
-  }
-
-  function retry() {
-    setState(LOADING);
-    setAttempt((value) => value + 1);
-  }
+  const changeTab = (next) => setTab(next);
+  const retry = () => query.refetch();
 
   return (
     <>

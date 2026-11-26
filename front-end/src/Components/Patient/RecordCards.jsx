@@ -1,13 +1,10 @@
-import { formatDate, getInitials } from '../../utils/format';
+import Avatar from '../ui/Avatar';
+import { formatDate } from '../../utils/format';
 
 function DoctorLine({ doctor, date }) {
   return (
     <div className="cl-pd-rec__head">
-      {doctor.photo_url ? (
-        <img className="cl-pd-avatar" src={doctor.photo_url} alt="" />
-      ) : (
-        <span className="cl-pd-avatar" aria-hidden="true">{getInitials(doctor.full_name)}</span>
-      )}
+      <Avatar src={doctor.photo_url} name={doctor.full_name} />
       <div>
         <h3 className="cl-pd-rec__doctor">{doctor.full_name}</h3>
         <p className="cl-pd-muted">{[doctor.specialty_name, formatDate(date)].filter(Boolean).join(' · ')}</p>

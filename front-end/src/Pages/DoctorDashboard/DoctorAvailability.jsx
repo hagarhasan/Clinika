@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { useDoctorData, errMsg, hhmm, toMin, to12, C, card, pill, btn } from './DoctorDashboard';
 import { updateSchedules, updateDoctor } from '../../api/doctorsApi';
 import AvailabilitySummary from './AvailabilitySummary';
+import TimeOffManager from '../../Components/availability/TimeOffManager';
 
 const DAYS = [
   { idx: 0, short: 'Mon', label: 'Monday', note: 'Full Day Consultation' },
@@ -448,6 +449,8 @@ export default function DoctorAvailability() {
           <AvailabilitySummary activeClinic={activeClinic} stats={stats} duration={safeDuration} />
         </div>
       )}
+
+      {profile?.id && <TimeOffManager doctorId={profile.id} />}
     </div>
   );
 }

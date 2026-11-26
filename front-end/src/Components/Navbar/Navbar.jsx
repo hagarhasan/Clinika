@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import Avatar from "../ui/Avatar";
 import { useToast } from "../../context/ToastContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { listDoctors } from "../../api/doctorsApi";
@@ -441,21 +442,8 @@ const Navbar = () => {
                       aria-expanded={showAccountMenu}
                       aria-label={`User Account Menu${unreadCount > 0 ? `, ${unreadCount} unread notifications` : ""}`}
                     >
-                      {/* أيقونة المستخدم (شخص) بدون أي حروف */}
-                      <svg
-                        width="19"
-                        height="19"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
+                      {/* صورة المستخدم، أو أول حرفين من اسمه لو مفيش صورة */}
+                      <Avatar bare className="profile-avatar-inner" src={user?.avatar_url} name={displayName} />
                       {/* شارة الإشعارات الحقيقية في حال وجود إشعارات غير مقروءة */}
                       {unreadCount > 0 && (
                         <span
@@ -475,19 +463,7 @@ const Navbar = () => {
                         {/* رأس القائمة */}
                         <div className="account-dropdown-header d-flex align-items-center gap-2 p-2 rounded mb-2">
                           <div className="account-dropdown-avatar d-flex align-items-center justify-content-center text-white rounded-circle flex-shrink-0">
-                            <svg
-                              width="18"
-                              height="18"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                              <circle cx="12" cy="7" r="4" />
-                            </svg>
+                            <Avatar bare className="profile-avatar-inner" src={user?.avatar_url} name={displayName} />
                           </div>
                           <div className="account-dropdown-info min-w-0 flex-grow-1">
                             <div className="account-dropdown-name fw-bold text-truncate">

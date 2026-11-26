@@ -1,14 +1,10 @@
 import { useEffect, useState } from 'react';
-import { getInitials } from '../../utils/format';
+import SharedAvatar from '../../Components/ui/Avatar';
 
 // Small pieces shared by the admin pages.
 
 export function Avatar({ name, src }) {
-  return src ? (
-    <img className="cl-pd-avatar" src={src} alt="" />
-  ) : (
-    <span className="cl-pd-avatar" aria-hidden="true">{getInitials(name)}</span>
-  );
+  return <SharedAvatar name={name} src={src} />;
 }
 
 export function Banner({ banner, onClose }) {

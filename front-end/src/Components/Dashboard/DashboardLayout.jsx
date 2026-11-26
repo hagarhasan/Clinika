@@ -1,5 +1,7 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import logoIcon from '../../assets/Logo.svg';
+import Avatar from '../ui/Avatar';
+import { useAuth } from '../../context/AuthContext';
 
 export default function DashboardLayout({
   portalLabel,
@@ -9,14 +11,17 @@ export default function DashboardLayout({
   userSubtitle,
   onLogout,
   badge = 0,
+  badges = {},
+  unread,
   children,
   role = 'patient',
 }) {
-  const notificationPath = role === 'patient'
-    ? '/patient-dashboard/notifications'
-    : role === 'doctor'
-      ? '/doctor-dashboard/manage-appointments'
-      : '/admin-dashboard/messages';
+  const { user: authUser } = useAuth();
+  const avatarSrc = authUser?.avatar_url || '';
+  const avatarName = userName || authUser?.full_name || '';
+  const notificationPath = `/${role}-dashboard/notifications`;
+  const bellCount = unread ?? badge;
+  const countFor = (item) => (item.badge === true ? badge : typeof item.badge === 'string' ? (badges[item.badge] || 0) : 0);
 
   const navLinks = (mobile = false) => navItems.map((item) => (
     <NavLink
@@ -31,9 +36,9 @@ export default function DashboardLayout({
           : <span className="material-symbols-outlined" aria-hidden="true">{item.icon}</span>
       )}
       <span>{item.label}</span>
-      {item.badge && badge > 0 && (
-        <span className="cl-pd-nav__badge" aria-label={`${badge} unread or new items`}>
-          {badge > 99 ? '99+' : badge}
+      {countFor(item) > 0 && (
+        <span className="cl-pd-nav__badge" aria-label={`${countFor(item)} unread or new items`}>
+          {countFor(item) > 99 ? '99+' : countFor(item)}
         </span>
       )}
     </NavLink>
@@ -57,9 +62,7 @@ export default function DashboardLayout({
         <div className="cl-pd-sidebar__back">
           {(userName || userSubtitle) && (
             <div className="cl-pd-sidebar__user">
-              <span className="cl-pd-avatar" aria-hidden="true">
-                {(userName || 'U').split(/\s+/).map((word) => word[0]).join('').slice(0, 2).toUpperCase()}
-              </span>
+              <Avatar src={avatarSrc} name={avatarName} />
               <span className="cl-pd-sidebar__user-text">
                 {userName && <strong>{userName}</strong>}
                 {userSubtitle && <small>{userSubtitle}</small>}
@@ -127,14 +130,12 @@ export default function DashboardLayout({
           <div className="cl-pd-topbar__actions">
             <Link className="cl-pd-topbar__bell" to={notificationPath} aria-label="Notifications">
               <span className="material-symbols-outlined" aria-hidden="true">notifications</span>
-              {badge > 0 && <span className="cl-pd-topbar__dot" aria-label={`${badge} unread notifications`} />}
+              {bellCount > 0 && <span className="cl-pd-topbar__dot" aria-label={`${bellCount} unread notifications`} />}
             </Link>
             {(userName || userSubtitle) && (
               <div className="dropdown">
                 <button className="cl-pd-user dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                  <span className="cl-pd-avatar cl-pd-avatar--sm" aria-hidden="true">
-                    {(userName || 'U').split(/\s+/).map((word) => word[0]).join('').slice(0, 2).toUpperCase()}
-                  </span>
+                  <Avatar size="sm" src={avatarSrc} name={avatarName} />
                   <span className="cl-pd-user__text">
                     {userName && <span className="cl-pd-user__name">{userName}</span>}
                     {userSubtitle && <span className="cl-pd-user__role">{userSubtitle}</span>}

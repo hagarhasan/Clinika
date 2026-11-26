@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useDoctorData, to12, hhmm, initials, C, card, pill, btn, STATUS_UI } from './DoctorDashboard';
+import Avatar from '../../Components/ui/Avatar';
+import { useDoctorData, to12, hhmm, C, card, pill, btn, STATUS_UI } from './DoctorDashboard';
 
 export default function DoctorOverview() {
   const { today, appointments, profile, loading } = useDoctorData();
@@ -56,9 +57,12 @@ export default function DoctorOverview() {
             return (
               <div key={a.id ?? idx} style={{ ...card, padding: '18px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: C.primaryFixed, color: C.primary, display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 14 }}>
-                    {initials(pName) || 'PT'}
-                  </div>
+                  <Avatar
+                    bare
+                    src={a.patient?.avatar_url}
+                    name={pName}
+                    style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: C.primaryFixed, color: C.primary, display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0, objectFit: 'cover' }}
+                  />
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <strong style={{ fontSize: 15, color: C.text }}>{pName}</strong>

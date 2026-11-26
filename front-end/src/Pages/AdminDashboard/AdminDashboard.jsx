@@ -6,6 +6,7 @@ import { getAdminActivity, getAdminStats } from '../../api/adminApi';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useAdminStats } from '../../hooks/useAdmin';
+import { useUnreadCount } from '../../hooks/useNotifications';
 import { queryKeys } from '../../hooks/queryKeys';
 import DashboardLayout from '../../Components/Dashboard/DashboardLayout';
 import { dashboardNavConfig } from '../../Components/Dashboard/navConfig';
@@ -35,6 +36,7 @@ const PAGE_TITLES = [
   ['catalog', 'Specialties & Clinics'],
   ['reports', 'Reports'],
   ['team', 'Admin Team'],
+  ['notifications', 'Notifications'],
 ];
 
 export default function AdminDashboard() {
@@ -45,6 +47,19 @@ function AdminShell() {
   const queryClient = useQueryClient();
   const statsQuery = useAdminStats();
   const stats = statsQuery.data || {};
+  const unread = useUnreadCount().data?.unread ?? 0;
+  // Download every admin page once when the dashboard opens, so tabs open instantly.
+  useEffect(() => {
+    import('./AdminOverview');
+    import('./ManageDoctors');
+    import('./AdminManage');
+    import('./ContactMessages');
+    import('./CatalogManage');
+    import('./Reports');
+    import('./AdminTeam');
+    import('./AdminProfile');
+    import('../Shared/NotificationsPage');
+  }, []);
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { showToast } = useToast();
@@ -104,6 +119,8 @@ function AdminShell() {
         userSubtitle={user?.email || 'Administrator'}
         navItems={dashboardNavConfig.admin.items}
         badge={stats.new_contact_messages || 0}
+        badges={{ unread }}
+        unread={unread}
         onLogout={handleLogout}
       />
     </>

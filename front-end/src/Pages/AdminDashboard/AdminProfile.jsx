@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { getErrorMessage } from '../../api/client';
 import PasswordCard from '../../Components/Patient/PasswordCard';
-import { getInitials } from '../../utils/format';
+import Avatar from '../../Components/ui/Avatar';
 import { useAuth } from '../../context/AuthContext';
 import { useAdminActivity } from '../../hooks/useAdmin';
 import { uploadAvatar } from '../../api/uploadsApi';
@@ -115,11 +115,7 @@ export default function AdminProfile() {
       )}
 
       <section className="cl-pd-card cl-pd-profile-head">
-        {user.avatar_url ? (
-          <img className="cl-pd-avatar cl-pd-avatar--lg" src={user.avatar_url} alt="" />
-        ) : (
-          <span className="cl-pd-avatar cl-pd-avatar--lg" aria-hidden="true">{getInitials(user.full_name)}</span>
-        )}
+        <Avatar size="lg" src={user.avatar_url} name={user.full_name} />
         <div>
           <h2 className="cl-pd-profile-head__name">
             {user.full_name}

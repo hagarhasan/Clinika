@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import PasswordCard from '../../Components/Patient/PasswordCard';
-import { getInitials } from '../../utils/format';
+import CredentialsEditor from '../../Components/profile/CredentialsEditor';
+import Avatar from '../../Components/ui/Avatar';
+import { useAuth } from '../../context/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../hooks/queryKeys';
 import '../PatientDashboard/patient-profile.css';
 import { useDoctorData, errMsg, drName } from './DoctorDashboard';
 import { uploadAvatar } from '../../api/uploadsApi';
@@ -12,6 +16,8 @@ const MAX_AVATAR_MB = 3;
 
 export default function DashDoctProfile() {
   const { user, profile, loading, refresh } = useDoctorData();
+  const { user: authUser, setUserData } = useAuth();
+  const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -61,7 +67,9 @@ export default function DashDoctProfile() {
     setAvatarBusy(true);
     setNotice({ type: '', text: '' });
     try {
-      await uploadAvatar(file);
+      const updatedUser = await uploadAvatar(file);
+      setUserData({ ...authUser, ...updatedUser }); // new photo shows in the top bar, sidebar and navbar
+      queryClient.invalidateQueries({ queryKey: queryKeys.doctors.all });
       await refresh();
       setNotice({ type: 'ok', text: 'Your photo was updated.' });
     } catch (err) {
@@ -128,11 +136,7 @@ export default function DashDoctProfile() {
       )}
 
       <section className="cl-pd-card cl-pd-profile-head">
-        {profile.photo_url ? (
-          <img className="cl-pd-avatar cl-pd-avatar--lg" src={profile.photo_url} alt="" />
-        ) : (
-          <span className="cl-pd-avatar cl-pd-avatar--lg" aria-hidden="true">{getInitials(fullName)}</span>
-        )}
+        <Avatar size="lg" src={profile.photo_url || authUser?.avatar_url} name={fullName} />
         <div>
           <h2 className="cl-pd-profile-head__name">{fullName}</h2>
           <p className="cl-pd-muted">{specialty} - JPG, PNG or WebP, up to {MAX_AVATAR_MB} MB.</p>
@@ -219,6 +223,13 @@ export default function DashDoctProfile() {
           </dl>
         )}
       </section>
+
+      <CredentialsEditor
+        key={(profile.credentials || []).map((c) => c.id ?? c.title).join('|')}
+        doctorId={profile.id}
+        credentials={profile.credentials || []}
+        onSaved={refresh}
+      />
 
       <PasswordCard />
     </>

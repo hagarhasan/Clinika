@@ -16,6 +16,7 @@ export const dashboardNavConfig = {
       { label: 'Manage Appointments', to: '/doctor-dashboard/manage-appointments', icon: 'calendar_month' },
       { label: 'Manage Availability', to: '/doctor-dashboard/manage-availability', icon: 'schedule' },
       { label: 'My Profile', to: '/doctor-dashboard/my-profile', icon: 'person' },
+      { label: 'Notifications', to: '/doctor-dashboard/notifications', icon: 'notifications', badge: true },
     ],
   },
   admin: {
@@ -28,6 +29,7 @@ export const dashboardNavConfig = {
       { label: 'Specialties & Clinics', to: '/admin-dashboard/catalog', icon: 'local_hospital' },
       { label: 'Reports', to: '/admin-dashboard/reports', icon: 'bar_chart' },
       { label: 'Admin Team', to: '/admin-dashboard/team', icon: 'admin_panel_settings' },
+      { label: 'Notifications', to: '/admin-dashboard/notifications', icon: 'notifications', badge: 'unread' },
       { label: 'My Profile', to: '/admin-dashboard/my-profile', icon: 'person' },
     ],
   },

@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import PasswordCard from '../../Components/Patient/PasswordCard';
-import { formatDate, getInitials } from '../../utils/format';
+import { useQueryClient } from '@tanstack/react-query';
+import Avatar from '../../Components/ui/Avatar';
+import { useAuth } from '../../context/AuthContext';
+import { usePatientProfile } from '../../hooks/usePatientStats';
+import { queryKeys } from '../../hooks/queryKeys';
+import { formatDate } from '../../utils/format';
 import { ErrorState, LoadingState } from '../../Components/Patient/StateViews';
-import { fetchProfile, updateProfile } from '../../api/patientsApi';
+import { updateProfile } from '../../api/patientsApi';
 import { uploadAvatar } from '../../api/uploadsApi';
 import { getErrorMessage, isUnauthorized } from '../../api/client';
 import './patient-profile.css';
@@ -25,8 +30,6 @@ const FIELDS = [
   { key: 'allergies', label: 'Allergies', type: 'textarea', wide: true },
   { key: 'chronic_conditions', label: 'Chronic conditions', type: 'textarea', wide: true },
 ];
-
-const LOADING = { status: 'loading', profile: null, error: '', needsLogin: false };
 
 const toForm = (profile) => Object.fromEntries(FIELDS.map(({ key }) => [key, profile[key] ?? '']));
 
@@ -73,35 +76,22 @@ function FieldInput({ field, value, onChange }) {
 }
 
 export default function PatientProfile() {
-  const [state, setState] = useState(LOADING);
-  const [attempt, setAttempt] = useState(0); // bump this number to reload
+  const queryClient = useQueryClient();
+  const { user: authUser, setUserData } = useAuth();
+  const profileQuery = usePatientProfile();
+  const state = {
+    status: profileQuery.isLoading ? 'loading' : profileQuery.isError ? 'error' : 'ready',
+    profile: profileQuery.data,
+    error: profileQuery.isError ? getErrorMessage(profileQuery.error) : '',
+    needsLogin: profileQuery.isError && isUnauthorized(profileQuery.error),
+  };
+  const retry = () => profileQuery.refetch();
   const [form, setForm] = useState(null); // null = viewing, an object = editing
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [notice, setNotice] = useState({ type: '', text: '' });
   const fileInput = useRef(null);
-
-  useEffect(() => {
-    let ignore = false;
-    fetchProfile()
-      .then((profile) => {
-        if (!ignore) setState({ status: 'ready', profile, error: '', needsLogin: false });
-      })
-      .catch((err) => {
-        if (!ignore) {
-          setState({ status: 'error', profile: null, error: getErrorMessage(err), needsLogin: isUnauthorized(err) });
-        }
-      });
-    return () => {
-      ignore = true;
-    };
-  }, [attempt]);
-
-  function retry() {
-    setState(LOADING);
-    setAttempt((value) => value + 1);
-  }
 
   function startEdit() {
     setNotice({ type: '', text: '' });
@@ -121,7 +111,10 @@ export default function PatientProfile() {
     setFormError('');
     try {
       const profile = await updateProfile(toPayload(form));
-      setState((prev) => ({ ...prev, profile }));
+      queryClient.setQueryData(queryKeys.patients.profile, profile);
+      // keep the name shown in the top bar / navbar up to date
+      const names = Object.fromEntries(['first_name', 'last_name', 'full_name', 'phone'].filter((key) => profile?.[key] !== undefined).map((key) => [key, profile[key]]));
+      setUserData({ ...authUser, ...names });
       setForm(null);
       setNotice({ type: 'ok', text: 'Your profile was updated.' });
     } catch (err) {
@@ -146,8 +139,10 @@ export default function PatientProfile() {
     setAvatarBusy(true);
     setNotice({ type: '', text: '' });
     try {
-      const user = await uploadAvatar(file);
-      setState((prev) => ({ ...prev, profile: { ...prev.profile, avatar_url: user.avatar_url } }));
+      const updatedUser = await uploadAvatar(file);
+      queryClient.setQueryData(queryKeys.patients.profile, (prev) => ({ ...prev, avatar_url: updatedUser.avatar_url }));
+      // the new photo appears everywhere (top bar, sidebar, navbar)
+      setUserData({ ...authUser, ...updatedUser });
       setNotice({ type: 'ok', text: 'Your photo was updated.' });
     } catch (err) {
       setNotice({ type: 'error', text: getErrorMessage(err) });
@@ -187,13 +182,7 @@ export default function PatientProfile() {
           )}
 
           <section className="cl-pd-card cl-pd-profile-head">
-            {profile.avatar_url ? (
-              <img className="cl-pd-avatar cl-pd-avatar--lg" src={profile.avatar_url} alt="" />
-            ) : (
-              <span className="cl-pd-avatar cl-pd-avatar--lg" aria-hidden="true">
-                {getInitials(profile.full_name)}
-              </span>
-            )}
+            <Avatar size="lg" src={profile.avatar_url} name={profile.full_name} />
             <div>
               <h2 className="cl-pd-profile-head__name">{profile.full_name}</h2>
               <p className="cl-pd-muted">JPG, PNG or WebP, up to {MAX_AVATAR_MB} MB.</p>

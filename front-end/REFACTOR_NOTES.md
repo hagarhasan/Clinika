@@ -103,3 +103,35 @@ The public pages still contain direct API imports and local fetch state; Navbar 
 - `ErrorBoundary` wraps the provider tree.
 - `utils/format.js` is the shared date/time/name/initials source; old `nameUtils.js` and `dateFormat.js` are deleted.
 - Remaining direct browser calls are restricted to `src/api/client.js`.
+
+## Backend coverage pass
+
+New usage of previously unused backend endpoints:
+
+| Feature | Endpoint(s) | Where |
+|---|---|---|
+| Doctor issues medical records and prescriptions, views a patient's history | `POST/GET /medical-records`, `POST/GET /prescriptions` | `Components/records/PatientRecordsModal.jsx` (button "Records & Rx" on Manage Appointments) |
+| Patient rates a completed visit | `POST /reviews` (+ `has_review` flag from `/appointments`) | `Components/appointments/ReviewModal.jsx`, `Components/Patient/AppointmentCard.jsx` |
+| Patient reschedules a visit | `PATCH /appointments/{id}/reschedule` + `/doctors/{id}/slots` | `Components/appointments/RescheduleModal.jsx` |
+| Doctor edits the video link of online visits | `PATCH /appointments/{id}/meeting-link` | `Components/appointments/MeetingLinkForm.jsx` |
+| Doctor time off | `GET/POST/DELETE /doctors/{id}/time-off` | `Components/availability/TimeOffManager.jsx` (Manage Availability) |
+| Doctor education / certifications | `PUT /doctors/{id}/credentials` | `Components/profile/CredentialsEditor.jsx` (My Profile) |
+| Notifications for doctor and admin (list, read, read-all, delete, unread badge) | `/notifications*` | `Pages/Shared/NotificationsPage.jsx`, nav config, bell in `DashboardLayout` |
+
+Bug fixes:
+
+- Doctor "Reject" / "Cancel" called `PATCH /appointments/{id}/status` with `cancelled`, which the backend rejects (it only accepts `confirmed`, `completed`, `no_show`). They now call `PATCH /appointments/{id}/cancel` with an optional reason.
+- Patient cancellation reason was sent as a raw string and silently dropped by the backend. It is now sent as `{ reason }`.
+- "Complete" and "No-show" are only offered after the visit start time (the backend rejects them earlier).
+- The doctor bell icon linked to Manage Appointments; it now opens Notifications. The notifications list no longer freezes after the first action (it follows the query cache).
+
+Still unused on purpose: `/doctors/{id}/credentials` GET (credentials already arrive with the doctor object), `/patients` and `/patients/{id}` (no screen needs them), `/appointments/{id}` GET, `/medical-records/{id}` PUT (editing records is not in the UI yet), `/uploads/image`.
+
+## Instant dashboard + user avatars
+
+- `hooks/useDashboardPreload.js` + `Pages/PatientDashboard/preload.js`: when the patient dashboard opens it loads the page code and all data once (profile, stats, notifications, both appointment lists, records, prescriptions). The pages then open from the cache with no spinner. The query keys in `preload.js` must match the ones the pages use. Failures never block the dashboard (8s safety timeout).
+- Doctor and admin dashboards download all their page code on entry (their data is already loaded by the shell / admin prefetch).
+- `PatientMedicalRecords` and `PatientProfile` now read from React Query (`usePatientData.js`, `usePatientProfile`) instead of loading on every visit.
+- `Components/ui/Avatar.jsx`: the one avatar component. Shows the photo, falls back to initials if there is no photo or the image fails to load. Initials: first letters of the first two words (single word: its first two letters; "Dr." / "د." titles are ignored).
+- The logged-in user's photo (`user.avatar_url` from `AuthContext`) shows in the dashboard sidebar and top bar (all roles) and in the public navbar. After a photo upload on any profile page, `AuthContext` is updated so it changes everywhere at once.
+- Doctor photos on appointment/record cards and patient photos on the doctor's appointment rows use the same component.
