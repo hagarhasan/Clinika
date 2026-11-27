@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDashboardPreload } from '../../hooks/useDashboardPreload';
 import { LoadingState } from '../../Components/Patient/StateViews';
 import { prefetchPatientDashboard } from './preload';
+import { getLogoutDestination } from '../../utils/logoutNavigation';
 
 
 export default function PatientDashboard() {
@@ -25,13 +26,14 @@ export default function PatientDashboard() {
 
   // Forget the login token, then go to home page with toast feedback
   function handleLogout() {
+    const redirectTo = getLogoutDestination(location);
     logout();
     showToast({
       type: 'info',
       title: 'Logged Out',
       message: 'You have been logged out successfully. Stay safe & healthy!',
     });
-    navigate('/', { replace: true });
+    navigate(redirectTo, { replace: true });
   }
 
   const PAGE_TITLES = {

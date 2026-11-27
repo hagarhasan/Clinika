@@ -1,73 +1,58 @@
 import { Link } from "react-router-dom";
-
-function ShieldIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" />
-      <path d="m9 12 2 2 4-4" />
-    </svg>
-  );
-}
+import { ArrowRight, CheckCircle2, Clock3, HeartPulse, ShieldCheck } from "lucide-react";
 
 export default function HeroSection() {
   return (
-    <section className="home-hero-wrapper">
-      <div className="container">
-        <div className="home-hero">
-          <div className="home-hero-content">
-            <div className="home-badge">
-              <span className="home-badge-dot"></span>
+    <section className="home-hero py-5">
+      <div className="container py-lg-4">
+        <div className="row align-items-center g-5">
+          <div className="col-lg-6 home-rise-in">
+            <span className="home-eyebrow d-inline-flex align-items-center gap-2 mb-3">
+              <ShieldCheck size={16} />
               CARE THAT FITS YOUR LIFE
-            </div>
-
-            <h1>
-              Find the Right Doctor
-              <span>for Your Health</span>
+            </span>
+            <h1 className="mb-4">
+              Your health deserves <span className="text-primary">the right care.</span>
             </h1>
-
-            <p className="home-hero-description">
-              Healthcare should feel accessible, not complicated. Find verified
-              clinic specialists, view real availability, book appointments in
-              seconds, and keep your care organized.
+            <p className="home-lead mb-4">
+              Discover trusted doctors, find a time that works, and make your next
+              healthcare visit feel simple.
             </p>
-
-            <div className="home-hero-buttons">
-              <Link to="/doctors" className="home-primary-button">
-                Find a Doctor
+            <div className="d-flex flex-wrap gap-3">
+              <Link to="/doctors" className="btn btn-primary btn-lg rounded-3 px-4">
+                Find a doctor <ArrowRight size={18} className="ms-2" />
               </Link>
-
-              <Link to="/doctors" className="home-secondary-button">
-                Book Appointment
-              </Link>
+              <a href="#home-search" className="btn btn-outline-primary btn-lg rounded-3 px-4">
+                Explore care
+              </a>
             </div>
-
-            <div className="home-trust-message">
-              <ShieldIcon />
-              <span>
-                A simpler, trusted way to schedule appointments across our
-                certified medical network.
+            <div className="d-flex flex-wrap gap-4 mt-4 pt-2 home-muted small">
+              <span className="d-inline-flex align-items-center gap-2">
+                <CheckCircle2 size={17} className="text-primary" /> Verified specialists
+              </span>
+              <span className="d-inline-flex align-items-center gap-2">
+                <Clock3 size={17} className="text-primary" /> Convenient scheduling
               </span>
             </div>
           </div>
 
-          {/* HERO IMAGE */}
-          <div className="home-hero-image-wrapper">
-            <img
-              src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=900&q=85"
-              alt="Doctor providing healthcare"
-              className="home-hero-image"
-            />
-
-            <div className="home-image-status">
-              <span className="home-status-dot"></span>
-              Built around you
-            </div>
-
-            <div className="home-image-card">
-              <div className="home-image-card-icon">♡</div>
-              <div>
-                <h4>Care, made personal.</h4>
-                <p>Your next chapter of wellness starts here.</p>
+          <div className="col-lg-6 home-fade-in home-delay-1">
+            <div className="home-hero-visual">
+              <img
+                className="home-hero-photo"
+                src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=1100&q=85"
+                alt="Doctor ready to provide care"
+              />
+              <div className="home-floating-card card">
+                <div className="card-body d-flex align-items-center gap-3 p-3">
+                  <span className="home-specialty-icon flex-shrink-0">
+                    <HeartPulse size={23} />
+                  </span>
+                  <div>
+                    <p className="fw-semibold mb-1">Care, made personal.</p>
+                    <p className="small home-muted mb-0">Your next step starts here.</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

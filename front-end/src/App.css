@@ -1,0 +1,31 @@
+@keyframes cl-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cl-main-content > * {
+  animation: cl-page-enter 320ms ease-out both;
+}
+
+.cl-app-layout button:not(:disabled),
+.cl-app-layout .btn {
+  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.cl-app-layout button:not(:disabled):hover,
+.cl-app-layout .btn:hover {
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-main-content > * {
+    animation: none;
+  }
+}

@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import "./Doctors.css";
 import { useAuth } from "../../context/AuthContext";
+import { useToast } from "../../context/ToastContext";
 import DoctorProfileHeader from "../../Components/Doctors/DoctorProfileHeader";
 const formatLocalDate = (date) => {
   const year = date.getFullYear();
@@ -60,7 +61,8 @@ export default function DoctorProfile() {
   useDoctorReviews(id);
   const navigate = useNavigate();
   const location = useLocation();
-  const { role, user } = useAuth();
+  const { role, user, token } = useAuth();
+  const { showToast } = useToast();
 
   // بيانات الدكتور القادمة من صفحة Doctors
   const passedDoctor = location.state?.doctor;
@@ -200,10 +202,14 @@ export default function DoctorProfile() {
     experience: doctor.experience ?? doctor.years_of_experience ?? 0,
 
     degree:
-      doctor.degree ||
-      doctor.title ||
-      doctor.qualification ||
-      "",
+      typeof doctor.degree === "object"
+        ? doctor.degree?.title || doctor.degree?.name || ""
+        : typeof doctor.title === "object"
+        ? doctor.title?.title || doctor.title?.name || ""
+        : doctor.degree ||
+          doctor.title ||
+          doctor.qualification ||
+          "",
 
     image:
       doctor.image ||
@@ -214,13 +220,23 @@ export default function DoctorProfile() {
     gender: doctor.gender || "",
 
     about:
-      doctor.about ||
-      doctor.bio ||
-      "Doctor profile information will be available soon.",
+      typeof doctor.about === "object"
+        ? doctor.about?.description || doctor.about?.bio || doctor.about?.name || ""
+        : typeof doctor.bio === "object"
+        ? doctor.bio?.description || doctor.bio?.bio || doctor.bio?.name || ""
+        : doctor.about ||
+          doctor.bio ||
+          "Doctor profile information will be available soon.",
 
-    languages: doctor.languages || ["English"],
+    languages: Array.isArray(doctor.languages)
+      ? doctor.languages.map((item) => (typeof item === "object" ? item.name || item.title || "" : item)).filter(Boolean)
+      : typeof doctor.languages === "string" && doctor.languages.trim()
+      ? [doctor.languages]
+      : ["English"],
 
-    focusAreas: doctor.focus_areas || doctor.focusAreas || [],
+    focusAreas: Array.isArray(doctor.focus_areas || doctor.focusAreas)
+      ? (doctor.focus_areas || doctor.focusAreas)
+      : [],
 
     education:
       Array.isArray(doctor.credentials) && doctor.credentials.length > 0
@@ -242,11 +258,13 @@ export default function DoctorProfile() {
       : doctor.time || "",
 
     clinicAddress:
-      doctor.clinicAddress ||
-      (typeof doctor.clinic === "object" ? doctor.clinic?.address || doctor.clinic?.city : "") ||
-      doctor.address ||
-      doctor.location ||
-      "",
+      typeof doctor.clinicAddress === "object"
+        ? doctor.clinicAddress?.address || doctor.clinicAddress?.city || ""
+        : doctor.clinicAddress ||
+          (typeof doctor.clinic === "object" ? doctor.clinic?.address || doctor.clinic?.city : "") ||
+          doctor.address ||
+          (typeof doctor.location === "string" ? doctor.location : "") ||
+          "",
 
     verified: doctor.is_verified ?? doctor.verified ?? false,
   };
@@ -254,24 +272,50 @@ export default function DoctorProfile() {
     role === "doctor" && Number(doctor.user_id) === Number(user?.id);
   // Book appointment
   const handleBookAppointment = () => {
+    const bookingPayload = {
+      ...doctor,
+      id: doctor.id,
+      name: doctorData.name,
+      specialty: doctorData.specialty,
+      clinic: doctorData.clinic,
+      clinicId:
+        selectedSlot?.clinic_id ||
+        doctor.clinic_id ||
+        (typeof doctor.clinic === "object" ? doctor.clinic?.id : null),
+      appointmentDate: selectedDate,
+      startTime: selectedTime || doctor.next_available?.start_time || "",
+      fee: doctorData.fee,
+      image: doctorData.image,
+      selectedSlot: selectedSlot || null,
+    };
+
+    if (isOwnDoctorProfile) {
+      showToast({
+        type: "error",
+        title: "Booking Unavailable",
+        message: "Doctors cannot book appointments with themselves.",
+      });
+      return;
+    }
+
+    if (!token || !user) {
+      showToast({
+        type: "info",
+        title: "Sign in required",
+        message: "Please log in first to book an appointment.",
+      });
+      navigate("/login", {
+        state: {
+          from: `/doctors/doctor_profile/${doctor.id}/book-appointment`,
+          forwardState: { doctor: bookingPayload },
+        },
+      });
+      return;
+    }
+
     navigate(`/doctors/doctor_profile/${doctor.id}/book-appointment`, {
       state: {
-        doctor: {
-          ...doctor,
-          id: doctor.id,
-          name: doctorData.name,
-          specialty: doctorData.specialty,
-          clinic: doctorData.clinic,
-          clinicId:
-            selectedSlot?.clinic_id ||
-            doctor.clinic_id ||
-            (typeof doctor.clinic === "object" ? doctor.clinic?.id : null),
-          appointmentDate: selectedDate,
-          startTime: selectedTime || doctor.next_available?.start_time || "",
-          fee: doctorData.fee,
-          image: doctorData.image,
-          selectedSlot: selectedSlot || null,
-        },
+        doctor: bookingPayload,
       },
     });
   };
@@ -338,9 +382,11 @@ export default function DoctorProfile() {
                   </div>
 
                   <strong>
-                    {Array.isArray(doctorData.languages)
+                    {Array.isArray(doctorData.languages) && doctorData.languages.length > 0
                       ? doctorData.languages.join(", ")
-                      : doctorData.languages}
+                      : typeof doctorData.languages === "string" && doctorData.languages.trim()
+                      ? doctorData.languages
+                      : "English"}
                   </strong>
 
                 </div>
@@ -436,8 +482,9 @@ export default function DoctorProfile() {
 
                       <div>
                         <strong>
-                          {doctorData.degree ||
-                            "Medical Degree"}
+                          {typeof doctorData.degree === "object"
+                            ? doctorData.degree?.title || doctorData.degree?.name || "Medical Degree"
+                            : doctorData.degree || "Medical Degree"}
                         </strong>
 
                         <p>Education details</p>

@@ -1,88 +1,50 @@
-import { Search, CalendarDays, CircleCheck } from "lucide-react";
+import { CalendarDays, CheckCircle2, Search } from "lucide-react";
+
+const careSteps = [
+  {
+    number: "01",
+    icon: Search,
+    title: "Find your doctor",
+    description: "Search verified doctors by specialty, name, or location.",
+  },
+  {
+    number: "02",
+    icon: CalendarDays,
+    title: "Choose a time",
+    description: "Browse available appointments and pick what works for you.",
+  },
+  {
+    number: "03",
+    icon: CheckCircle2,
+    title: "Book with confidence",
+    description: "Confirm your visit and keep your care organized in one place.",
+  },
+];
 
 export default function HowItWorksSection() {
   return (
-    <section className="home-how-wrapper">
+    <section className="home-section">
       <div className="container">
-        <div className="home-how-section">
-          <div className="home-how-header">
-            <div>
-              <span className="home-section-eyebrow">
-                A LITTLE SIMPLER. A LOT MORE HUMAN.
-              </span>
-              <h2>Your next appointment, in three steps.</h2>
+        <div className="home-section-heading text-center mx-auto mb-5">
+          <span className="home-eyebrow">A LITTLE SIMPLER. A LOT MORE HUMAN.</span>
+          <h2 className="mt-2 mb-2">Your next appointment in three steps</h2>
+          <p className="mb-0">A straightforward way to find the care and support you deserve.</p>
+        </div>
+        <div className="row row-cols-1 row-cols-md-3 g-4">
+          {careSteps.map(({ number, icon: StepIcon, title, description }, index) => (
+            <div className={`col home-rise-in home-delay-${index + 1}`} key={number}>
+              <article className="home-step-card card h-100">
+                <div className="card-body p-4 p-lg-5">
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <span className="home-step-number"><StepIcon size={20} /></span>
+                    <span className="home-eyebrow">{number}</span>
+                  </div>
+                  <h3 className="h5 fw-bold">{title}</h3>
+                  <p className="home-muted mb-0">{description}</p>
+                </div>
+              </article>
             </div>
-
-            <p className="home-how-header-description">
-              Less time figuring things out. More space to focus on what matters:
-              you and your loved ones' health.
-            </p>
-          </div>
-
-          <div className="home-how-grid">
-            {/* STEP 1 */}
-            <article className="home-how-card">
-              <div className="home-how-card-top">
-                <div className="home-how-icon">
-                  <Search size={19} />
-                </div>
-                <span className="home-how-number">01</span>
-              </div>
-
-              <h3>Find Your Doctor</h3>
-              <p>
-                Filter by specialty, clinic location, accepted insurance,
-                or doctor name to find a certified fit for your needs.
-              </p>
-
-              <div className="home-how-note">
-                <span>START WITH WHAT MATTERS</span>
-                <p>Specialty · Location · Insurance network</p>
-              </div>
-            </article>
-
-            {/* STEP 2 */}
-            <article className="home-how-card">
-              <div className="home-how-card-top">
-                <div className="home-how-icon">
-                  <CalendarDays size={19} />
-                </div>
-                <span className="home-how-number">02</span>
-              </div>
-
-              <h3>Choose Your Appointment</h3>
-              <p>
-                Browse open time slots live on our scheduling board.
-                Pick the day and time that smoothly fits your routine.
-              </p>
-
-              <div className="home-how-note">
-                <span>MAKE ROOM FOR YOUR HEALTH</span>
-                <p>Instant slots · Morning or Evening</p>
-              </div>
-            </article>
-
-            {/* STEP 3 */}
-            <article className="home-how-card">
-              <div className="home-how-card-top">
-                <div className="home-how-icon home-how-icon-active">
-                  <CircleCheck size={19} />
-                </div>
-                <span className="home-how-number">03</span>
-              </div>
-
-              <h3>Confirm Your Booking</h3>
-              <p>
-                Review clinic directions and receive swift digital confirmation
-                along with pre-visit check-in instructions.
-              </p>
-
-              <div className="home-how-note">
-                <span>KNOW WHAT COMES NEXT</span>
-                <p>SMS alerts · Calendar synchronization</p>
-              </div>
-            </article>
-          </div>
+          ))}
         </div>
       </div>
     </section>

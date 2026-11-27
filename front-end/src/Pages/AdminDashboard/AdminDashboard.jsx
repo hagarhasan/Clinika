@@ -18,6 +18,7 @@ import {
 } from './adminQueries';
 import { prefetchServerListPages } from './useServerList';
 import './admin.css';
+import { getLogoutDestination } from '../../utils/logoutNavigation';
 
 const ADMIN_LISTS = [
   ['/admin/doctors', { limit: 8, offset: 0 }],
@@ -63,7 +64,8 @@ function AdminShell() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { showToast } = useToast();
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
   const pageTitle = PAGE_TITLES.find(([key]) => pathname.includes(key))?.[1] ?? 'Overview';
   const userName = user?.full_name
     || [user?.first_name, user?.last_name].filter(Boolean).join(' ')
@@ -97,13 +99,14 @@ function AdminShell() {
   }, [queryClient]);
 
   const handleLogout = () => {
+    const redirectTo = getLogoutDestination(location);
     logout();
     showToast({
       type: 'info',
       title: 'Logged Out',
       message: 'You have been logged out successfully. Stay safe & healthy!',
     });
-    navigate('/', { replace: true });
+    navigate(redirectTo, { replace: true });
   };
 
   return (

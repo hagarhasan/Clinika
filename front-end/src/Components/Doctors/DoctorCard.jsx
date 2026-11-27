@@ -6,7 +6,27 @@ import {
   UserRound,
 } from "lucide-react";
 
-export default function DoctorCard({ doctor, onViewProfile, onBookAppointment }) {
+export default function DoctorCard({ doctor = {}, onViewProfile, onBookAppointment }) {
+  const specialtyText =
+    typeof doctor.specialty === "object"
+      ? doctor.specialty?.name || "Medical Specialist"
+      : doctor.specialty || "Medical Specialist";
+
+  const degreeText =
+    typeof doctor.degree === "object"
+      ? doctor.degree?.name || doctor.degree?.title || ""
+      : doctor.degree || "";
+
+  const clinicText =
+    typeof doctor.clinic === "object"
+      ? doctor.clinic?.name || ""
+      : doctor.clinic || "";
+
+  const locationText =
+    typeof doctor.location === "object"
+      ? doctor.location?.city || doctor.location?.name || ""
+      : doctor.location || "";
+
   return (
     <article className="doctor-card card">
       <div className="doctor-image-wrapper">
@@ -37,7 +57,7 @@ export default function DoctorCard({ doctor, onViewProfile, onBookAppointment })
         <div className="doctor-top-row">
           <div>
             <h3>{doctor.name}</h3>
-            <p className="doctor-specialty">{doctor.specialty}</p>
+            <p className="doctor-specialty">{specialtyText}</p>
           </div>
           <div className="doctor-rating">
             {doctor.rating != null ? (
@@ -53,22 +73,28 @@ export default function DoctorCard({ doctor, onViewProfile, onBookAppointment })
         </div>
 
         <div className="doctor-details">
-          <div>
-            <MapPin size={12} />
-            <span>{doctor.clinic} - {doctor.location}</span>
-          </div>
-          <div>
-            <BadgeCheck size={12} />
-            <span>{doctor.degree}</span>
-          </div>
+          {(clinicText || locationText) && (
+            <div>
+              <MapPin size={12} />
+              <span>{[clinicText, locationText].filter(Boolean).join(" - ")}</span>
+            </div>
+          )}
+          {degreeText && (
+            <div>
+              <BadgeCheck size={12} />
+              <span>{degreeText}</span>
+            </div>
+          )}
           <div>
             <Clock size={12} />
             <span>{doctor.experience} years clinical practice</span>
           </div>
-          <div>
-            <MapPin size={12} />
-            <span>{doctor.location}</span>
-          </div>
+          {locationText && (
+            <div>
+              <MapPin size={12} />
+              <span>{locationText}</span>
+            </div>
+          )}
         </div>
 
         <div className="doctor-booking-info">

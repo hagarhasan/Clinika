@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { getMe } from '../../api/authApi';
 import { getMyDoctorProfile, getDoctorStats, getSlots, getSchedules } from '../../api/doctorsApi';
 import { getTodayAppointments, listAppointments } from '../../api/appointmentsApi';
@@ -10,6 +10,7 @@ import { formatName } from '../../utils/format';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { useUnreadCount } from '../../hooks/useNotifications';
+import { getLogoutDestination } from '../../utils/logoutNavigation';
 
 
 export const TOKEN_KEY = 'token';
@@ -67,6 +68,7 @@ export const useDoctorData = () => useContext(DoctorDataContext);
 
 export default function DoctorDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout: authLogout, token } = useAuth();
   const { showToast } = useToast();
   const unread = useUnreadCount().data?.unread ?? 0;
@@ -82,6 +84,7 @@ export default function DoctorDashboard() {
     user: null, profile: null, stats: null, today: [], appointments: [], slots: [], schedules: [], loading: true, error: '',
   });
   const logout = useCallback(() => {
+    const redirectTo = getLogoutDestination(location);
     authLogout();
     showToast({
       type: 'info',
@@ -89,8 +92,8 @@ export default function DoctorDashboard() {
       message: 'You have been logged out successfully. Stay safe & healthy!',
     });
     setState((p) => ({ ...p, user: null, profile: null, loading: false }));
-    navigate('/', { replace: true });
-  }, [navigate, authLogout, showToast]);
+    navigate(redirectTo, { replace: true });
+  }, [navigate, location, authLogout, showToast]);
 
   const load = useCallback(async (isActive = () => true) => {
     if (!token) {

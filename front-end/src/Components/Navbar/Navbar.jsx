@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { NavLink, Link, useNavigate } from "react-router-dom";
+import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Avatar from "../ui/Avatar";
 import { useToast } from "../../context/ToastContext";
@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { listDoctors } from "../../api/doctorsApi";
 import { useUnreadCount } from "../../hooks/useNotifications";
 import { formatName } from "../../utils/format";
+import { getLogoutDestination } from "../../utils/logoutNavigation";
 import "./Navbar.css";
 
 const DASHBOARD_CONFIG = {
@@ -220,6 +221,7 @@ const DASHBOARD_CONFIG = {
 
 const Navbar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const menuRef = useRef(null);
   const { user, role: authRole, token, logout } = useAuth();
   const { showToast } = useToast();
@@ -286,6 +288,7 @@ const Navbar = () => {
   };
 
   const handleLogout = () => {
+    const redirectTo = getLogoutDestination(location);
     logout();
     setShowLogoutConfirm(false);
     setShowAccountMenu(false);
@@ -298,7 +301,7 @@ const Navbar = () => {
       message: "You have been logged out successfully. Stay safe & healthy!",
     });
 
-    navigate("/", { replace: true });
+    navigate(redirectTo, { replace: true });
   };
 
   const currentRole = role || user?.role || "patient";
@@ -478,7 +481,7 @@ const Navbar = () => {
                         {/* تنبيه الإشعارات الحقيقية داخل القائمة المنسدلة */}
                         {unreadCount > 0 && (
                           <Link
-                            to={currentRole === "patient" ? "/patient-dashboard/notifications" : "#"}
+                            to={`/${currentRole}-dashboard/notifications`}
                             className="d-flex align-items-center justify-content-between p-2 mb-2 rounded text-decoration-none"
                             style={{ backgroundColor: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c" }}
                             onClick={closeMenu}

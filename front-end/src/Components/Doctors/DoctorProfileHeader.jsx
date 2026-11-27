@@ -8,7 +8,27 @@ import {
   UserRound,
 } from "lucide-react";
 
-export default function DoctorProfileHeader({ doctor, isOwnProfile, onBook }) {
+export default function DoctorProfileHeader({ doctor = {}, isOwnProfile, onBook }) {
+  const specialtyText =
+    typeof doctor.specialty === "object"
+      ? doctor.specialty?.name || "Medical Specialist"
+      : doctor.specialty || "Medical Specialist";
+
+  const degreeText =
+    typeof doctor.degree === "object"
+      ? doctor.degree?.title || doctor.degree?.name || ""
+      : doctor.degree || "";
+
+  const clinicName =
+    typeof doctor.clinic === "object"
+      ? doctor.clinic?.name || ""
+      : doctor.clinic || "";
+
+  const locationText =
+    typeof doctor.location === "object"
+      ? doctor.location?.city || doctor.location?.name || ""
+      : doctor.location || (typeof doctor.clinic === "object" ? doctor.clinic?.city : "") || "";
+
   return (
     <div className="profile-header-card">
       <div className="profile-doctor-image">
@@ -31,12 +51,18 @@ export default function DoctorProfileHeader({ doctor, isOwnProfile, onBook }) {
             <span className="profile-verified-badge"><BadgeCheck size={14} />Verified</span>
           )}
         </div>
-        <p className="profile-specialty">{doctor.specialty}</p>
-        <p className="profile-degree">{doctor.degree}</p>
+        <p className="profile-specialty">{specialtyText}</p>
+        {degreeText && <p className="profile-degree">{degreeText}</p>}
         <div className="profile-header-details">
           <span><Star size={14} fill="currentColor" className="profile-star" /><strong>{doctor.rating}</strong> ({doctor.reviews} patient reviews)</span>
           <span><Clock size={14} />{doctor.experience} Years Clinical Practice</span>
-          <span><MapPin size={14} />{doctor.clinic}{doctor.location && `, ${doctor.location}`}</span>
+          {(clinicName || locationText) && (
+            <span>
+              <MapPin size={14} />
+              {clinicName}
+              {locationText && `, ${locationText}`}
+            </span>
+          )}
         </div>
       </div>
       <div className="profile-fee-card">

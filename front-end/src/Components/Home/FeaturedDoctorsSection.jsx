@@ -1,171 +1,148 @@
-import { Link } from "react-router-dom";
-import { Star, ShieldCheck, UserRound } from "lucide-react";
-import { formatName, formatAvailability } from "../../utils/format";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight, Clock3, ShieldCheck, Star, UserRound } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useToast } from "../../context/ToastContext";
+import { formatAvailability, formatName } from "../../utils/format";
 
 export default function FeaturedDoctorsSection({
-  doctors = [],
-  loadingDoctors = false,
-  doctorsError = "",
+  doctorsQuery,
+  featuredDoctors = [],
 }) {
-  const { role, user } = useAuth();
-  const visibleDoctors = role === "doctor"
-    ? doctors.filter((doctor) => Number(doctor.user_id) !== Number(user?.id))
-    : doctors;
+  const navigate = useNavigate();
+  const { user, token } = useAuth();
+  const { showToast } = useToast();
+
+  const handleBookClick = (e, doctor, targetState) => {
+    if (!token || !user) {
+      e.preventDefault();
+      showToast({
+        type: "info",
+        title: "Sign in required",
+        message: "Please log in first to book an appointment.",
+      });
+      navigate("/login", {
+        state: {
+          from: `/doctors/doctor_profile/${doctor.id}/book-appointment`,
+          forwardState: targetState,
+        },
+      });
+    }
+  };
 
   return (
-    <section className="home-doctors-wrapper">
+    <section className="home-section bg-light">
       <div className="container">
-        <div className="home-doctors-section">
-          <div className="home-doctors-header">
-            <div className="home-doctors-heading">
-              <span className="home-section-eyebrow">PEOPLE BEHIND THE CARE</span>
-              <h2>Meet your next care partner.</h2>
-              <p>
-                Get to know a doctor's focus, verified experience, and clinical
-                background before reserving your appointment.
-              </p>
-
-              <div className="home-doctors-trust">
-                <ShieldCheck size={14} />
-                <span>
-                  Verified clinic specialists. Real-time scheduling calendar updated continuously.
-                </span>
-              </div>
-            </div>
-
-            <Link to="/doctors" className="home-view-specialties d-none d-md-inline-flex">
-              View all doctors
-              <span>→</span>
-            </Link>
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-3 mb-4">
+          <div className="home-section-heading">
+            <span className="home-eyebrow">PEOPLE BEHIND THE CARE</span>
+            <h2 className="mt-2 mb-2">Meet our doctors</h2>
+            <p className="mb-0">Get to know trusted practitioners and find the right care partner.</p>
           </div>
+          <Link to="/doctors" className="btn btn-outline-primary rounded-3 align-self-start align-self-md-end">
+            View all doctors <ArrowRight size={16} className="ms-2" />
+          </Link>
+        </div>
 
-          <div className="home-doctors-grid">
-            {loadingDoctors ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <div className="home-doctor-card home-doctor-skeleton-card" key={i}>
-                  <div className="home-doctor-skeleton-image"></div>
-                  <div className="home-doctor-info">
-                    <div className="skeleton-line" style={{ width: "70%", height: "18px", marginBottom: "8px" }}></div>
-                    <div className="skeleton-line" style={{ width: "45%", height: "14px", marginBottom: "8px" }}></div>
-                    <div className="skeleton-line" style={{ width: "55%", height: "12px", marginBottom: "12px" }}></div>
-                    <div className="skeleton-line" style={{ width: "100%", height: "42px", borderRadius: "10px", marginTop: "auto", marginBottom: "14px" }}></div>
-                    <div className="d-flex gap-2">
-                      <div className="skeleton-line flex-grow-1" style={{ height: "38px", borderRadius: "8px" }}></div>
-                      <div className="skeleton-line flex-grow-1" style={{ height: "38px", borderRadius: "8px" }}></div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : doctorsError ? (
-              <p role="alert" className="text-danger">{doctorsError}</p>
-            ) : visibleDoctors.length === 0 ? (
-              <p className="text-muted">No doctors available right now.</p>
-            ) : (
-              visibleDoctors.map((doctor) => {
-                const displayName = formatName(doctor.full_name);
-                const rating = doctor.rating_avg ? Number(doctor.rating_avg).toFixed(1) : "New";
+        {doctorsQuery.isLoading ? (
+          <div className="d-flex justify-content-center py-5">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Loading doctors...</span>
+            </div>
+          </div>
+        ) : doctorsQuery.isError ? (
+          <div className="alert alert-warning" role="alert">
+            {doctorsQuery.error?.message || "Doctors could not be loaded right now."}
+          </div>
+        ) : featuredDoctors.length === 0 ? (
+          <p className="home-muted">No doctors are available right now.</p>
+        ) : (
+          <div className="row align-items-center justify-content-center row-cols-1 row-cols-sm-2 row-cols-xl-4 g-4">
+            {featuredDoctors.map((doctor) => {
+              const displayName = formatName(doctor.full_name);
+              const rating = doctor.rating_avg ? Number(doctor.rating_avg).toFixed(1) : "New";
+              const bookState = {
+                doctor: {
+                  ...doctor,
+                  name: displayName,
+                  specialty: doctor.specialty?.name || "Medical Specialist",
+                  clinic: doctor.clinic?.name || "Clinika Clinic",
+                  clinicId: doctor.next_available?.clinic_id || doctor.clinic?.id,
+                  appointmentDate: doctor.next_available?.appointment_date || "",
+                  startTime: doctor.next_available?.start_time || "",
+                  fee: doctor.consultation_fee ?? 0,
+                  image: doctor.photo_url || "",
+                },
+              };
 
-                return (
-                  <article className="home-doctor-card" key={doctor.id}>
-                    <div className="home-doctor-image-wrapper">
-                      {doctor.photo_url && (
+              return (
+                <div className="col home-rise-in" key={doctor.id}>
+                  <article className="home-doctor-card card h-100">
+                    <div className="position-relative">
+                      {doctor.photo_url ? (
                         <img
+                          className="home-doctor-photo"
                           src={doctor.photo_url}
                           alt={displayName}
-                          className="home-doctor-image"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                            if (e.currentTarget.nextElementSibling) {
-                              e.currentTarget.nextElementSibling.style.display = "flex";
-                            }
+                          onError={(event) => {
+                            event.currentTarget.hidden = true;
+                            event.currentTarget.nextElementSibling?.classList.remove("d-none");
                           }}
                         />
-                      )}
-
-                      <div
-                        className="home-doctor-image-placeholder"
-                        style={{
-                          display: doctor.photo_url ? "none" : "flex",
-                        }}
-                      >
-                        <UserRound size={64} strokeWidth={1.5} />
+                      ) : null}
+                      <div className={`home-doctor-placeholder ${doctor.photo_url ? "d-none" : ""}`}>
+                        <UserRound size={52} />
                       </div>
-
                       {doctor.is_verified && (
-                        <span className="home-verified-badge">
-                          <ShieldCheck size={12} strokeWidth={2.5} />
-                          <span>Verified Doctor</span>
+                        <span className="badge text-bg-light position-absolute top-0 start-0 m-3">
+                          <ShieldCheck size={14} className="text-primary me-1" /> Verified
                         </span>
                       )}
                     </div>
-
-                    <div className="home-doctor-info">
-                      <h3 title={displayName}>{displayName}</h3>
-
-                      <span className="home-doctor-specialty">
+                    <div className="card-body d-flex flex-column p-4">
+                      <h3 className="h5 fw-bold text-truncate mb-1" title={displayName}>
+                        {displayName}
+                      </h3>
+                      <p className="text-primary fw-semibold small mb-2">
                         {doctor.specialty?.name || "Medical Specialist"}
-                      </span>
-
-                      <p className="home-doctor-experience">
-                        {doctor.years_of_experience ?? 0} years clinical practice
                       </p>
-
-                      <div className="home-doctor-rating">
-                        <Star size={14} fill="#f59e0b" color="#f59e0b" />
+                      <p className="home-muted small mb-3">
+                        {doctor.years_of_experience ?? 0} years of clinical practice
+                      </p>
+                      <div className="d-flex align-items-center gap-2 small mb-3">
+                        <Star size={15} fill="currentColor" className="text-warning" />
                         <strong>{rating}</strong>
                         {Number(doctor.reviews_count) > 0 && (
-                          <span>({doctor.reviews_count} patient reviews)</span>
+                          <span className="home-muted">({doctor.reviews_count} reviews)</span>
                         )}
                       </div>
-
-                      <div className="home-doctor-availability">
-                        <span className="home-availability-dot"></span>
-                        <div className="home-availability-text-group">
-                          <span className="home-availability-label">NEXT AVAILABLE</span>
-                          <span className="home-availability-time">
-                            {formatAvailability(doctor.next_available)}
-                          </span>
-                        </div>
+                      <div className="small home-muted mb-3">
+                        <Clock3 size={15} className="text-primary me-2" />
+                        {formatAvailability(doctor.next_available)}
                       </div>
-
-                      <div className="home-doctor-actions">
+                      <div className="d-flex gap-2 mt-auto">
                         <Link
                           to={`/doctors/doctor_profile/${doctor.id}`}
-                          state={{ doctor }}
-                          className="home-doctor-profile-button"
+                          state={{ doctor: bookState.doctor }}
+                          className="btn btn-outline-primary btn-sm flex-grow-1"
                         >
                           Profile
                         </Link>
-
                         <Link
                           to={`/doctors/doctor_profile/${doctor.id}/book-appointment`}
-                          state={{
-                            doctor: {
-                              ...doctor,
-                              id: doctor.id,
-                              name: displayName,
-                              specialty: doctor.specialty?.name || "Medical Specialist",
-                              clinic: doctor.clinic?.name || "Clinika Clinic",
-                              clinicId: doctor.next_available?.clinic_id || doctor.clinic?.id,
-                              appointmentDate: doctor.next_available?.appointment_date || "",
-                              startTime: doctor.next_available?.start_time || "",
-                              fee: doctor.consultation_fee ?? 0,
-                              image: doctor.photo_url || "",
-                            },
-                          }}
-                          className="home-doctor-book-button"
+                          state={bookState}
+                          onClick={(e) => handleBookClick(e, doctor, bookState)}
+                          className="btn btn-primary btn-sm flex-grow-1"
                         >
                           Book
                         </Link>
                       </div>
                     </div>
                   </article>
-                );
-              })
-            )}
+                </div>
+              );
+            })}
           </div>
-        </div>
+        )}
       </div>
     </section>
   );
